@@ -1,123 +1,130 @@
-# Startup Idea 1: Vimcal — The Fastest Calendar, Rebuilt Around Language
+# Startup Idea 1: CleanMyMac → Cleanasaurus — Your Files, Cleaned Up by Conversation
 
-**Reference company:** [Vimcal](https://www.ycombinator.com/companies/vimcal) (YC S18, New York City)
-**YC tagline:** "The world's fastest calendar, beautifully designed for remote teams."
-**Category:** SaaS · Productivity · Scheduling · Calendar
+**Reference company:** [CleanMyMac](https://macpaw.com/cleanmymac) by MacPaw (Kyiv, Ukraine)
+**What it does today:** Mac cleanup, storage tools, duplicate and large-file finder ("My Clutter"), and malware removal powered by MacPaw's Moonlock engine.
+**Our product:** Cleanasaurus, a better version of CleanMyMac rebuilt around plain-English requests, a learned user profile, and validated plans.
+**Team:** Nate Kim, Nate Park, Wesley Chang
+**Mascot:** an 8-bit, arcade-style T-rex in a maid costume, armed with a feather duster
+**Category:** AI · Productivity · Desktop Utilities · Storage & Security
 
 ---
 
 ## Overview
 
-Vimcal is a keyboard-first calendar for people who live in their calendars: founders, recruiters, salespeople, and anyone on a remote team spread across time zones. Its main advantage is speed. You can create events, send availability, and switch time zones in a few keystrokes instead of many clicks.
+Cleanasaurus is a **downloadable desktop app that runs locally** and manages your files through a simple chat interface. You tell it what you want in plain English:
 
-This version keeps that speed and adds an LLM-powered **command bar**. A user types or pastes free-form text, such as "30 min with Priya and Sam next week, mornings Pacific, not Friday" or a raw email thread asking to meet. The system turns it into a **validated** calendar action: an event, a set of proposed slots, or a reschedule. That action is checked against the user's real calendar before it is shown or sent.
+> "My laptop is almost full. Delete duplicate files in Downloads, put my school PDFs into folders by class, and check anything I downloaded this month for malware."
+
+Cleanasaurus turns that request into a **concrete plan**: create these folders, move these files, delete these exact duplicates, quarantine this suspicious installer. It shows the plan before anything changes, then carries it out safely.
+
+Core capabilities:
+- **Plain-English file control:** create, rename, move, and reorganize files and directories.
+- **Duplicate & storage cleanup:** finds byte-identical duplicates (by hash) and large forgotten files, and shows how much space each action frees.
+- **Malware checks:** scans files with real signature engines (ClamAV/YARA) and hash reputation, then explains the results in plain English.
+- **Personalized profile:** learns how *you* like things stored (naming style, folder structure, what you usually download, and where it should go), so it can organize new files automatically.
+- **Human in the loop:** you decide which folders it may touch freely, which need approval, and which it must never touch.
 
 ---
 
-## How Vimcal Satisfies the 8 Criteria
+## How Cleanasaurus Satisfies the 8 Criteria
 
 ### 1. Solves one problem extremely well
-**Problem: turning scheduling intent into a correct calendar action as fast as possible.**
-Vimcal does not try to be a CRM, a task manager, or a meeting recorder. It does one thing: get a meeting from "we should talk" to "on everyone's calendar in the right time zone" with as little friction as possible. Every feature (keyboard shortcuts, availability sharing, time-zone overlays, the NL command bar) serves that goal.
+**Problem: people's computers are full and disorganized, and cleaning them up is so tedious and risky that nobody does it.**
+Downloads folders hold thousands of files, the same PDF exists five times, and "Storage Almost Full" warnings keep coming back. People also download files without knowing whether they're safe. Cleanasaurus does one job: **get your computer clean, organized, and safe, and keep it that way, with one conversation.**
 
 ### 2. You know the target customers or have direct access to them
-The core users are heavy calendar users on distributed teams. As a university student I have direct access to:
-- **Student org leaders and TAs**, who schedule dozens of meetings a week across conflicting class schedules.
-- **Recruiters and alumni** I talk to during internship season, who coordinate across time zones every day.
-- **Startup founders** in the university entrepreneurship network and YC alumni communities, who are Vimcal's original power-user group.
-
-I can interview these people this week, watch them schedule a meeting, and count the clicks.
+The target user is **anyone with storage or organization problems on their computer**, starting with students. We have direct access to:
+- **Friends and classmates at UVA:** MacBooks with 256 GB drives, Downloads folders full of lecture slides and assignment files.
+- **Club members** (music, diabolo, CS organizations) whose work creates large media files.
+- **Family members** who are less technical, are most at risk from malware, and are least able to clean up a computer themselves.
+- **Ourselves:** all three of us have this problem.
 
 ### 3. You are familiar with (or can quickly learn) most of the required infrastructure
 | Component | Technology | Familiarity |
 |---|---|---|
-| Frontend | React / Next.js, keyboard-shortcut handling | Familiar |
-| Calendar data | Google Calendar API, Microsoft Graph API (OAuth 2.0) | Learnable quickly: well-documented REST APIs |
-| Backend | Node.js or Python (FastAPI), PostgreSQL | Familiar |
-| Time zones | `luxon` / `date-fns-tz` / Python `zoneinfo` (IANA tz database) | Familiar |
-| LLM | Claude API with structured (JSON) tool output | Familiar from coursework |
-| Hosting | Vercel (frontend) + Fly.io/Render (API) + managed Postgres | Familiar |
+| Desktop app | Tauri or Electron + React | Learnable quickly (web stack) |
+| File operations | Node/Rust file system APIs, file watchers, OS trash | Familiar |
+| Duplicate detection | SHA-256 hashing, size pre-filtering | Familiar |
+| Malware scanning | ClamAV, YARA rules, hash reputation lookups | Learnable quickly |
+| User profile | Local SQLite store of preferences and past decisions | Familiar |
+| LLM | Claude API with tool use / structured output (optional local model via Ollama) | Familiar |
+| Distribution | Code-signed installers with auto-update | Learnable quickly |
 
 ### 4. Reimagines the problem space to make it significantly better
-Traditional calendars (Google Calendar, Outlook) are **form-driven**: click a slot, fill in fields, open a separate time-zone converter, then copy-paste availability into an email. Vimcal reimagines the calendar as a **command-driven tool**, like Vim for your schedule:
-- **Keyboard-first:** almost every action is a shortcut, so there is no mouse round-trip.
-- **Availability as a first-class object:** you select open slots and paste them as text or a booking link in seconds, already converted to the recipient's time zone.
-- **Language as input:** with the LLM command bar, the input is what you would have said to an assistant, not a form. Pasting an email thread like "Does Tues or Wed afternoon work for you guys? I'm in London" produces correctly converted candidate slots that avoid existing conflicts.
+**Why CleanMyMac falls short:** it already cleans junk, finds duplicates, and removes malware, but only through **fixed categories and buttons**. It can't *organize* your files, can't understand a request like "sort my school files by class," and doesn't learn how you like things stored. Cleanasaurus keeps what CleanMyMac does well and fixes those gaps.
 
-The result is a 5–10x reduction in time-to-scheduled for common meetings.
+Today's options make **you** do the work:
+- **Finder / File Explorer:** manual dragging, one folder at a time.
+- **CleanMyMac / CCleaner:** fixed categories ("system junk"); you can't say *what you want*.
+- **Sparkle (Every):** AI organizing, but cloud-processed, no malware checks, no per-folder permission zones.
+- **Duplicate finders (Gemini 2, dupeGuru):** produce long lists for you to review by hand.
+- **Antivirus (Malwarebytes):** separate app, technical alerts, no organizing.
+- **Hazel:** powerful automation, but you write the rules yourself.
+
+Cleanasaurus combines cleaning, organizing, and security into **one conversation**, and it **learns your habits** so organization happens automatically over time instead of as a yearly cleanup marathon.
 
 ### 5. An LLM/Generative model is core to the solution (not a "chatbot in a sidebar")
-The LLM is **the parser for scheduling intent**, the main way scheduling input enters the product. It is not a chat window next to the calendar. Its job:
-- **Input:** free text or a pasted email thread, plus context (the user's time zone, working hours, known contacts).
-- **Output:** a strict structured object, for example:
+The LLM is the **planner**. It turns a vague human request plus the user's profile into a structured action plan:
 ```json
 {
-  "action": "propose_slots",
-  "title": "Sync with Priya & Sam",
-  "duration_minutes": 30,
-  "attendees": ["priya@acme.com", "sam@acme.com"],
-  "window": {"start": "2026-10-19", "end": "2026-10-23"},
-  "constraints": {
-    "time_of_day": {"start": "09:00", "end": "12:00", "tz": "America/Los_Angeles"},
-    "exclude_weekdays": ["FRI"]
-  }
+  "request": "Clean up Downloads and sort school files by class",
+  "actions": [
+    {"op": "mkdir", "path": "~/Documents/School/CS4501"},
+    {"op": "move", "src": "~/Downloads/LLM_lecture3.pdf", "dst": "~/Documents/School/CS4501/", "reason": "Matches course CS4501; profile: school files go in Documents/School/<course>"},
+    {"op": "delete_duplicate", "path": "~/Downloads/LLM_lecture3 (1).pdf", "keep": "~/Downloads/LLM_lecture3.pdf", "reason": "Identical copy"},
+    {"op": "quarantine", "path": "~/Downloads/free_vst_crack.dmg", "reason": "Scanner flagged; unsigned installer"}
+  ]
 }
 ```
-A deterministic slot-finding engine then uses this object to query free/busy data. Without the LLM, the user goes back to filling out forms, so the product's main interaction depends on it.
+Understanding that "Lecture 3 – Transformers.pdf" belongs to CS 4501, or that a user always keeps receipts in a "Finance" folder, takes language understanding. Without the LLM, Cleanasaurus would be just another file browser.
 
 ### 6. Validation Guardrail: No LLM-generated artifact reaches the user without passing through a validator
-Every LLM output passes through a **layered validator** before it is rendered or sent:
-1. **Schema validation** (Zod / Pydantic): required fields present, correct types, `action` is in an allowed set.
-2. **Semantic/temporal validation:**
-   - All time zones are valid IANA identifiers.
-   - The date window is in the future and `start < end`.
-   - Duration is between 5 and 480 minutes.
-   - Times fall within declared constraints and do not cross DST gaps ambiguously.
-3. **Grounding validation:**
-   - Every attendee email resolves to a known contact or appears literally in the input text. Invented emails are rejected.
-   - Relative dates ("next Tuesday") are recomputed deterministically and must match the LLM's resolved dates.
-4. **Calendar-reality validation:** proposed slots must have no conflicts on the user's free/busy data (and on attendees' data, when visible).
-
-Only an object that passes all four layers is shown as a confirmation card ("Create event?" / "Copy these 3 slots?"). Nothing is written to the calendar or emailed without passing.
+Every plan is checked by a deterministic **validator** before the user sees it, and nothing touches disk until then:
+1. **Target plan check:** the user sets (or approves) a **target plan**: the folder structure and rules they want. Every action must move the file system *toward* that target. Actions that contradict it are rejected.
+2. **Permission zones:** every path must be inside a zone the user allowed. 🟢 *free* (act automatically), 🟡 *ask first*, 🔴 *never touch* (e.g., system folders, `~/Library`, git repos). Any red-zone action fails validation.
+3. **Schema & existence:** the JSON matches the schema, `op` is in the allowed set, source files exist, and destinations are valid with no name collisions.
+4. **Duplicate proof:** a `delete_duplicate` is allowed only if the SHA-256 hashes **actually match**, and the kept copy must still exist afterward.
+5. **Malware ground truth:** the LLM can't call a file safe or dangerous on its own. Quarantine actions must be backed by a ClamAV/YARA/hash-reputation result.
+6. **Dry-run simulation:** the whole plan runs on a virtual copy of the file tree to check that nothing is lost and to calculate the space freed.
+7. **Reversible by design:** deletes go to the trash/quarantine with an undo log, never permanent deletion.
 
 ### 7. Self-Correction Loop: Validation errors automatically feed back into the LLM to retry/correct
-When validation fails, the system builds a **structured error report** and sends it back to the LLM with the original input:
+Validation failures are sent back to the LLM automatically:
 ```
-Your previous output failed validation:
-- constraints.time_of_day.tz = "PST" is not a valid IANA zone (did you mean "America/Los_Angeles"?)
-- attendees[1] = "sam@company.com" does not appear in the input or contacts; known match: "sam@acme.com"
-- Resolved "next Tuesday" as 2026-10-21, but deterministic resolution gives 2026-10-20.
-Return a corrected JSON object.
+Plan failed validation:
+- actions[2] delete_duplicate: hashes differ ("LLM_lecture3 (1).pdf" is a different version). Do not delete; consider renaming.
+- actions[5] move targets ~/Library/Preferences, which is a never-touch zone. Remove this action.
+Return a corrected plan.
 ```
-- Up to **3 automatic retries**, each with the cumulative error list.
-- If the loop still fails, the UI falls back to a **pre-filled manual form** that highlights the uncertain fields, so the user is never shown an unvalidated guess.
-- All failures are logged with their error types to improve the prompt and few-shot examples over time.
+- The LLM re-plans and the new plan is **validated again**, for up to 3 retries.
+- **The LLM asks the user when it's stuck or sees something strange.** If retries run out, or the validator flags something unusual (an unknown file type, a hidden folder with thousands of files, an unsigned executable), Cleanasaurus asks a clear question instead of guessing: *"I found 3 versions of Resume.pdf with different contents. Keep all three, or only the newest?"*
+- The user's answers are **saved to their profile**, so it doesn't ask the same question twice.
 
 ### 8. Deployability: If built, you are able to fully deploy it
-- **Web app:** Next.js on Vercel, deployed through CI/CD on every push to `main`.
-- **API + workers:** containerized FastAPI/Node service on Fly.io or Render, using managed PostgreSQL (Supabase/Neon) for users, tokens, and preferences.
-- **Auth:** Google and Microsoft OAuth, with tokens encrypted at rest.
-- **LLM:** Claude API through server-side calls, so no keys reach the client.
-- **Cost/scale:** each command is a single short LLM call (plus at most 3 retries), so it is cheap enough for a free tier.
-- **Compliance step:** Google OAuth verification for calendar scopes, which is a documented and achievable process.
-
-Every piece is standard, documented infrastructure that a small team can deploy and run end to end.
+- **Desktop app:** Tauri/Electron builds for macOS (and Windows), code-signed and notarized, downloadable from our website with auto-updates.
+- **Local-first:** file scanning, hashing, malware checks, and the user profile all stay on the user's machine. Only file names and metadata (not file contents) are sent to the LLM, or nothing is sent at all when using a local model.
+- **Backend:** a small API service (Fly.io/Render) for accounts and LLM proxying, so no API keys ship in the app.
+- **Malware signatures:** ClamAV's free, regularly updated signature database.
 
 ---
 
 ## Architecture Sketch
 ```
-User input (text / pasted email)
-        │
-        ▼
-   LLM intent parser ──► structured JSON
-        │                     │
-        │                     ▼
-        │           Validator (schema → temporal → grounding → calendar)
-        │                     │
-        │        ┌────── fail ┴ pass ──────┐
-        │        ▼                         ▼
-        └── error report (≤3 retries)   Confirmation card → Calendar API / clipboard
-                 │
-                 └── after 3 fails → pre-filled manual form
+User: "Clean up my Downloads and sort school stuff"
+          │
+          ▼
+Local scan (file tree · hashes · malware scan) + User profile + Target plan
+          │
+          ▼
+   LLM planner ──► structured action plan (JSON)
+          ▲                     │
+          │                     ▼
+ error report (≤3 retries) ◄─ fail ─ Validator (target plan · permission zones · schema ·
+          │                            hash proof · malware ground truth · dry-run)
+          │                     │ pass
+  still failing or strange?     ▼
+          ▼             Plan preview ("frees 18.4 GB") ──► user approves ──► execute (undoable)
+  Ask the user a question                                         │
+          │                                                       ▼
+          └──────────────► answer saved to profile ◄──── learns from decisions
 ```
