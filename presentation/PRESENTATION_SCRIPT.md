@@ -17,13 +17,13 @@
 ## Part 1: Nate Park (front end): Problem & Market
 
 **[Title · 0:00–0:10]**
-Hi, we're Cleanasaurus. Our pitch is simple: you should be able to tell your computer to clean itself, in plain English, and **trust** it to do it safely.
+Hello, our startup is called Cleanasaurus. So the main idea is that you should be able to tell your computer to clean itself, in plain English, and **trust** it to do it safely. 
 
 **[01 The Pain · 0:10–0:55]**
-Picture this: the "Storage Almost Full" pop-up. You open Downloads and there are two thousand files, five copies of the same lecture PDF, and an installer you don't even remember downloading. Cleaning it up by hand takes hours, and one wrong delete can cost you something important, so most people just ignore it. Our target user is **anyone** with storage or organization problems, and we're starting with college students on 256-gigabyte laptops, because that's us and everyone we know.
+Imagine this scenario: the "Storage Almost Full" pop-up. You open Downloads and there are two thousand files, five copies of the same lecture PDF, and an installer you don't even remember downloading. Cleaning it up by hand would take hours, and one wrong delete can cost you something important, so most people just leave this everything there and suffer the consequences of full storage. Our target user is **anyone** with storage or organization problems, and we're starting with college students on laptops, because we know this audience the best.
 
 **[02 The Market · 0:55–1:30]**
-And people already pay to fix this. There are over a **hundred million** active Macs, and MacPaw, the company behind CleanMyMac, reaches over thirty million users. But every tool does one slice. CleanMyMac cleans and scans for malware but can't organize or understand what you want. Sparkle organizes with AI, but has no malware checks and no limits you control. Hazel makes you write rules by hand. Cleanasaurus is the first to do **all four** in one conversation.
+People are already paying to fix this issue. There are over a **hundred million** active Macs, and MacPaw, the company behind CleanMyMac, reaches over thirty million users. But through our research about other companies, we learned that every tool does one slice. CleanMyMac cleans and scans for malware but can't organize or understand what you want. Sparkle organizes with AI, but has no malware checks and no limits you control. Hazel makes you write rules by hand. Cleanasaurus is the first to do **all four** in one conversation.
 
 *Hand-off line (if splitting): "Wesley's going to show you what it actually does."*
 
@@ -32,10 +32,10 @@ And people already pay to fix this. There are over a **hundred million** active 
 ## Part 2: Wesley Chang (front end): MVP & Hypothesis
 
 **[03 What It Does · 1:30–2:00]**
-Cleanasaurus is a local desktop app with a chat interface. You ask for what you want. The LLM writes a concrete plan: every move, delete, and new folder. A validator checks that plan **before** you ever see it. Then you approve it with one click, and everything can be undone. Along the way it scans for malware, and it learns your habits so next time it needs less input.
+Cleanasaurus is a local desktop app with a chat interface. You ask for what you want in plain english. The LLM writes a concrete plan for every move, delete, or new folder. Then there's a validator that checks that plan **before** you ever see it. Then you approve it with one click, and everything can be undone. Along the way it scans for malware, and it learns your habits so next time it needs less input.
 
 **[04 Hypothesis · 2:00–2:25]**
-Here's the one thing our MVP has to prove. (pause) We believe students with cluttered laptops will let an AI clean and reorganize their files, as long as every plan is checked and previewed first. The question is **trust**, not capability. We're right if at least **sixty percent** of testers approve and run a full cleanup plan in their very first session.
+Our hypothesis is that we believe students with cluttered laptops will let an AI clean and reorganize their files, as long as every plan is checked and previewed first. The question with this is **trust**, not capability. Our bar is if at least **sixty percent** of testers approve and run a full cleanup plan in their very first session.
 
 **[05 The MVP · 2:25–3:05]**
 This is our working MVP. The dino **is** the chatbot. You type "free up space and sort my school files by class." It comes back with a plan that already passed the validator: quarantine two files the malware scanner flagged, trash duplicates proven identical by hash, and move lecture PDFs into class folders. You uncheck anything you don't want, approve, and can undo with one click. When it hits something strange, like three different resumes, it **asks** you instead of guessing, and remembers your answer.
@@ -47,13 +47,15 @@ This is our working MVP. The dino **is** the chatbot. You type "free up space an
 ## Part 3: Nate Kim (back end): Safety Loop, Validation & Metrics
 
 **[06 Why These Features · 3:05–3:20]**
-We cut everything that doesn't test trust. In: chat-to-plan, malware scans, permission zones, and undo. Later: Windows and background protection. And the core of trust is this loop: **no plan reaches you** until the validator passes it. Failures go back to the LLM automatically, and if it's still stuck, it asks you.
+With our MVP we wanted to focus on items that tested trust. So right now, we have chat-to-plan, malware scans, permission zones, and undo. We also want to implement Windows support later down the road. And the core of trust is this loop is that **no plan reaches you** until the validator passes it. Failures go back to the LLM automatically, and if it's still stuck, it asks you.
 
 **[07 Validation Plan · 3:20–3:55]**
-To test it, we're recruiting fifteen people through our group chats and clubs: ten friends and classmates, plus five non-CS students or family members, so we aren't only testing on people like us. Week one, we sit with each of them for twenty minutes on their own laptop while they think aloud through three tasks. Week two, we step back: seven days of unsupervised use, with opt-in logs of every plan, approval, retry, question, and undo, then an exit survey.
+To test it, we're recruiting our friends. We want at least ten friends and classmates, plus five non-CS students or family members, so we aren't only testing on people like us.
+
+**optional ngl:***Week one, we sit with each of them for twenty minutes on their own laptop while they think aloud through three tasks. Week two, we step back: seven days of unsupervised use, with opt-in logs of every plan, approval, retry, question, and undo, then an exit survey.
 
 **[08 Success Metrics · 3:55–4:45]**
-And here's how we'll know. (pause) Our primary KPI: at least **sixty percent** of testers approve and run a full plan in their first session. Under forty percent, our hypothesis is wrong. Second, forty percent run another cleanup within a week, which shows it's useful, not just a novelty. Third, fewer than ten percent of actions get undone, which shows the plans are actually right. And for safety, **zero** unsafe actions can reach a user. One, and we stop. (pause) Cleanasaurus: tell your computer to clean itself. Thank you!
+Our primary KPI is that at least **sixty percent** of testers approve and run a full plan in their first session. If we have under forty percent, our hypothesis is wrong. Second, forty percent run another cleanup within a week, which shows it's useful, not just anothe ruseless desktop app. Third, fewer than ten percent of actions get undone, which shows the plans are actually right. And for safety, **zero** unsafe actions can reach a user. One, and we stop. Thank you!
 
 ---
 
