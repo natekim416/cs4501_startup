@@ -9,5 +9,6 @@
 | MVP app (run instructions inside) | [`app/`](app/) |
 | MVP pitch slides (PDF) | [`presentation/Cleanasaurus_MVP_Pitch.pdf`](presentation/Cleanasaurus_MVP_Pitch.pdf) |
 | Presentation script (split by speaker) | [`presentation/PRESENTATION_SCRIPT.md`](presentation/PRESENTATION_SCRIPT.md) |
+| Talking points (bullet version) | [`presentation/PRESENTATION_BULLETS.md`](presentation/PRESENTATION_BULLETS.md) |
 | Selected idea + 8 criteria | [`readme-startupSelected.md`](readme-startupSelected.md) |
 | Other ideas | [`readme-startup2.md`](readme-startup2.md) – [`readme-startup5.md`](readme-startup5.md) |
