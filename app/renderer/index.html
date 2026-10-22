@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'">
+  <title>Cleanasaurus</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header class="hud">
+    <div class="logo"><span id="logo-dino"></span><span class="logo-text">CLEANASAURUS</span></div>
+    <div class="hud-stat">
+      <span class="label">DISK</span>
+      <div class="bar" id="disk-bar"><div class="fill" id="disk-fill"></div></div>
+      <span id="disk-text">--</span>
+    </div>
+    <div class="hud-stat"><span class="label">FREED</span><span id="freed" class="score">0.0 MB</span></div>
+    <div class="hud-stat"><span class="label">MODE</span><span id="mode" class="mode">--</span></div>
+  </header>
+
+  <main class="layout">
+    <section class="chat-panel">
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="chips" id="chips">
+        <button class="chip">Free up space</button>
+        <button class="chip">Sort my school files by class</button>
+        <button class="chip">Organize everything</button>
+        <button class="chip">Scan for malware</button>
+      </div>
+      <form class="composer" id="composer">
+        <span class="prompt">&gt;</span>
+        <input id="input" autocomplete="off" placeholder="Tell the dino what to clean...">
+        <button type="submit" class="btn btn-primary">SEND</button>
+      </form>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <h2>FOLDER</h2>
+        <p id="folder-path" class="path">No folder selected</p>
+        <button id="pick" class="btn">SELECT FOLDER</button>
+        <p id="folder-stats" class="muted"></p>
+      </div>
+
+      <div class="panel">
+        <h2>PERMISSION ZONES</h2>
+        <ul id="zones" class="zones"></ul>
+        <div class="zone-add" id="zone-add" hidden>
+          <span class="muted">This folder:</span>
+          <button class="zone-btn free" data-zone="free">FREE</button>
+          <button class="zone-btn ask" data-zone="ask">ASK</button>
+          <button class="zone-btn never" data-zone="never">NEVER</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>TARGET PLAN</h2>
+        <p class="muted">Organized files may only go here:</p>
+        <p id="target" class="path">Inside the selected folder</p>
+        <button id="pick-target" class="btn">CHANGE</button>
+      </div>
+
+      <div class="panel">
+        <h2>DINO MEMORY</h2>
+        <ul id="memory" class="memory"><li class="muted">Nothing learned yet.</li></ul>
+      </div>
+
+      <div class="panel">
+        <h2>SAFETY LOG</h2>
+        <ul id="log" class="log"><li class="muted">Every plan is checked here before you see it.</li></ul>
+      </div>
+
+      <div class="panel">
+        <h2>CLAUDE API KEY</h2>
+        <form id="key-form" class="key-form">
+          <input id="key" type="password" placeholder="sk-ant-... (blank = demo mode)">
+          <button class="btn" type="submit">SET</button>
+        </form>
+      </div>
+    </aside>
+  </main>
+
+  <script src="sprite.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
