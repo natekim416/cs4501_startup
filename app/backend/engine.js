@@ -40,6 +40,7 @@ class Engine {
       malwareEngine: malware.engine,
       findings: this.findings,
       zone: this.profile.zoneFor(folder),
+      zoneReason: this.profile.zoneInfo(folder).reason,
     };
   }
 
@@ -51,7 +52,7 @@ class Engine {
       return {
         mode: this.mode,
         planId: null,
-        summary: "This folder is in a NEVER zone, so I won't touch anything in it. Change its zone on the right if you want me to clean it.",
+        summary: `This folder is in a NEVER zone (${this.profile.zoneInfo(this.folder).reason}), so I won't touch anything in it.`,
         actions: [],
         questions: [],
         attempts: [],

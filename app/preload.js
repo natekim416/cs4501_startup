@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   init: () => ipcRenderer.invoke('init'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   scan: (folder) => ipcRenderer.invoke('scan', folder),
+  prepareTour: () => ipcRenderer.invoke('prepare-tour'),
   plan: (request) => ipcRenderer.invoke('plan', request),
   answer: (question, choice) => ipcRenderer.invoke('answer', question, choice),
   execute: (planId, ids) => ipcRenderer.invoke('execute', planId, ids),

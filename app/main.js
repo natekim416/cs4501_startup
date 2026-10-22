@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { Engine } = require('./backend/engine');
+const { makeDemoFolder } = require('./scripts/make-demo-folder');
 
 const arg = (name) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -52,6 +53,14 @@ function registerIpc() {
     return res.canceled ? null : res.filePaths[0];
   });
   ipcMain.handle('scan', (_e, folder) => engine.scanFolder(folder));
+  // The guided demo always runs on a fresh practice folder outside the user's real files.
+  ipcMain.handle('prepare-tour', () => {
+    const folder = makeDemoFolder(path.join(os.tmpdir(), 'cleanasaurus-tour', 'Downloads'));
+    engine.profile.setZone(folder, 'free');
+    engine.profile.data.preferences = engine.profile.data.preferences.filter((p) => !p.includes('versions of'));
+    engine.profile.save();
+    return { folder, profile: profileView() };
+  });
   ipcMain.handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('execute', (_e, planId, ids) => ({ ...engine.execute(planId, ids), disk: diskInfo() }));
@@ -88,6 +97,7 @@ app.whenReady().then(() => {
   registerIpc();
   createWindow();
   if (arg('ui-test')) require('./test/ui-smoke')(win, arg('ui-test'));
+  if (arg('tour-test')) require('./test/tour-check')(win, arg('tour-test'));
 });
 
 app.on('window-all-closed', () => app.quit());

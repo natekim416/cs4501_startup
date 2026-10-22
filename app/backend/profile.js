@@ -36,10 +36,15 @@ class Profile {
     fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
   }
 
-  // The most specific matching zone wins. Anything inside a git repo is never touched.
   zoneFor(target) {
+    return this.zoneInfo(target).zone;
+  }
+
+  // The most specific matching zone wins. Anything inside a code project (git repo) is never touched.
+  zoneInfo(target) {
     const resolved = path.resolve(target);
-    if (insideGitRepo(resolved)) return 'never';
+    const repo = gitRepoRoot(resolved);
+    if (repo) return { zone: 'never', reason: `inside the code project ${repo}` };
     let best = null;
     for (const z of this.data.zones) {
       const root = path.resolve(z.path);
@@ -47,7 +52,7 @@ class Profile {
         if (!best || root.length > best.root.length) best = { root, zone: z.zone };
       }
     }
-    return best ? best.zone : 'ask';
+    return best ? { zone: best.zone, reason: `zone set for ${best.root}` } : { zone: 'ask', reason: 'no zone set, so I ask first' };
   }
 
   setZone(zonePath, zone) {
@@ -72,13 +77,16 @@ class Profile {
   }
 }
 
-function insideGitRepo(target) {
-  let dir = target;
-  while (dir !== path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, '.git'))) return true;
-    dir = path.dirname(dir);
+// Returns the repo folder if target is inside a code project. A repo at the home folder
+// or above (e.g. a dotfiles repo in ~) isn't a code project, so it doesn't count.
+function gitRepoRoot(target) {
+  const home = path.resolve(os.homedir());
+  const inHome = target.startsWith(home + path.sep);
+  for (let dir = target; dir !== path.dirname(dir); dir = path.dirname(dir)) {
+    if (inHome && dir === home) return null;
+    if (fs.existsSync(path.join(dir, '.git'))) return dir;
   }
-  return false;
+  return null;
 }
 
 module.exports = { Profile, DEFAULT_PROFILE };

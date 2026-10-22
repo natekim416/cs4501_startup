@@ -12,7 +12,7 @@ No server or backend service is needed. Everything runs on your computer.
 cd app
 npm install
 npm run demo        # creates a messy fake folder at ~/CleanasaurusDemo/Downloads and opens the app on it
-npm start           # opens the app; pick any folder with SELECT FOLDER
+npm start           # opens the app; pick any folder with SELECT FOLDER, or press ▶ DEMO for a guided tour
 npm test            # 16 backend tests, incl. 9 minimal-functionality checks (MIN-1 … MIN-9)
 npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions
 ```

@@ -124,7 +124,7 @@ async function useFolder(folder) {
   let text = `Scanned ${info.fileCount} files (${formatBytes(info.totalBytes)}).`;
   if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} sets of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
   if (info.findings.length) text += `\n${info.findings.length} file(s) look suspicious: ${info.findings.map((f) => f.name).join(', ')}.`;
-  if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone, so I won't touch it.`;
+  if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
   text += '\nWhat should I do?';
   botSay(text);
 }

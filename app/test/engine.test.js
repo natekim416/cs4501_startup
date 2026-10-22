@@ -125,3 +125,22 @@ test('only the newest plan can be approved', async () => {
   assert.ok(fresh.ok, JSON.stringify(fresh.errors));
   assert.ok(fresh.results.every((r) => r.ok));
 });
+
+test('a git repo at the home folder does not make everything NEVER, but real projects stay protected', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cleanasaurus-home-'));
+  const oldHome = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    fs.mkdirSync(path.join(home, '.git'));
+    fs.mkdirSync(path.join(home, 'Downloads'));
+    fs.mkdirSync(path.join(home, 'code', 'myproject', '.git'), { recursive: true });
+    const { Profile } = require('../backend/profile');
+    const profile = new Profile(path.join(home, 'data', 'profile.json'));
+    profile.setZone(path.join(home, 'Downloads'), 'free');
+    assert.strictEqual(profile.zoneFor(path.join(home, 'Downloads')), 'free');
+    assert.strictEqual(profile.zoneFor(path.join(home, 'code', 'myproject', 'src')), 'never');
+    assert.match(profile.zoneInfo(path.join(home, 'code', 'myproject')).reason, /code project/);
+  } finally {
+    process.env.HOME = oldHome;
+  }
+});
