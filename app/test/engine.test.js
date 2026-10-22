@@ -33,7 +33,7 @@ test('demo plan passes validation, asks about resume versions, and can be undone
   assert.ok(plan.attempts.at(-1).ok);
   assert.ok(plan.questions.some((q) => q.text.includes('Resume')));
   assert.ok(plan.bytesFreed > 0);
-  const run = engine.execute(plan.actions.map((a) => a.id));
+  const run = engine.execute(plan.planId, plan.actions.map((a) => a.id));
   assert.ok(run.ok, JSON.stringify(run.errors));
   assert.ok(fs.existsSync(path.join(folder, 'School', 'CS4501', 'CS4501_Lecture3_Transformers.pdf')));
   assert.ok(!fs.existsSync(path.join(folder, 'free_vst_crack.command')));
@@ -99,5 +99,29 @@ test('failed plans are retried with the validator errors, then the user is asked
   assert.strictEqual(plan.attempts.length, 3);
   assert.deepStrictEqual(seen, [0, 1, 1]);
   assert.strictEqual(plan.actions.length, 0);
-  assert.match(plan.questions[0].text, /couldn't make every step safe/);
+  assert.match(plan.questions[0].text, /couldn't make a safe plan/);
+  assert.deepStrictEqual(plan.questions[0].options, ['OK']);
+});
+
+test('a NEVER-zone folder gets a clear refusal instead of three failed tries', async () => {
+  const { folder, engine } = setup();
+  engine.scanFolder(folder);
+  engine.profile.setZone(folder, 'never');
+  const plan = await engine.plan('Free up space');
+  assert.strictEqual(plan.attempts.length, 0);
+  assert.strictEqual(plan.actions.length, 0);
+  assert.match(plan.summary, /NEVER zone/);
+});
+
+test('only the newest plan can be approved', async () => {
+  const { folder, engine } = setup();
+  engine.scanFolder(folder);
+  const first = await engine.plan('Free up space');
+  const second = await engine.plan('Sort my school files by class');
+  const stale = engine.execute(first.planId, first.actions.map((a) => a.id));
+  assert.strictEqual(stale.ok, false);
+  assert.match(stale.errors[0], /out of date/);
+  const fresh = engine.execute(second.planId, second.actions.map((a) => a.id));
+  assert.ok(fresh.ok, JSON.stringify(fresh.errors));
+  assert.ok(fresh.results.every((r) => r.ok));
 });

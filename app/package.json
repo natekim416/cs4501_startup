@@ -8,7 +8,8 @@
     "start": "electron .",
     "demo-files": "node scripts/make-demo-folder.js",
     "demo": "node scripts/make-demo-folder.js && electron . --demo-folder=$HOME/CleanasaurusDemo/Downloads",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:ui": "node scripts/ui-test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

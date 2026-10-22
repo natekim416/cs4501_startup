@@ -21,7 +21,7 @@ function createWindow() {
     minHeight: 720,
     backgroundColor: '#1B1A2E',
     title: 'Cleanasaurus',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
@@ -54,7 +54,7 @@ function registerIpc() {
   ipcMain.handle('scan', (_e, folder) => engine.scanFolder(folder));
   ipcMain.handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
-  ipcMain.handle('execute', (_e, ids) => ({ ...engine.execute(ids), disk: diskInfo() }));
+  ipcMain.handle('execute', (_e, planId, ids) => ({ ...engine.execute(planId, ids), disk: diskInfo() }));
   ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
   ipcMain.handle('set-zone', (_e, zonePath, zone) => {
     engine.profile.setZone(zonePath, zone);
@@ -87,6 +87,7 @@ app.whenReady().then(() => {
   if (arg('demo-folder')) engine.profile.setZone(arg('demo-folder'), 'free');
   registerIpc();
   createWindow();
+  if (arg('ui-test')) require('./test/ui-smoke')(win, arg('ui-test'));
 });
 
 app.on('window-all-closed', () => app.quit());

@@ -1,7 +1,7 @@
 // UI logic. Talks to the backend only through window.api (see preload.js).
 const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
-const state = { folder: null, freed: 0, home: '' };
+const state = { folder: null, freed: 0, home: '', currentCard: null };
 
 const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE' };
 
@@ -51,7 +51,8 @@ function typewrite(node, text) {
   const tick = () => {
     span.textContent = text.slice(0, (i += 3));
     scrollDown();
-    if (i < text.length) requestAnimationFrame(tick);
+    // setTimeout instead of requestAnimationFrame so text still finishes while the window is in the background.
+    if (i < text.length) setTimeout(tick, 16);
   };
   tick();
 }
@@ -130,7 +131,10 @@ async function useFolder(folder) {
 
 // ---------- Plans ----------
 
+const isBusy = () => document.body.classList.contains('busy');
+
 async function sendRequest(text) {
+  if (isBusy()) return;
   if (!state.folder) {
     botSay('Pick a folder first with SELECT FOLDER on the right.');
     return;
@@ -148,9 +152,21 @@ async function sendRequest(text) {
   }
 }
 
+// Older plan cards can't be approved once a newer plan exists or the folder settings change.
+function retirePlans() {
+  document.querySelectorAll('.card').forEach((card) => {
+    card.classList.add('stale');
+    card.querySelectorAll('button, input').forEach((b) => (b.disabled = true));
+    const badge = card.querySelector('.badge');
+    if (badge) badge.textContent = 'OUT OF DATE';
+  });
+  state.currentCard = null;
+}
+
 function showPlan(result) {
   setMode(result.mode);
-  const lastTry = result.attempts[result.attempts.length - 1];
+  retirePlans();
+  const lastTry = result.attempts[result.attempts.length - 1] || { attempt: 0 };
   if (result.summary) botSay(result.summary);
 
   if (result.actions.length) {
@@ -182,8 +198,9 @@ function showPlan(result) {
       list,
       el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Everything can be undone.')),
     );
-    approve.addEventListener('click', () => runPlan(list, approve));
+    approve.addEventListener('click', () => runPlan(result.planId, list, approve));
     attach(card);
+    state.currentCard = card;
   }
 
   for (const w of result.warnings) log(w, 'fail');
@@ -198,10 +215,18 @@ function askQuestion(q) {
       el('button', {
         class: 'btn btn-pink',
         onclick: async () => {
+          if (isBusy()) return;
           options.querySelectorAll('button').forEach((b) => (b.disabled = true));
           userSay(choice);
-          if (choice === 'Cancel') return botSay('Okay, nothing changed.');
-          if (choice === 'Run only the safe part') return botSay('The safe part is in the plan above. Approve it whenever you are ready.');
+          if (choice === 'Cancel' || choice === 'OK') {
+            retirePlans();
+            return botSay('Okay, nothing changed.');
+          }
+          if (choice === 'Run only the safe part') {
+            if (!state.currentCard) return botSay('That plan is out of date. Ask me again for a fresh one.');
+            state.currentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return botSay('Here it is. Press APPROVE on the plan to run it.');
+          }
           document.body.classList.add('busy');
           try {
             const result = await api.answer(q.text, choice);
@@ -218,12 +243,21 @@ function askQuestion(q) {
   attach(box);
 }
 
-async function runPlan(list, approve) {
+async function runPlan(planId, list, approve) {
   const ids = [...list.querySelectorAll('input:checked')].map((i) => i.dataset.id);
   if (!ids.length) return botSay('Nothing is checked, so there is nothing to do.');
+  if (isBusy()) return;
   approve.disabled = true;
   list.querySelectorAll('input').forEach((i) => (i.disabled = true));
-  const res = await api.execute(ids);
+  let res;
+  try {
+    res = await api.execute(planId, ids);
+  } catch (err) {
+    approve.disabled = false;
+    list.querySelectorAll('input').forEach((i) => (i.disabled = false));
+    return botSay(`I couldn't run that: ${err.message}`);
+  }
+  state.currentCard = null;
   if (!res.ok) {
     log('Approved subset failed re-check', 'fail');
     return botSay(`I stopped before touching anything, because your selection isn't safe on its own:\n- ${res.errors.join('\n- ')}`);
@@ -251,7 +285,7 @@ async function runPlan(list, approve) {
 
 api.onAttempt((a) => {
   if (a.ok) log(`TRY ${a.attempt}: PASS`, 'pass');
-  else log(`TRY ${a.attempt}: FAIL (${a.errors.length} errors) → sent back to the LLM`, 'fail');
+  else log(`TRY ${a.attempt}: FAIL (${a.errors.length} errors) → sent back. First: ${a.errors[0]}`, 'fail');
 });
 
 $('#composer').addEventListener('submit', (e) => {
@@ -276,8 +310,11 @@ $('#pick-target').addEventListener('click', async () => {
 
 document.querySelectorAll('.zone-btn').forEach((b) =>
   b.addEventListener('click', async () => {
+    if (!state.folder || isBusy()) return;
+    document.body.classList.add('busy');
+    retirePlans();
     renderProfile(await api.setZone(state.folder, b.dataset.zone));
-    useFolder(state.folder);
+    await useFolder(state.folder);
   }),
 );
 

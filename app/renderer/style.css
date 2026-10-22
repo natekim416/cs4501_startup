@@ -173,3 +173,5 @@ button { font: inherit; cursor: pointer; }
 .key-form input { flex: 1; min-width: 0; font: inherit; font-size: 18px; background: var(--ink-2); color: var(--paper); border: 3px solid var(--ink-3); padding: 6px; }
 
 body.busy .composer input { border-color: var(--gold); }
+
+.card.stale { opacity: 0.45; box-shadow: none; }

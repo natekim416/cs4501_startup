@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   scan: (folder) => ipcRenderer.invoke('scan', folder),
   plan: (request) => ipcRenderer.invoke('plan', request),
   answer: (question, choice) => ipcRenderer.invoke('answer', question, choice),
-  execute: (ids) => ipcRenderer.invoke('execute', ids),
+  execute: (planId, ids) => ipcRenderer.invoke('execute', planId, ids),
   undo: () => ipcRenderer.invoke('undo'),
   setZone: (zonePath, zone) => ipcRenderer.invoke('set-zone', zonePath, zone),
   setTarget: (destRoot) => ipcRenderer.invoke('set-target', destRoot),

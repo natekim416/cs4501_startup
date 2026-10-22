@@ -13,7 +13,8 @@ cd app
 npm install
 npm run demo        # creates a messy fake folder at ~/CleanasaurusDemo/Downloads and opens the app on it
 npm start           # opens the app; pick any folder with SELECT FOLDER
-npm test            # backend tests (scanner, malware checks, validator, retry loop, undo)
+npm test            # 16 backend tests, incl. 9 minimal-functionality checks (MIN-1 … MIN-9)
+npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions
 ```
 
 **Claude vs. demo mode.** With `ANTHROPIC_API_KEY` set (or a key pasted in the app's side panel), plans come from Claude (`claude-opus-5-5`, structured JSON output). Without a key, the app runs in **DEMO MODE** with an offline rule-based planner, so it still works in class with no internet. The validator, malware checks, zones, and undo are the same in both modes.
