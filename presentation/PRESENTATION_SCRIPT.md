@@ -6,15 +6,15 @@
 
 | Part | Speaker (owner) | Slides | Time |
 |---|---|---|---|
-| 1. Problem & Market | **Wesley Chang** (front end) | Title, 01 Pain, 02 Market | 0:00–1:30 |
-| 2. MVP & Hypothesis | **Nate Park** (front end) | 03 What it does, 04 Hypothesis, 05 MVP demo | 1:30–3:05 |
+| 1. Problem & Market | **Nate Park** (front end) | Title, 01 Pain, 02 Market | 0:00–1:30 |
+| 2. MVP & Hypothesis | **Wesley Chang** (front end) | 03 What it does, 04 Hypothesis, 05 MVP demo | 1:30–3:05 |
 | 3. Safety & Validation | **Nate Kim** (back end) | 06 Safety loop, 07 Validation plan, 08 Metrics | 3:05–4:45 |
 
 `(pause)` = stop for one beat. **Bold** = hit this word.
 
 ---
 
-## Part 1: Wesley Chang (front end): Problem & Market
+## Part 1: Nate Park (front end): Problem & Market
 
 **[Title · 0:00–0:10]**
 Hi, we're Cleanasaurus. Our pitch is simple: you should be able to tell your computer to clean itself, in plain English, and **trust** it to do it safely.
@@ -25,11 +25,11 @@ Picture this: the "Storage Almost Full" pop-up. You open Downloads and there are
 **[02 The Market · 0:55–1:30]**
 And people already pay to fix this. There are over a **hundred million** active Macs, and MacPaw, the company behind CleanMyMac, reaches over thirty million users. But every tool does one slice. CleanMyMac cleans and scans for malware but can't organize or understand what you want. Sparkle organizes with AI, but has no malware checks and no limits you control. Hazel makes you write rules by hand. Cleanasaurus is the first to do **all four** in one conversation.
 
-*Hand-off line (if splitting): "Nate's going to show you what it actually does."*
+*Hand-off line (if splitting): "Wesley's going to show you what it actually does."*
 
 ---
 
-## Part 2: Nate Park (front end): MVP & Hypothesis
+## Part 2: Wesley Chang (front end): MVP & Hypothesis
 
 **[03 What It Does · 1:30–2:00]**
 Cleanasaurus is a local desktop app with a chat interface. You ask for what you want. The LLM writes a concrete plan: every move, delete, and new folder. A validator checks that plan **before** you ever see it. Then you approve it with one click, and everything can be undone. Along the way it scans for malware, and it learns your habits so next time it needs less input.
@@ -63,15 +63,15 @@ Whoever is presenting answers. If the room allows teammates to help, the owner j
 
 | Question | Owner | Answer (≤40 words) |
 |---|---|---|
-| Why does this need an LLM? | Nate Park | Turning "sort my school stuff by class" into specific file moves needs language understanding. Fixed rules can't do it, which is why Hazel makes you write rules yourself. |
+| Why does this need an LLM? | Wesley | Turning "sort my school stuff by class" into specific file moves needs language understanding. Fixed rules can't do it, which is why Hazel makes you write rules yourself. |
 | What if it deletes something important? | Nate Kim | It can only remove files proven byte-identical by SHA-256 to a copy that survives. Removed files go to the Dino Bin, every run can be undone, and NEVER zones are blocked by the validator. |
 | How does the self-correction loop work? | Nate Kim | Validator errors are sent back to the LLM word-for-word, like "this destination is a NEVER zone." It retries up to three times; if it still fails, it keeps only the safe actions and asks the user. |
 | Can the AI call something malware wrongly? | Nate Kim | No. Only the scanners (ClamAV, signatures, file-type and signing checks) can flag a file. The validator rejects any quarantine the scanner didn't flag. |
 | Privacy? | Nate Kim | Everything runs locally. Only file names and metadata go to Claude, never file contents, and demo mode works fully offline. |
-| Why not just CleanMyMac? | Wesley | It can't organize files, and you can't tell it what you want in plain English. We combine cleaning, organizing, and malware checks in one conversation. |
-| Testing on friends is biased. | Wesley | That's why a third of testers are non-CS students or family, and we measure what people *do* (logs), not just what they say. |
-| How do you make money? | Wesley | Freemium: cleanup is free; automatic organizing and ongoing protection are paid, like CleanMyMac. |
-| Can you actually ship it? | Nate Park | It already runs. It's an Electron app, so it packages as a signed macOS installer with auto-updates. No server needed. |
+| Why not just CleanMyMac? | Nate Park | It can't organize files, and you can't tell it what you want in plain English. We combine cleaning, organizing, and malware checks in one conversation. |
+| Testing on friends is biased. | Nate Park | That's why a third of testers are non-CS students or family, and we measure what people *do* (logs), not just what they say. |
+| How do you make money? | Nate Park | Freemium: cleanup is free; automatic organizing and ongoing protection are paid, like CleanMyMac. |
+| Can you actually ship it? | Wesley | It already runs. It's an Electron app, so it packages as a signed macOS installer with auto-updates. No server needed. |
 
 ## Key numbers to memorize
 - **≥60%** approve a full plan in session 1 (fail **<40%**)
