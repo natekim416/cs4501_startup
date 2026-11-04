@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE' };
 
 function formatBytes(n) {
   if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
@@ -306,7 +306,12 @@ async function runPlan(planId, list, approve) {
   setDisk(res.disk);
   log(`Ran ${res.results.length - failed.length} actions`, 'pass');
   const undo = el('button', { class: 'btn' }, '↶ UNDO');
-  const body = botSay(`Done! ${res.results.length - failed.length} actions complete, ${formatBytes(res.bytesFreed)} freed.${failed.length ? `\n${failed.length} could not run.` : ''}\nRemoved files are in the Dino Bin, so nothing is gone for good.`);
+  const body = botSay(
+    `Done! ${res.results.length - failed.length} actions complete. ${formatBytes(res.bytesFreed)} freed on disk.` +
+      (res.freedNote ? `\n${res.freedNote}` : '') +
+      (failed.length ? `\n${failed.length} could not run.` : '') +
+      `\nRemoved files are in the Dino Bin. Deleted build folders can be rebuilt with the command I saved.`,
+  );
   body.append(el('div', { class: 'undo-row' }, undo));
   undo.addEventListener('click', async () => {
     undo.disabled = true;
@@ -315,7 +320,8 @@ async function runPlan(planId, list, approve) {
     $('#freed').textContent = formatBytes(state.freed);
     setDisk(r.disk);
     log(`Undid ${r.undone} steps`, 'info');
-    botSay(`Undone. ${r.undone} steps reversed.`);
+    const rebuild = (r.needsRebuild || []).map((x) => `- ${x.cwd}: ${x.command}`).join('\n');
+    botSay(`Undone. ${r.undone} steps reversed.${rebuild ? `\nThese build folders were deleted for real. Rebuild them with:\n${rebuild}` : ''}`);
   });
 }
 

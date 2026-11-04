@@ -38,14 +38,15 @@ class Profile {
     fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
   }
 
-  zoneFor(target) {
-    return this.zoneInfo(target).zone;
+  zoneFor(target, opts) {
+    return this.zoneInfo(target, opts).zone;
   }
 
-  // The most specific matching zone wins. Anything inside a code project (git repo) is never touched.
-  zoneInfo(target) {
+  // The most specific matching zone wins. Anything inside a code project (git repo) is never touched,
+  // except that the rebuild proof may check a project's build folders (ignoreRepos).
+  zoneInfo(target, { ignoreRepos = false } = {}) {
     const resolved = path.resolve(target);
-    const repo = gitRepoRoot(resolved);
+    const repo = !ignoreRepos && gitRepoRoot(resolved);
     if (repo) return { zone: 'never', reason: `inside the code project ${repo}` };
     let best = null;
     for (const z of this.data.zones) {

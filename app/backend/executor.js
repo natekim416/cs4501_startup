@@ -1,5 +1,6 @@
-// Carries out an approved plan. Nothing is permanently deleted: removed files go to the
-// Dino Bin and suspicious files go to quarantine, and every step is logged so it can be undone.
+// Carries out an approved plan. Personal files are never permanently deleted: removed files go to the
+// Dino Bin and suspicious files go to quarantine. Rebuildable folders are really deleted (that's what
+// frees space), and their rebuild recipe is logged so undo can tell the user how to get them back.
 const fs = require('fs');
 const path = require('path');
 
@@ -59,16 +60,27 @@ class Executor {
       if (a.op === 'quarantine') stripExecute(to);
       return { type: 'move', from: a.path, to };
     }
+    if (a.op === 'delete_rebuildable') {
+      if (!a.recipe) throw new Error(`No rebuild recipe for ${a.path}; refusing to delete it.`);
+      fs.rmSync(a.path, { recursive: true });
+      return { type: 'deleted', path: a.path, recipe: a.recipe };
+    }
     throw new Error(`Unknown op ${a.op}`);
   }
 
   // Reverses the most recent batch, newest step first.
   undoLast() {
     const batch = this.history.pop();
-    if (!batch) return { undone: 0 };
+    if (!batch) return { undone: 0, needsRebuild: [] };
     let undone = 0;
+    const needsRebuild = [];
     for (const step of [...batch.steps].reverse()) {
       try {
+        if (step.type === 'deleted') {
+          // Deleted for real: it comes back by rebuilding, not by moving files.
+          needsRebuild.push({ path: step.path, ...step.recipe });
+          continue;
+        }
         if (step.type === 'move') {
           fs.mkdirSync(path.dirname(step.from), { recursive: true });
           fs.renameSync(step.to, step.from);
@@ -81,7 +93,7 @@ class Executor {
       }
     }
     this.saveLog();
-    return { undone };
+    return { undone, needsRebuild };
   }
 }
 

@@ -30,7 +30,9 @@ async function planAndRun(engine, request) {
 test('MIN-1 free up space: removes exact duplicates and keeps one copy of each', async () => {
   const { folder, engine } = setup();
   const { run } = await planAndRun(engine, 'Free up space');
-  assert.ok(run.bytesFreed > 30 * 1024 * 1024);
+  // US-12: duplicates go to the Dino Bin, so they show as an estimate, not as space freed on disk.
+  assert.ok(run.estimatedFreed > 30 * 1024 * 1024);
+  assert.ok(run.binnedBytes > 30 * 1024 * 1024);
   assert.ok(fs.existsSync(path.join(folder, 'SummerVideo.mp4')));
   assert.ok(!fs.existsSync(path.join(folder, 'SummerVideo (1).mp4')));
   assert.ok(fs.existsSync(path.join(folder, 'CS4501_Lecture3_Transformers.pdf')));

@@ -23,9 +23,12 @@ test('US-11 a rebuild-proof failure names which condition failed and the project
   fs.rmSync(path.join(project, 'package.json'));
   const res = validate(del(path.join(project, 'node_modules')), ctxFor(root));
   assert.strictEqual(res.ok, false);
-  assert.strictEqual(res.errors[0].condition, 'recipe');
-  assert.match(res.errors[0].message, /no lockfile/i);
-  assert.match(res.errors[0].message, /hoohacks-2026/);
+  // Deleting package.json also leaves the repo with uncommitted changes, so expect both reasons.
+  const recipe = res.errors.find((e) => e.condition === 'recipe');
+  assert.ok(recipe, JSON.stringify(res.errors));
+  assert.match(recipe.message, /no lockfile/i);
+  assert.match(recipe.message, /hoohacks-2026/);
+  assert.ok(res.errors.some((e) => e.condition === 'clean_worktree'));
 });
 
 test('US-11 each failing condition gets its own plain-English reason', () => {

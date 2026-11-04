@@ -45,12 +45,13 @@ const STEPS = [
     const card = await __t.waitFor(() => __t.liveCards()[0], 'plan card');
     if (!/PASSED CHECKS/.test(card.textContent)) throw new Error('no PASSED CHECKS badge');
     return card.querySelectorAll('.action').length + ' actions';`],
-  ['APPROVE runs the plan and updates FREED', `
+  ['APPROVE runs the plan, and FREED is honest about the Dino Bin (US-12)', `
     __t.liveCards()[0].querySelector('.btn-primary').click();
     await __t.waitFor(() => /Done! \\d+ actions complete/.test(__t.botText()), 'Done message');
-    const freed = document.querySelector('#freed').textContent;
-    if (freed === '0.0 MB' || freed === '0 B') throw new Error('FREED did not change: ' + freed);
-    return 'freed ' + freed;`],
+    // The demo folder only has duplicates. They go to the Dino Bin on the same disk, so the
+    // measured change is ~0, and the dino must say the space frees up when the bin is emptied.
+    await __t.waitFor(() => /frees up when you empty it/.test(__t.botText()), 'Dino Bin note');
+    return 'freed ' + document.querySelector('#freed').textContent + ', bin noted';`],
   ['UNDO reverses it', `
     __t.button('↶ UNDO').click();
     await __t.waitFor(() => /Undone\\. \\d+ steps reversed/.test(__t.botText()), 'Undone message');
