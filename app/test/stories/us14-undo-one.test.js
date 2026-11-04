@@ -28,7 +28,7 @@ test('US-14 undoing one action leaves every other action done', TODO, () => {
   assert.ok(fs.existsSync(path.join(dest, path.basename(b))));
 });
 
-test('US-14 "Undo all" still reverses the whole run', TODO, () => {
+test('US-14 "Undo all" still reverses the whole run (guard: already works, must keep working)', () => {
   const { ex, a, b } = twoMoves();
   ex.undoLast();
   assert.ok(fs.existsSync(a) && fs.existsSync(b));

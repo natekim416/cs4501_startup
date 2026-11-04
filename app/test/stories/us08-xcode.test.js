@@ -34,4 +34,6 @@ test('US-08 Xcode Archives and the rest of ~/Library stay NEVER', TODO, () => {
   const archives = path.join(home, 'Library', 'Developer', 'Xcode', 'Archives', '2026-01-01');
   const res = validate({ actions: [{ id: 'a', op: 'delete_rebuildable', path: archives, dest: '', keep: '', reason: 'x' }] }, { scan: { root: home, files: [], dirs: [] }, findings: [], profile });
   assert.strictEqual(res.ok, false);
+  // It must be refused *because* it's an Archive, not just because the type is unknown.
+  assert.match(res.errors.map((e) => e.message).join(' '), /Xcode Archives.*crash reports/);
 });

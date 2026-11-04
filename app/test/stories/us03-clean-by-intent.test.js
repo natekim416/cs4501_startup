@@ -27,7 +27,9 @@ test('US-03 an ambiguous request asks a question with options instead of guessin
   const { engine } = setup();
   const plan = await engine.plan("I'm done with the CS class");
   assert.strictEqual(plan.actions.length, 0);
-  assert.ok(plan.questions[0].options.length >= 2);
+  const q = plan.questions.find((x) => /which class/i.test(x.text));
+  assert.ok(q, JSON.stringify(plan.questions));
+  assert.ok(q.options.some((o) => /3140/.test(o)) && q.options.some((o) => /2150/.test(o)));
 });
 
 test('US-03 a named project changed in the last 30 days shows up unchecked, with a note', TODO, async () => {

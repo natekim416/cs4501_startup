@@ -24,6 +24,7 @@ test('US-13 a quarantined file still goes to the app quarantine folder, not the 
   const data = tmp();
   const bad = write(path.join(tmp(), 'crack.command'), 'x');
   const ex = new Executor(data, { trashDir: trash });
+  assert.strictEqual(ex.trashDir, trash, 'the executor must know where the macOS Trash is');
   ex.run([{ id: 'a', op: 'quarantine', path: bad, reason: 'flagged' }]);
   assert.strictEqual(fs.readdirSync(trash).length, 0);
   assert.ok(fs.readdirSync(path.join(data, 'quarantine')).length > 0);
