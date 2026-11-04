@@ -45,3 +45,18 @@ test('US-01 a folder macOS blocks is named with how to grant access, not silentl
     fs.chmodSync(blocked, 0o755);
   }
 });
+
+test('US-01 asking "where did my space go?" answers with the breakdown and proposes nothing', async () => {
+  const { Engine } = require('../../backend/engine');
+  const root = tmp();
+  makeJsProject(root, 'big-app', { kb: 200 });
+  makePyProject(root, 'ds');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const res = await engine.plan('Where did my space go?');
+  assert.strictEqual(res.actions.length, 0);
+  assert.match(res.summary, /JavaScript packages/);
+  assert.match(res.summary, /big-app/);
+  assert.ok(res.breakdown && res.breakdown.byType.javascript > 0);
+});
