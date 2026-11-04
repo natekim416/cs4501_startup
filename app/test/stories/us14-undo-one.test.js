@@ -21,7 +21,7 @@ function twoMoves() {
   return { ex, run, a, b, dest };
 }
 
-test('US-14 undoing one action leaves every other action done', TODO, () => {
+test('US-14 undoing one action leaves every other action done', () => {
   const { ex, run, a, b, dest } = twoMoves();
   ex.undoAction(run.batchId, 'm1');
   assert.ok(fs.existsSync(a));
@@ -34,7 +34,7 @@ test('US-14 "Undo all" still reverses the whole run (guard: already works, must 
   assert.ok(fs.existsSync(a) && fs.existsSync(b));
 });
 
-test('US-14 undoing a move whose original folder was deleted recreates the folder', TODO, () => {
+test('US-14 undoing a move whose original folder was deleted recreates the folder', () => {
   const dir = tmp();
   const sub = path.join(dir, 'Old');
   const f = write(path.join(sub, 'x.pdf'));
