@@ -219,3 +219,5 @@ body.tour-talking #tour-guide .dino { animation: talk 0.25s steps(2) infinite; }
 .tour-actions .btn { box-shadow: 4px 4px 0 var(--ink); }
 .dust { position: fixed; width: 10px; height: 10px; z-index: 70; pointer-events: none; animation: dust 0.9s steps(6) forwards; }
 @keyframes dust { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+
+.why.note { color: #B0306E; font-weight: 700; }

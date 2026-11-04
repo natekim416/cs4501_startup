@@ -3,7 +3,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
-const { findArtifacts } = require('./devclutter');
+const { findArtifacts, lastChanged, INACTIVE_DAYS } = require('./devclutter');
+const { matchProjects } = require('./intent');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
 const { makePlan } = require('./planner');
@@ -117,7 +118,10 @@ class Engine {
       };
     }
     this.scanFolder(this.folder);
-    const ctx = { scan: this.snapshot, dev: this.dev, findings: this.findings, profile: this.profile };
+    // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
+    const projectNames = [...new Set(this.dev.map((d) => path.basename(d.project)))];
+    const intent = matchProjects(request, projectNames);
+    const ctx = { scan: this.snapshot, dev: this.dev, findings: this.findings, profile: this.profile, named: intent.matched, intent };
     const attempts = [];
     let previous = null;
     let plan;
@@ -155,6 +159,13 @@ class Engine {
       );
     }
     for (const s of check.strange) questions.push({ text: s.text, options: ['Yes, go ahead', 'No, leave it'], action: s.action });
+
+    // A project the user named but touched recently is allowed, and shown unchecked so they decide.
+    for (const a of plan.actions || []) {
+      if (a.op !== 'delete_rebuildable') continue;
+      const days = Math.floor((Date.now() - lastChanged(path.dirname(a.path))) / 864e5);
+      if (days < INACTIVE_DAYS) Object.assign(a, { checked: false, note: `${path.basename(path.dirname(a.path))} is still active (changed ${days} day${days === 1 ? '' : 's'} ago). Check it only if you're sure.` });
+    }
 
     const planId = ++this.planCount;
     this.lastPlan = { id: planId, request, plan, check };

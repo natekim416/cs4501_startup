@@ -212,7 +212,7 @@ function showPlan(result) {
     const askFirst = new Set(result.needsApproval);
     const items = result.actions.map((a) => {
       const box = el('input', { type: 'checkbox', 'data-id': a.id, 'aria-label': `Include ${OP_LABEL[a.op]} ${a.path}` });
-      box.checked = !askFirst.has(a.id);
+      box.checked = !askFirst.has(a.id) && a.checked !== false;
       const dest = a.dest === state.folder ? './' : short(a.dest) + '/';
       const target = a.op === 'move' ? `${short(a.path)}  →  ${dest}` : a.op === 'rename' ? `${short(a.path)}  →  ${short(a.dest)}` : short(a.path);
       return el(
@@ -220,7 +220,7 @@ function showPlan(result) {
         { class: 'action' },
         box,
         el('span', { class: `op ${a.op}` }, OP_LABEL[a.op] || a.op),
-        el('div', {}, el('div', { class: 'file' }, target, askFirst.has(a.id) ? el('span', { class: 'ask-tag' }, 'ASK FIRST') : null), el('div', { class: 'why' }, a.reason)),
+        el('div', {}, el('div', { class: 'file' }, target, askFirst.has(a.id) ? el('span', { class: 'ask-tag' }, 'ASK FIRST') : null), el('div', { class: 'why' }, a.reason), a.note ? el('div', { class: 'why note' }, a.note) : null),
       );
     });
     const list = el('ul', { class: 'actions' }, items);

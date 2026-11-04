@@ -60,6 +60,7 @@ Rules:
 - Only put new folders and moved files inside the allowed destination roots.
 - Never act on files in "never" zones. Files in "ask" zones are allowed but the user will be asked.
 - Follow the user's saved preferences.
+- If the user says which classes or projects they're done with, delete only artifacts from those projects (use the "projects" list; course codes like "CS 3140" match folder names like cs3140-hw1). Put the project name at the start of each reason. If you can't tell which projects they mean, ask with the candidate projects as options instead of guessing.
 - If something is ambiguous or unusual (files that look like versions of each other, a request that could mean two things), do not guess: add a question with 2-4 short options and leave those files alone.
 - If you receive validator errors, fix exactly those problems and return the full corrected plan.`;
 
@@ -80,6 +81,7 @@ function summarizeScan(scan, findings, profile, dev = []) {
     duplicate_groups: scan.duplicates.map((g, i) => ({ group: i + 1, files: g.files })),
     malware_findings: findings.map((f) => ({ path: f.path, evidence: f.evidence })),
     rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason })),
+    projects: [...new Set(dev.map((d) => path.basename(d.project)))],
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -122,11 +124,12 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
+function demoPlan({ request, scan, dev = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
-  const dedupe = want(/dup|space|storage|clean|free|copies/i);
+  const doneWith = want(/done with|finished with|over with/i);
+  const dedupe = want(/dup|space|storage|clean|free|copies/i) || doneWith;
   const root = profile.data.targetPlan.destRoots[0] || scan.root;
   const actions = [];
   const questions = [];
@@ -154,13 +157,18 @@ function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
     gone.add(f.path);
   }
   if (dedupe) {
-    // Rebuildable dev folders first: that's where the space is.
+    // Rebuildable dev folders first: that's where the space is. If the request names projects
+    // ("done with CS 3140"), only those; if it's ambiguous, ask instead.
+    if (intent.ambiguous) questions.push(intent.ambiguous);
+    const named = new Set(intent.matched);
     for (const d of dev) {
-      if (d.label !== 'rebuildable' || rejected.has(d.path)) continue;
+      if (d.label !== 'rebuildable' || rejected.has(d.path) || intent.ambiguous) continue;
       const project = path.basename(d.project);
-      add({ op: 'delete_rebuildable', path: d.path, project, reason: `${project}: ${d.reason}` });
+      if (doneWith && !named.has(project)) continue;
+      const why = named.has(project) ? `${project}: you said you're done with it. ${d.reason}` : `${project}: ${d.reason}`;
+      add({ op: 'delete_rebuildable', path: d.path, project, reason: why });
     }
-    for (const g of scan.duplicates) {
+    for (const g of doneWith ? [] : scan.duplicates) {
       const [keep, ...rest] = g.files;
       for (const p of rest) {
         if (gone.has(p) || gone.has(keep)) continue;

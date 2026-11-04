@@ -296,4 +296,4 @@ function findArtifacts(root, opts = {}) {
   return items.sort((a, b) => b.bytes - a.bytes);
 }
 
-module.exports = { typeOf, labelPath, rebuildProof, measureFreeable, toolCaches, exportCondaEnv, findArtifacts, INACTIVE_DAYS };
+module.exports = { typeOf, labelPath, rebuildProof, measureFreeable, toolCaches, exportCondaEnv, findArtifacts, lastChanged, INACTIVE_DAYS };
