@@ -1,6 +1,7 @@
 // UI smoke test: drives the real app window by clicking buttons, like a user would.
 // Loaded by main.js only when started with --ui-test=<result file> (see scripts/ui-test.js).
 const fs = require('fs');
+const path = require('path');
 
 // Runs inside the page: small helpers for finding and clicking things.
 const HELPERS = `
@@ -24,7 +25,18 @@ const HELPERS = `
   true;
 `;
 
+// A step is either page code (a string) or a function that runs in the main process.
 const STEPS = [
+  ['first launch asks about the usage log, and it stays off until answered', `
+    await __t.waitFor(() => document.querySelector('.consent'), 'usage log prompt');
+    if ((await api.init()).usage.enabled) throw new Error('log is on before the user answered');
+    if (!__t.button('TURN ON')) throw new Error('panel does not offer TURN ON');
+    return 'ok';`],
+  ['saying yes turns the log on and the prompt goes away', `
+    __t.button('YES, KEEP A LOG').click();
+    await __t.waitFor(() => __t.button('TURN OFF'), 'TURN OFF button');
+    if (document.querySelector('.consent')) throw new Error('prompt still showing');
+    return 'ok';`],
   ['app starts and scans the demo folder', `
     await __t.waitFor(() => /Scanned \\d+ files/.test(__t.botText()), 'scan message');
     return document.querySelector('#folder-stats').textContent;`],
@@ -46,7 +58,7 @@ const STEPS = [
   ['NEVER zone: dino refuses clearly, no plan card', `
     await __t.setZone('NEVER');
     __t.button('Organize everything').click();
-    await __t.waitFor(() => /NEVER zone, so I won't touch/.test(__t.botText()), 'NEVER refusal');
+    await __t.waitFor(() => /NEVER zone \(.*\), so I won't touch anything/.test(__t.botText()), 'NEVER refusal');
     if (__t.liveCards().length) throw new Error('a plan card is still approvable');
     return 'ok';`],
   ['back to FREE: plan appears and asks about resume versions', `
@@ -68,16 +80,51 @@ const STEPS = [
     await __t.waitFor(() => (__t.botText().match(/Done! \\d+ actions complete/g) || []).length >= 2, 'second Done message');
     if (/out of date|couldn't run/.test(__t.botText())) throw new Error('error shown: ' + __t.botText().slice(-200));
     return 'ok';`],
+  ['the practice folder stayed out of the usage log', `
+    const { events } = (await api.init()).usage;
+    if (events !== 1) throw new Error('expected only the logging_on event, found ' + events);
+    return 'ok';`],
+  ['a run and undo on a real folder are logged', `
+    await api.setZone(__t.real, 'free');
+    await useFolder(__t.real);
+    __t.button('Free up space').click();
+    const card = await __t.waitFor(() => __t.liveCards().find((c) => !c.querySelector('.btn-primary').disabled), 'plan card');
+    card.querySelector('.btn-primary').click();
+    await __t.waitFor(() => (__t.botText().match(/Done! \\d+ actions complete/g) || []).length >= 3, 'third Done message');
+    [...document.querySelectorAll('.undo-row button')].pop().click();
+    await __t.waitFor(() => (__t.botText().match(/Undone\\. \\d+ steps/g) || []).length >= 2, 'second Undone message');
+    const shown = document.querySelector('#usage-status').textContent;
+    const { events } = (await api.init()).usage;
+    if (!shown.includes(events + ' events')) throw new Error('panel is out of date: ' + shown);
+    return events + ' events';`],
+  ['EXPORT saves a copy with counts and no file names', async ({ win, base }) => {
+    const out = path.join(base, 'exported.jsonl');
+    require('electron').dialog.showSaveDialog = async () => ({ canceled: false, filePath: out });
+    await win.webContents.executeJavaScript(`__t.button('EXPORT').click(); __t.waitFor(() => /Saved a copy/.test(__t.botText()), 'export message')`);
+    const raw = fs.readFileSync(out, 'utf8');
+    for (const name of fs.readdirSync(path.join(base, 'Real'))) if (raw.includes(name)) throw new Error('log contains ' + name);
+    if (raw.includes('/')) throw new Error('log contains a path');
+    const logged = raw.trim().split('\n').map((line) => JSON.parse(line).event);
+    for (const event of ['logging_on', 'scan', 'plan', 'run', 'undo']) if (!logged.includes(event)) throw new Error('no ' + event + ' event');
+    return logged.join(', ');
+  }],
+  ['TURN OFF deletes the log', async ({ win, base }) => {
+    await win.webContents.executeJavaScript(`window.confirm = () => true; __t.button('TURN OFF').click(); __t.waitFor(() => __t.button('TURN ON'), 'TURN ON button')`);
+    if (fs.existsSync(path.join(base, 'data', 'usage-log.jsonl'))) throw new Error('log file still there');
+    return 'ok';
+  }],
 ];
 
 module.exports = function runUiTest(win, resultFile) {
   win.webContents.once('did-finish-load', async () => {
     const results = [];
+    const base = path.dirname(resultFile);
     try {
       await win.webContents.executeJavaScript(HELPERS);
+      await win.webContents.executeJavaScript(`__t.real = ${JSON.stringify(path.join(base, 'Real'))}; true`);
       for (const [name, body] of STEPS) {
         try {
-          const detail = await win.webContents.executeJavaScript(`(async () => { ${body} })()`);
+          const detail = typeof body === 'function' ? await body({ win, base }) : await win.webContents.executeJavaScript(`(async () => { ${body} })()`);
           results.push({ name, ok: true, detail });
         } catch (err) {
           results.push({ name, ok: false, detail: String(err.message || err) });

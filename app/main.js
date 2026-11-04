@@ -45,6 +45,7 @@ function registerIpc() {
     mode: engine.mode,
     disk: diskInfo(),
     profile: profileView(),
+    usage: engine.usage.status(),
     demoFolder: arg('demo-folder'),
     screenshot: Boolean(arg('screenshot')),
   }));
@@ -52,10 +53,11 @@ function registerIpc() {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'], defaultPath: path.join(os.homedir(), 'Downloads') });
     return res.canceled ? null : res.filePaths[0];
   });
-  ipcMain.handle('scan', (_e, folder) => engine.scanFolder(folder));
+  ipcMain.handle('scan', (_e, folder) => engine.openFolder(folder));
   // The guided demo always runs on a fresh practice folder outside the user's real files.
   ipcMain.handle('prepare-tour', () => {
     const folder = makeDemoFolder(path.join(os.tmpdir(), 'cleanasaurus-tour', 'Downloads'));
+    engine.practiceFolders.add(folder);
     engine.profile.setZone(folder, 'free');
     engine.profile.data.preferences = engine.profile.data.preferences.filter((p) => !p.includes('versions of'));
     engine.profile.save();
@@ -81,6 +83,13 @@ function registerIpc() {
     engine.apiKey = key || process.env.ANTHROPIC_API_KEY || '';
     return engine.mode;
   });
+  ipcMain.handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
+  ipcMain.handle('export-usage', async () => {
+    const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });
+    if (res.canceled || !res.filePath) return null;
+    engine.usage.exportTo(res.filePath);
+    return res.filePath;
+  });
   // Used by `npm run screenshot` to capture the window for slides.
   ipcMain.handle('capture', async () => {
     const out = arg('screenshot');
@@ -93,9 +102,13 @@ function registerIpc() {
 app.whenReady().then(() => {
   engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData') });
   // The generated demo folder is safe to change freely.
-  if (arg('demo-folder')) engine.profile.setZone(arg('demo-folder'), 'free');
+  if (arg('demo-folder')) {
+    engine.profile.setZone(arg('demo-folder'), 'free');
+    engine.practiceFolders.add(arg('demo-folder'));
+  }
   registerIpc();
   createWindow();
+  engine.usage.onChange = () => win.webContents.send('usage', engine.usage.status());
   if (arg('ui-test')) require('./test/ui-smoke')(win, arg('ui-test'));
   if (arg('tour-test')) require('./test/tour-check')(win, arg('tour-test'));
 });

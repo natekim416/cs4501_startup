@@ -7,13 +7,21 @@ const { validate } = require('./validator');
 const { makePlan } = require('./planner');
 const { Executor } = require('./executor');
 const { Profile } = require('./profile');
+const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine'];
+
+function countOps(actions) {
+  return Object.fromEntries(OPS.map((op) => [`ops_${op}`, actions.filter((a) => a.op === op).length]));
+}
 
 class Engine {
   constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY } = {}) {
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.executor = new Executor(dataDir);
+    this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
+    this.practiceFolders = new Set();
     this.apiKey = apiKey;
     this.folder = null;
     this.snapshot = null;
@@ -24,6 +32,25 @@ class Engine {
 
   get mode() {
     return this.apiKey ? 'llm' : 'demo';
+  }
+
+  // Practice runs (the guided demo, --demo-folder) aren't real use, so they stay out of the usage log.
+  track(event, fields) {
+    if (!this.practiceFolders.has(this.folder)) this.usage.record(event, { mode: this.mode, ...fields });
+  }
+
+  // The user picked or rescanned a folder. plan() also rescans, so only this counts as a scan in the log.
+  openFolder(folder) {
+    const info = this.scanFolder(folder);
+    this.track('scan', {
+      files: info.fileCount,
+      bytes: info.totalBytes,
+      duplicateGroups: info.duplicateGroups,
+      duplicateBytes: info.duplicateBytes,
+      flagged: info.findings.length,
+      zone: info.zone,
+    });
+    return info;
   }
 
   scanFolder(folder) {
@@ -47,8 +74,10 @@ class Engine {
   // Plans, validates, and feeds errors back to the planner until the plan passes or attempts run out.
   async plan(request, onAttempt = () => {}) {
     if (!this.folder) throw new Error('Pick a folder first.');
+    const started = Date.now();
     this.lastPlan = null;
     if (this.profile.zoneFor(this.folder) === 'never') {
+      this.track('plan', { refused: true, zone: 'never' });
       return {
         mode: this.mode,
         planId: null,
@@ -103,6 +132,18 @@ class Engine {
 
     const planId = ++this.planCount;
     this.lastPlan = { id: planId, request, plan, check };
+    this.track('plan', {
+      zone: this.profile.zoneFor(this.folder),
+      tries: attempts.length,
+      passed: attempts.at(-1).ok,
+      validatorErrors: attempts.reduce((n, a) => n + a.errors.length, 0),
+      actions: (plan.actions || []).length,
+      needsApproval: check.needsApproval.length,
+      questions: questions.length,
+      bytesToBin: check.bytesFreed,
+      ms: Date.now() - started,
+      ...countOps(plan.actions || []),
+    });
     return {
       mode: this.mode,
       planId,
@@ -118,6 +159,7 @@ class Engine {
 
   // Saves the answer to the profile so the same question isn't asked twice, then re-plans.
   async answer(question, choice, onAttempt) {
+    this.track('question_answered');
     this.profile.remember(`${question.replace(/\?$/, '')}: ${choice}`);
     const request = this.lastPlan ? this.lastPlan.request : '';
     return this.plan(`${request} (User answered "${question}" with "${choice}")`, onAttempt);
@@ -131,14 +173,29 @@ class Engine {
     const chosen = this.lastPlan.plan.actions.filter((a) => actionIds.includes(a.id));
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
     const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile });
-    if (!check.ok) return { ok: false, errors: check.errors.map((e) => e.message) };
+    if (!check.ok) {
+      this.track('run_blocked', { errors: check.errors.length });
+      return { ok: false, errors: check.errors.map((e) => e.message) };
+    }
     const run = this.executor.run(chosen);
+    const ran = run.results.filter((r) => r.ok).length;
+    this.track('run', {
+      proposed: this.lastPlan.plan.actions.length,
+      approved: chosen.length,
+      ran,
+      failed: chosen.length - ran,
+      steps: run.steps,
+      bytesToBin: check.bytesFreed,
+      ...countOps(chosen),
+    });
     this.lastPlan = null;
     return { ok: true, ...run, bytesFreed: check.bytesFreed };
   }
 
   undo() {
-    return this.executor.undoLast();
+    const result = this.executor.undoLast();
+    this.track('undo', { undone: result.undone });
+    return result;
   }
 }
 

@@ -109,6 +109,44 @@ function setMode(mode) {
   m.className = `mode ${mode}`;
 }
 
+// ---------- Usage log (opt-in) ----------
+
+function renderUsage(status) {
+  state.usageOn = status.enabled;
+  $('#usage-status').textContent = status.enabled
+    ? `On · ${status.events} event${status.events === 1 ? '' : 's'}, saved only on this computer. EXPORT makes a copy you can send to the team. Turning it off deletes the log.`
+    : 'Off, so nothing is recorded. If you turn it on, it keeps counts, sizes, and timings on this computer, never file names or what you type.';
+  $('#usage-toggle').textContent = status.enabled ? 'TURN OFF' : 'TURN ON';
+  $('#usage-export').hidden = !status.enabled;
+  if (status.asked) document.querySelector('.consent')?.closest('.msg').remove();
+}
+
+// Asked once, on first launch. Both answers look the same, and ignoring it leaves the log off.
+function offerUsageLog() {
+  const choice = (label, on, reply) =>
+    el('button', {
+      class: 'btn btn-pink',
+      onclick: async () => {
+        renderUsage(await api.setUsage(on));
+        botSay(reply);
+      },
+    }, label);
+  attach(
+    el(
+      'div',
+      { class: 'consent' },
+      el('p', {}, 'One question first: can I keep a usage log to help my team test me? It counts files, sizes, and timings, plus what you approve or undo. It never records file names, folder names, or what you type.'),
+      el('p', {}, 'The log stays on this computer unless you export it and send it yourself. You can change your mind any time under USAGE LOG, at the bottom of the right side.'),
+      el(
+        'div',
+        { class: 'options' },
+        choice('YES, KEEP A LOG', true, "Thanks! The log is on. When you're ready to send it, press EXPORT under USAGE LOG."),
+        choice('NO THANKS', false, 'No problem. Nothing is being recorded.'),
+      ),
+    ),
+  );
+}
+
 // ---------- Folder ----------
 
 async function useFolder(folder) {
@@ -288,6 +326,23 @@ api.onAttempt((a) => {
   else log(`TRY ${a.attempt}: FAIL (${a.errors.length} errors) → sent back. First: ${a.errors[0]}`, 'fail');
 });
 
+api.onUsage(renderUsage);
+
+$('#usage-toggle').addEventListener('click', async () => {
+  const on = !state.usageOn;
+  if (!on && !confirm('Turn off the usage log and delete what it has recorded?')) return;
+  renderUsage(await api.setUsage(on));
+});
+
+$('#usage-export').addEventListener('click', async () => {
+  try {
+    const saved = await api.exportUsage();
+    if (saved) botSay(`Saved a copy to ${short(saved)}. Open it to see exactly what's in it, then send it to the team.`);
+  } catch (err) {
+    botSay(`I couldn't export the log: ${err.message}`);
+  }
+});
+
 $('#composer').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = $('#input').value.trim();
@@ -330,9 +385,11 @@ $('#key-form').addEventListener('submit', async (e) => {
   setMode(init.mode);
   setDisk(init.disk);
   renderProfile(init.profile);
+  renderUsage(init.usage);
   botSay(
     `RAWR! I'm Cleanasaurus, your file maid.\nPick a folder, then tell me what you want in plain English.\nI check every plan for safety before you see it, and I never touch your NEVER zones.${init.mode === 'demo' ? '\n(No Claude API key found, so I\'m in DEMO MODE with offline rules.)' : ''}`,
   );
+  if (!init.usage.asked && !init.screenshot) offerUsageLog();
   if (init.demoFolder) await useFolder(init.demoFolder);
   if (init.screenshot) {
     await sendRequest('Free up space and sort my school files by class');

@@ -18,6 +18,8 @@ const DEFAULT_PROFILE = {
   // Where organized files are allowed to end up. Empty means "inside the folder being cleaned".
   targetPlan: { destRoots: [], notes: '' },
   preferences: [],
+  // null until the user answers, then true or false. See usage-log.js.
+  usageLogging: null,
 };
 
 class Profile {

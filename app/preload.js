@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('api', {
   setTarget: (destRoot) => ipcRenderer.invoke('set-target', destRoot),
   forget: (pref) => ipcRenderer.invoke('forget', pref),
   setApiKey: (key) => ipcRenderer.invoke('set-api-key', key),
+  setUsage: (on) => ipcRenderer.invoke('set-usage', on),
+  exportUsage: () => ipcRenderer.invoke('export-usage'),
   capture: () => ipcRenderer.invoke('capture'),
   onAttempt: (fn) => ipcRenderer.on('attempt', (_e, attempt) => fn(attempt)),
+  onUsage: (fn) => ipcRenderer.on('usage', (_e, status) => fn(status)),
 });

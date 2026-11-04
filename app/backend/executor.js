@@ -35,7 +35,7 @@ class Executor {
     }
     this.history.push(batch);
     this.saveLog();
-    return { batchId: batch.id, results };
+    return { batchId: batch.id, results, steps: batch.steps.length };
   }
 
   apply(a, batchId) {

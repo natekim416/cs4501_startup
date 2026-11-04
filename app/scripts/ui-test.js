@@ -8,6 +8,8 @@ const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cleanasaurus-ui-'));
 const folder = path.join(base, 'Downloads');
 const results = path.join(base, 'results.json');
 execFileSync('node', [path.join(__dirname, 'make-demo-folder.js'), folder]);
+// A second folder that isn't marked as practice, so the usage log treats it as real use.
+execFileSync('node', [path.join(__dirname, 'make-demo-folder.js'), path.join(base, 'Real')]);
 
 const electron = require('electron');
 spawnSync(electron, ['.', `--demo-folder=${folder}`, `--data-dir=${path.join(base, 'data')}`, `--ui-test=${results}`], {
