@@ -97,3 +97,21 @@ test('US-03 "free up space but keep my capstone" leaves the capstone alone', asy
   const plan = await engine.plan('Free up space but keep my capstone');
   assert.deepStrictEqual(plan.actions.filter((a) => a.op === 'delete_rebuildable').map((a) => a.project), ['cs2150-lab']);
 });
+
+test('US-03 negations and keep-first phrasing are respected (found by grader round 3)', () => {
+  const { matchProjects } = require('../../backend/intent');
+  const names = ['cs3140-hw1', 'cs3140-final', 'hoohacks-2026'];
+  assert.deepStrictEqual(matchProjects("I'm not done with CS 3140. Free up space.", names).matched, []);
+  assert.deepStrictEqual(matchProjects("I'm not done with CS 3140. Free up space.", names).kept.sort(), ['cs3140-final', 'cs3140-hw1']);
+  assert.deepStrictEqual(matchProjects("I'm done with CS 3140 but I still need the final", names).matched, ['cs3140-hw1']);
+  assert.deepStrictEqual(matchProjects("Keep cs3140-final, I'm done with the rest of CS 3140", names).matched, ['cs3140-hw1']);
+  assert.deepStrictEqual(matchProjects("Clean up before I leave for break, I'm done with CS 3140", names).matched.sort(), ['cs3140-final', 'cs3140-hw1']);
+});
+
+test('US-03 answering "which projects?" with one project plans exactly that project (found by grader round 3)', async () => {
+  const { engine } = setup();
+  const first = await engine.plan("I'm done with the class with the robot project");
+  const q = first.questions.find((x) => /which projects/i.test(x.text));
+  const plan = await engine.answer(q.text, 'cs3140-hw1');
+  assert.deepStrictEqual(plan.actions.filter((a) => a.op === 'delete_rebuildable').map((a) => a.project), ['cs3140-hw1']);
+});
