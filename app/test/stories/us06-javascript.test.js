@@ -69,3 +69,24 @@ test('US-06 node_modules nested inside another node_modules is not listed separa
   const items = findArtifacts(root).filter((i) => i.type === 'node_modules');
   assert.strictEqual(items.length, 1);
 });
+
+test('US-06 asking to clear package caches offers each cache as one action, and the validator only allows known caches', async () => {
+  const { Engine } = require('../../backend/engine');
+  const { validate } = require('../../backend/validator');
+  const home = tmp();
+  const cache = path.dirname(write(path.join(home, '.npm', '_cacache', 'content-v2', 'blob'), 'c'.repeat(30 * 1024)));
+  const root = tmp();
+  makeJsProject(root, 'app');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const plan = await engine.plan('Clear my package caches');
+  const clear = plan.actions.filter((a) => a.op === 'clear_cache');
+  assert.deepStrictEqual(clear.map((a) => a.path), [path.join(home, '.npm', '_cacache')]);
+  const run = engine.execute(plan.planId, clear.map((a) => a.id));
+  assert.ok(run.ok, JSON.stringify(run.errors));
+  assert.ok(!fs.existsSync(path.join(cache, 'blob')), 'cache contents are gone');
+  const bad = validate({ actions: [{ id: 'x', op: 'clear_cache', path: path.join(home, 'Documents'), dest: '', keep: '', reason: 'x' }] }, { scan: engine.snapshot, findings: [], profile: engine.profile, home });
+  assert.strictEqual(bad.ok, false);
+  assert.match(bad.errors[0].message, /not a package-manager cache/);
+});

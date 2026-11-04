@@ -62,3 +62,21 @@ test('US-07 findArtifacts recognizes a venv by pyvenv.cfg even when it is not na
   assert.strictEqual(items.length, 1);
   assert.strictEqual(path.basename(items[0].path), 'env');
 });
+
+test('US-07 an inactive conda environment is exported during the scan, offered in the plan, and passes the proof', async () => {
+  const { Engine } = require('../../backend/engine');
+  const root = tmp();
+  const env = path.join(root, 'cs4774', 'conda-env');
+  write(path.join(env, 'conda-meta', 'history'), '# history\n');
+  write(path.join(env, 'lib', 'big.so'), 'x'.repeat(40 * 1024));
+  age(path.join(root, 'cs4774'), 90);
+  const condaRun = (cmd, args) => (args[0] === 'env' ? 'name: cs4774\ndependencies:\n  - numpy\n' : '');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', condaRun });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const item = engine.dev.find((d) => d.type === 'conda-env');
+  assert.strictEqual(item.label, 'rebuildable', item.reason);
+  const plan = await engine.plan('Free up space');
+  assert.ok(plan.attempts.at(-1).ok, JSON.stringify(plan.attempts));
+  assert.ok(plan.actions.some((a) => a.op === 'delete_rebuildable' && a.path === env));
+});
