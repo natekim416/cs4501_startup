@@ -418,7 +418,7 @@ These came up in the sessions. We're saying no for now on purpose.
 
 ## 6. Release plan
 
-**Alpha (Release 1) goal:** run the pivot test: 20 CS students from outside our friend group, using the app unsupervised, measured against the KPIs in [§7](#pivot-test-kpi--stories-it-depends-on).
+**Where we are (Nov 4):** the Alpha delivered Sprints 1–3 except US-04 (19 of 29 stories done; see [tdd/README.md](../tdd/README.md#3-every-github-issue-and-its-tests)). **Beta goal:** finish Sprint 4 and US-04, then run the pivot test: 20 CS students from outside our friend group, using the app unsupervised, measured against the KPIs in [§7](#pivot-test-kpi--stories-it-depends-on).
 
 | Priority | Stories | Points |
 |---|---|---|
@@ -430,12 +430,14 @@ These came up in the sessions. We're saying no for now on purpose.
 
 **Sprint plan.** This assumes the three of us finish about 20 points a week. That's a guess; after Sprint 1, we'll replace it with our real pace.
 
-| Sprint | Stories | Points | Done means |
-|---|---|---|---|
-| 1 · Foundation | US-01 breakdown, US-02 labels, US-05 rebuild proof, US-12 real freed | 19 | We can show a tester their clutter and prove what's safe |
-| 2 · First cleanups | US-06 JavaScript, US-07 Python, US-03 clean by intent, US-11 validator reasons | 21 | A tester can say "I'm done with CS 3140" and get real space back |
-| 3 · Get it back | US-15 rebuild, US-14 per-action undo, US-04 protect projects, US-18 summary, US-19 unsigned | 15 | Every deletion can be rebuilt, and every plan is readable in one sentence |
-| 4 · Coverage and test kit | US-08 Xcode, US-09 Docker, US-10 ML caches, US-16 storage watch, US-21 logs and fake door | 23 | All five ecosystems are covered, and the pivot test can run unsupervised |
+| Sprint | Stories | Points | Done means | Status |
+|---|---|---|---|---|
+| 1 · Foundation | US-01 breakdown, US-02 labels, US-05 rebuild proof, US-12 real freed | 19 | We can show a tester their clutter and prove what's safe | ✅ Alpha |
+| 2 · First cleanups | US-06 JavaScript, US-07 Python, US-03 clean by intent, US-11 validator reasons | 21 | A tester can say "I'm done with CS 3140" and get real space back | ✅ Alpha |
+| 3 · Get it back | US-15 rebuild, US-14 per-action undo, US-04 protect projects, US-18 summary, US-19 unsigned | 15 | Every deletion can be rebuilt, and every plan is readable in one sentence | ✅ Alpha, except US-04 |
+| 4 · Coverage and test kit | US-08 Xcode, US-09 Docker, US-10 ML caches, US-16 storage watch, US-21 logs and fake door | 23 | All five ecosystems are covered, and the pivot test can run unsupervised | Beta |
+
+**Beta schedule** *(proposed; team to confirm)*: week of Nov 9: US-04, record live Claude runs, merge `alpha-review` · Nov 16: US-08 Xcode, US-09 Docker · Nov 23: US-10 ML caches, US-16 storage watch · Nov 30: US-21 Go Pro and rebuild logging, recruit 20 testers, start the pivot test.
 
 **Dependencies:** US-05 comes before US-06 to US-10 and US-15. US-01 comes before US-03. US-21 must be done before the test starts.
 

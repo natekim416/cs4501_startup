@@ -13,8 +13,9 @@ cd app
 npm install
 npm run demo        # creates a messy fake folder at ~/CleanasaurusDemo/Downloads and opens the app on it
 npm start           # opens the app; pick any folder with SELECT FOLDER, or press ▶ DEMO for a guided tour
-npm test            # 114 tests: 69 pass, 45 todo for stories not built yet; one file per user story, plus MIN-1 … MIN-9 and LLM-1 … LLM-6
-npm run test:coverage  # same, with line and branch coverage (backend: 94.5% lines)
+npm test            # 125 tests: 98 pass, 27 todo for stories not built yet; one file per user story, plus MIN-1 … MIN-9, LLM-1 … LLM-7, REG-1 … REG-4
+npm run test:todos  # fails if a todo test passes (it couldn't be testing its story)
+npm run test:coverage  # same, with line and branch coverage (backend: 95.8% lines)
 npm run dev-demo    # creates fake dev projects at ~/CleanasaurusDemo/code (old, active, dirty, no lockfile, .env, a VM) and opens the app
 npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions, usage log
 ```

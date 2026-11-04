@@ -2,19 +2,19 @@
 
 **Team:** Nate Kim, Nate Park, Wesley Chang · **Stories and issues:** [requirements/USER_STORIES.md](../requirements/USER_STORIES.md), GitHub issues #2–#30
 
-> **Who wrote what.** Every test in this repo was drafted by Claude (Claude Code, Opus 5.5), working in our sessions. The reviews in §5 were also done by AI: Claude's own review pass, plus an independent AI review that played a critical grader. **No team member has hand-edited a test yet.** Our human review is scheduled in [TEAM_REVIEW.md](TEAM_REVIEW.md), and §4 will be updated with its results. We'd rather report 0% human-refined than claim review we haven't done.
+> **Who wrote what.** Every test in this repo was drafted by Claude (Claude Code, Opus 5.5), working in our sessions. The reviews in §5 were also done by AI: Claude's own review pass, plus an independent AI review that played a critical grader. **No team member has hand-edited a test yet.** Our human review is scheduled in [TEAM_REVIEW.md](TEAM_REVIEW.md), and §5 will be updated with its results. We'd rather report 0% human-refined than claim review we haven't done.
 
 ## 1. Engineering metrics
 
 | Metric | Value | How it's measured |
 |---|---|---|
 | User stories | **29** | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
-| GitHub issues logged vs. closed | **29 logged, 10 closed on GitHub**, plus **4 more built** on `alpha-review` (#4, #7, #8, #20) that close when it merges, so **14 of 29 done** | Closed: 6 already built in the MVP (#25–#30), 4 by Alpha work (#3, #6, #12, #13) |
-| Automated tests | **121** unit and integration tests, plus a **14-step** end-to-end UI test | `npm test`, `npm run test:ui` |
-| Average tests per issue | **4.2** overall (121 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
-| Pass rate | **100% of runnable tests (81/81)**. Counting every test: **67% (81/121)**. The other 40 (33%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt) |
-| Line coverage (`backend/` only) | **95.7%** lines, **90.5%** branches, 94.6% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
-| AI-generated vs. refined | **100% AI-generated** (121 tests + 14 UI steps). **14 changed or added because of AI review** (§5). **0 refined by a team member so far** | Commit history; §5 |
+| GitHub issues logged vs. closed | **29 logged, 10 closed on GitHub.** 9 more are built on `alpha-review` (#2, #4, #7, #8, #14, #15, #16, #19, #20) and close when it merges, so **19 of 29 are done** | Closed: 6 already built in the MVP (#25–#30), 4 by Alpha work (#3, #6, #12, #13) |
+| Automated tests | **125** unit and integration tests, plus a **14-step** end-to-end UI test. **89 of the 125 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
+| Average tests per issue | **4.3** overall (125 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
+| Pass rate | **100% of runnable tests (98/98)**. Counting every test: **78% (98/125)**. The other 27 (22%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt) |
+| Line coverage (`backend/` only) | **95.8%** lines, **90.1%** branches, 93.6% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
+| AI-generated vs. refined | **100% AI-generated** (125 tests + 14 UI steps). **21 tests added or changed because of review**, every one listed in §5 (rows 1–15). **0 refined by a team member so far** | Commit history; §5 |
 
 ## 2. How we ran it, and what the history actually shows
 
@@ -46,9 +46,9 @@
 
 | Issue | Story | Priority | Tests | Status |
 |---|---|---|---|---|
-| #2 | US-01 Storage breakdown | Must | `us01-storage-breakdown.test.js` (3) | 🔴 todo |
+| #2 | US-01 Storage breakdown | Must | `us01-storage-breakdown.test.js` (4) | 🟢 pass (on `alpha-review`) |
 | #3 | US-02 Label rebuildable vs. not | Must | `us02-labels.test.js` (5) | 🟢 pass |
-| #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (5), LLM-7, REG-3, REG-4 | 🟢 pass (on `alpha-review`) |
+| #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (8), LLM-7, REG-3, REG-4 | 🟢 pass (on `alpha-review`) |
 | #5 | US-04 Protect projects | Must | `us04-protect-projects.test.js` (3) | 🔴 todo |
 | #6 | US-05 Rebuild proof | Must | `us05-rebuild-proof.test.js` (12) | 🟢 pass |
 | #7 | US-06 JavaScript packages | Must | `us06-javascript.test.js` (7) | 🟢 pass; caches now offered in plans (on `alpha-review`) |
@@ -58,12 +58,12 @@
 | #11 | US-10 ML caches | Must | `us10-ml-caches.test.js` (3) | 🔴 todo |
 | #12 | US-11 Validator reasons | Must | `us11-validator-reasons.test.js` (3), `llm-planner.test.js` LLM-2, LLM-3 | 🟢 pass |
 | #13 | US-12 Real space freed | Must | `us12-real-freed.test.js` (4), UI step 5 | 🟢 pass |
-| #14 | US-13 macOS Trash | Should | `us13-macos-trash.test.js` (2) | 🔴 todo |
-| #15 | US-14 Undo one action | Must | `us14-undo-one.test.js` (3: 2 todo, 1 guard) | 🔴 todo |
-| #16 | US-15 One-click rebuild | Must | `us15-rebuild.test.js` (3) | 🔴 todo |
+| #14 | US-13 macOS Trash | Should | `us13-macos-trash.test.js` (2) | 🟢 pass (on `alpha-review`) |
+| #15 | US-14 Undo one action | Must | `us14-undo-one.test.js` (3) | 🟢 pass (on `alpha-review`) |
+| #16 | US-15 One-click rebuild | Must | `us15-rebuild.test.js` (3) | 🟢 pass (on `alpha-review`) |
 | #17 | US-16 Storage watch | Must | `us16-storage-watch.test.js` (3) | 🔴 todo |
 | #18 | US-17 Semester sweep | Could | `us17-semester-sweep.test.js` (2) | 🔴 todo |
-| #19 | US-18 One-sentence summary | Must | `us18-summary.test.js` (3) | 🔴 todo |
+| #19 | US-18 One-sentence summary | Must | `us18-summary.test.js` (3) | 🟢 pass (on `alpha-review`) |
 | #20 | US-19 Unsigned isn't malware | Must | `us19-unsigned.test.js` (2) | 🟢 pass (on `alpha-review`) |
 | #21 | US-20 Local model | Could | `us20-local-model.test.js` (2) | 🔴 todo |
 | #22 | US-21 Logs and Go Pro | Must | `usage-log.test.js` (8, built part), `us21-logs-go-pro.test.js` (2) | 🟡 log built, rest todo |
@@ -89,7 +89,7 @@
 - **Every failure names its condition**, for example "no lockfile (package-lock.json, yarn.lock, or pnpm-lock.yaml) in hoohacks-2026". The reason goes back to the planner (Claude or the offline planner) and shows in the Safety Log.
 - **Real space freed.** Proven folders are deleted, and FREED is the measured change in free disk space. Duplicates in the Dino Bin are reported as "frees up when you empty it."
 - **Honest sizes.** Files hard-linked to pnpm's shared store don't count.
-- **Demo.** `npm run dev-demo` builds old projects plus every case the proof must refuse. With no API key, the *offline* planner proposes everything labeled rebuildable, and the validator rejects 3 (uncommitted work, a project touched 4 days ago, a `.env` secret). With an API key, Claude chooses which projects match the request. That path is tested with a fake client (LLM-2), but we haven't recorded a live run yet.
+- **Demo.** `npm run dev-demo` builds 8 projects plus every case the proof must refuse. The scripted request "I'm done with CS 3140 and the hackathon. Free up space." targets only the CS 3140 and hackathon projects. The validator rejects `hoohacks-2026` for uncommitted work, and try 2 passes with the two CS 3140 folders. The other courses, the `.env` secret, and the VM are never proposed. With an API key, Claude makes the same choice from the request. That path is tested with a simulated client (LLM-2, LLM-7); a live run hasn't been recorded yet.
 
 ## 5. Review log: what changed in the AI-generated tests
 
@@ -107,6 +107,9 @@
 | 10 | Approving a named, still-active project failed the run-time re-check | Found while wiring #7/#8 | **Bug** (REG-3) | Fixed first, test written after (says so in its name) |
 | 11 | The demo request ("done with CS 3140…") also deleted an unnamed course (`cs4774`) | Independent AI review, round 1 | **Bug** | Fixed by US-03; REG-4 guards the exact demo request |
 | 12 | Claude wasn't told a project's course, age, or uncommitted status | Independent AI review, round 1 | Missing context | LLM-7 red, then the prompt adds them |
+| 13 | "Done with CS 3140 but keep the final" still deleted the final; "the robot project" returned an empty plan | Independent AI review, round 2 | Missing edge cases | Two US-03 tests red, then keep-clauses and a "which projects?" question |
+| 14 | A plain request with "but keep my capstone" | Same review | Missing edge case | **Code first, test right after** (US-03 last test); disclosed |
+| 15 | Two leftover unused `const TODO` lines | Same review | Dead code in tests | Removed |
 
 **Known limits:**
 - The secret check is cautious: a `node_modules` that ships test certificates (`.pem`) is refused.
@@ -116,8 +119,6 @@
 
 ## 6. Next stories, in sprint order
 
-1. Merge `alpha-review` (closes #4, #7, #8, #20). Record a real Claude run of the demo request.
-2. US-01 storage breakdown.
-3. US-15 one-click rebuild and US-14 per-action undo.
-4. US-18 summary.
+1. Merge `alpha-review` (closes #2, #4, #7, #8, #14, #15, #16, #19, #20). Record a real Claude run of the demo request.
+2. US-04 protect projects.
 5. US-08 Xcode, US-09 Docker, US-10 ML caches, US-16 storage watch, US-21 Go Pro.

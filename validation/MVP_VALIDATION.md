@@ -53,6 +53,8 @@ Trust KPIs ask whether people will let the app act. Value KPIs ask whether it wa
 
 **Scale:** 🟢 met the target · 🟡 close, within 15 points · 🔴 missed by more, or any unsafe action.
 
+> **Disclosure:** these KPI ratings and decision rules were rewritten on Nov 4 (commit `0e1ab0e`), after the results were tallied. The earlier version used a points scorecard (green 2, yellow 1, red 0) and put the undo rate under Accuracy. Under that earlier version the decision was also **Pivot** (Trust 8/8, Value 2/8), so the change did not change the outcome.
+
 **Decision rules:**
 - **Validated:** no trust KPI is 🔴, and every value KPI is 🟢.
 - **Pivot:** no trust KPI is 🔴, but a value KPI isn't 🟢. The engine works, but it's aimed at the wrong problem or people.
