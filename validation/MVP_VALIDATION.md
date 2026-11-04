@@ -151,6 +151,8 @@ This is a **customer-segment pivot** (from everyone with a Mac to CS students) p
 **New hypothesis:**
 
 > CS students whose laptops are over 80% full will, without us in the room, approve a validated plan that actually frees at least 10 GB of rebuildable developer clutter in their first session (≥60% of testers), and at least 40% will run it again within 30 days.
+>
+> **Moat KPI** *(proposed; team to confirm)*: in a head-to-head with CleanMyMac's purge on their own laptops, at least 50% of those testers prefer Cleanasaurus, and none lose work with it.
 
 **What it looks like:**
 
@@ -200,7 +202,7 @@ This is the MVP's duplicate proof made broader. Today the app may delete a file 
 5. **It fixes the MVP's two biggest value flaws.** Rebuildables are actually deleted, so space is actually freed. And the app can finally remove things that aren't duplicates, with proof.
 6. **We are the customer, and we can reach more of them.** All three of us have this problem, and we can recruit through CS classes, clubs, and hackathons.
 7. **There's room to grow.** SlashData estimates [48.4 million developers worldwide](https://www.slashdata.co/post/global-developer-population-trends-2025-how-many-developers-are-there) as of Q3 2025. Students are the beachhead, and working developers come next.
-8. **The competition proves the pain but leaves a gap.** Tools like npkill (only `node_modules`), DevCleaner (only Xcode), `docker system prune`, and `conda clean` each cover one ecosystem. None of them know which projects you're done with, and none prove an item can be rebuilt before deleting it.
+8. **The competition proves the pain but leaves a gap.** Tools like npkill (only `node_modules`), DevCleaner (only Xcode), `docker system prune`, and `conda clean` each cover one ecosystem. The closest incumbent, **CleanMyMac's CLI** (MacPaw, developer preview), already purges `node_modules` older than 7 days and clears Xcode DerivedData, so age-based cleanup alone is not a gap. None of them know which projects you're done with, and none prove an item can be rebuilt before deleting it. Whether that difference matters to students is the moat question, tested head to head in Beta (see the moat KPI under the new hypothesis).
 
 **Why not the other directions?**
 

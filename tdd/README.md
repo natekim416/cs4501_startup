@@ -9,12 +9,12 @@
 | Metric | Value | How it's measured |
 |---|---|---|
 | User stories | **29** | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
-| GitHub issues logged vs. closed | **29 logged, 10 closed** | 6 closed as already built in the MVP (#25–#30), 4 closed by Alpha work (#3, #6, #12, #13). #7 and #8 were reopened because parts of their criteria aren't wired into plans yet |
-| Automated tests | **114** unit and integration tests, plus a **14-step** end-to-end UI test | `npm test`, `npm run test:ui` |
-| Average tests per issue | **3.9** (114 / 29) | Every issue has at least 2 tests; see §3 |
-| Pass rate | **100% of runnable tests** (69/69). 45 more are written for stories not built yet and run as `todo` (61% of all 114) | [`05-green-run.txt`](05-green-run.txt) |
-| Line coverage (backend) | **94.5%** lines, **88.6%** branches, 93.1% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). The UI (renderer, main) is exercised by the end-to-end test but not included in the measurement |
-| AI-generated vs. refined | **128 of 128 checks AI-generated (100%)**. **10 refined** after AI review (§5). **0 refined by a team member so far** | Commit history; §5 |
+| GitHub issues logged vs. closed | **29 logged, 10 closed on GitHub**, plus **4 more built** on `alpha-review` (#4, #7, #8, #20) that close when it merges, so **14 of 29 done** | Closed: 6 already built in the MVP (#25–#30), 4 by Alpha work (#3, #6, #12, #13) |
+| Automated tests | **121** unit and integration tests, plus a **14-step** end-to-end UI test | `npm test`, `npm run test:ui` |
+| Average tests per issue | **4.2** overall (121 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
+| Pass rate | **100% of runnable tests (81/81)**. Counting every test: **67% (81/121)**. The other 40 (33%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt) |
+| Line coverage (`backend/` only) | **95.7%** lines, **90.5%** branches, 94.6% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
+| AI-generated vs. refined | **100% AI-generated** (121 tests + 14 UI steps). **14 changed or added because of AI review** (§5). **0 refined by a team member so far** | Commit history; §5 |
 
 ## 2. How we ran it, and what the history actually shows
 
@@ -25,7 +25,7 @@
    - The later LLM tests (§2 step 5) failed on real assertions.
 3. **Built the core until green.** We built the rebuild proof, labels, and JS and Python detection (`d2f885d`), then wired them into the validator, executor, engine, and planner (`454d384`). The first implementation took minutes, not days, because Claude wrote it.
 4. **Tests for unbuilt stories stay red on purpose.** They run on every `npm test` and are marked `todo` with their issue number. An independent review found four of them that passed even though their story wasn't built. They tested the wrong thing, so we tightened them (§5).
-5. **The Claude path got its own tests later.** The independent review found the LLM planner had 0% coverage. Tests LLM-1…6 use a fake Anthropic client and were committed before the code change (`3464586` red, saved as [`03-red-run-llm.txt`](03-red-run-llm.txt); `c4c4aee` green).
+5. **The Claude path got its own tests later.** The independent review found the LLM planner had 0% coverage. Tests LLM-1…6 use a fake Anthropic client and were committed before the code change (`3464586` red, then `c4c4aee` green). The red output in [`03-red-run-llm.txt`](03-red-run-llm.txt) was captured right after `3464586` but committed together with `c4c4aee`.
 6. **CI.** [`.github/workflows/test.yml`](../.github/workflows/test.yml) runs `npm test` on every push. It was added after the first red commit, and our first push was the finished branch. So **GitHub only shows green runs**: the red steps live in the commit history and the saved run files, not on CI.
 
 | Commit | What it contains | Result |
@@ -37,6 +37,10 @@
 | `14138e7` | REG-1 and REG-2 regression tests with a planner fix | 🟢 (test and fix in one commit, so red isn't shown) |
 | `3464586` | LLM-1…6 tests, and four weak todo tests made able to fail | 🔴 6 LLM tests fail on assertions |
 | `c4c4aee` | Planner accepts an injected client; coverage script | 🟢 69/69, 94.5% lines |
+| `dab3cfb` → `659210e` | US-03 tests switched on and 2 added (red), then clean-by-intent | 🔴 5 fail → 🟢 |
+| `91356d7` → `d02ed7a` | Plan-level tests for caches and conda (red), then the wiring; REG-3 added after its fix | 🔴 2 fail → 🟢 |
+| US-19 commits | Tests switched on (red; one test bug fixed), then unsigned-is-unknown | 🔴 2 fail → 🟢 |
+| LLM-7 commit → next | Claude's prompt gets course, age, and uncommitted status | 🔴 1 fail → 🟢 81/81 |
 
 ## 3. Every GitHub issue and its tests
 
@@ -44,11 +48,11 @@
 |---|---|---|---|---|
 | #2 | US-01 Storage breakdown | Must | `us01-storage-breakdown.test.js` (3) | 🔴 todo |
 | #3 | US-02 Label rebuildable vs. not | Must | `us02-labels.test.js` (5) | 🟢 pass |
-| #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (3) | 🔴 todo |
+| #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (5), LLM-7, REG-3, REG-4 | 🟢 pass (on `alpha-review`) |
 | #5 | US-04 Protect projects | Must | `us04-protect-projects.test.js` (3) | 🔴 todo |
 | #6 | US-05 Rebuild proof | Must | `us05-rebuild-proof.test.js` (12) | 🟢 pass |
-| #7 | US-06 JavaScript packages | Must | `us06-javascript.test.js` (6) | 🟡 tests pass; caches not offered in plans yet (reopened) |
-| #8 | US-07 Python environments | Must | `us07-python.test.js` (5) | 🟡 tests pass; conda export not wired into plans yet (reopened) |
+| #7 | US-06 JavaScript packages | Must | `us06-javascript.test.js` (7) | 🟢 pass; caches now offered in plans (on `alpha-review`) |
+| #8 | US-07 Python environments | Must | `us07-python.test.js` (6) | 🟢 pass; conda export wired into plans (on `alpha-review`) |
 | #9 | US-08 Xcode | Must | `us08-xcode.test.js` (3) | 🔴 todo |
 | #10 | US-09 Docker | Must | `us09-docker.test.js` (4) | 🔴 todo |
 | #11 | US-10 ML caches | Must | `us10-ml-caches.test.js` (3) | 🔴 todo |
@@ -60,7 +64,7 @@
 | #17 | US-16 Storage watch | Must | `us16-storage-watch.test.js` (3) | 🔴 todo |
 | #18 | US-17 Semester sweep | Could | `us17-semester-sweep.test.js` (2) | 🔴 todo |
 | #19 | US-18 One-sentence summary | Must | `us18-summary.test.js` (3) | 🔴 todo |
-| #20 | US-19 Unsigned isn't malware | Must | `us19-unsigned.test.js` (2) | 🔴 todo |
+| #20 | US-19 Unsigned isn't malware | Must | `us19-unsigned.test.js` (2) | 🟢 pass (on `alpha-review`) |
 | #21 | US-20 Local model | Could | `us20-local-model.test.js` (2) | 🔴 todo |
 | #22 | US-21 Logs and Go Pro | Must | `usage-log.test.js` (8, built part), `us21-logs-go-pro.test.js` (2) | 🟡 log built, rest todo |
 | #23 | US-22 Huge folders | Should | `us22-huge-folder.test.js` (2) | 🔴 todo |
@@ -71,7 +75,7 @@
 | #28 | US-27 Ask and remember | Built | MIN-8, `engine.test.js` (answers remembered), UI steps 8–9 | 🟢 pass |
 | #29 | US-28 Safety checks visible | Built | `engine.test.js` (rejects unsafe plans, retries), LLM-2, LLM-3 | 🟢 pass |
 | #30 | US-29 Malware from real scanners | Built | MIN-3, `engine.test.js` (flags test malware) | 🟢 pass |
-| — | Regressions | — | `regressions.test.js` REG-1, REG-2 | 🟢 pass |
+| — | Regressions | — | `regressions.test.js` REG-1…REG-4 | 🟢 pass |
 
 ## 4. What the core does now
 
@@ -99,6 +103,10 @@
 | 6 | US-08 Archives, US-13 quarantine, and US-03 ambiguity passed while their stories weren't built | Independent AI review | Tests that couldn't fail | Each now asserts the actual criterion |
 | 7 | US-14 "Undo all" passes because it already works | Independent AI review | Mislabeled | Changed from todo to a guard test |
 | 8 | The Claude planner path had 0% coverage | Independent AI review | Missing tests | Added LLM-1…6 with a fake client, red first |
+| 9 | US-19's tests pointed at the app's `Contents` folder, not the `.app` | The test run | Test bug | Fixed the path |
+| 10 | Approving a named, still-active project failed the run-time re-check | Found while wiring #7/#8 | **Bug** (REG-3) | Fixed first, test written after (says so in its name) |
+| 11 | The demo request ("done with CS 3140…") also deleted an unnamed course (`cs4774`) | Independent AI review, round 1 | **Bug** | Fixed by US-03; REG-4 guards the exact demo request |
+| 12 | Claude wasn't told a project's course, age, or uncommitted status | Independent AI review, round 1 | Missing context | LLM-7 red, then the prompt adds them |
 
 **Known limits:**
 - The secret check is cautious: a `node_modules` that ships test certificates (`.pem`) is refused.
@@ -108,8 +116,8 @@
 
 ## 6. Next stories, in sprint order
 
-1. Wire package caches (US-06) and conda export (US-07) into plans, then close #7 and #8.
-2. US-03 clean by intent: Claude maps "done with CS 3140" to projects. This is the LLM's central job, so it's first after #7 and #8. US-01 storage breakdown comes alongside it.
+1. Merge `alpha-review` (closes #4, #7, #8, #20). Record a real Claude run of the demo request.
+2. US-01 storage breakdown.
 3. US-15 one-click rebuild and US-14 per-action undo.
-4. US-18 summary and US-19 unsigned-is-unknown.
+4. US-18 summary.
 5. US-08 Xcode, US-09 Docker, US-10 ML caches, US-16 storage watch, US-21 Go Pro.

@@ -3,6 +3,8 @@
 // rule-based planner so the app can still be demoed (shown as DEMO MODE in the UI).
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { projectInfo } = require('./devclutter');
+const { courseCodes } = require('./intent');
 
 const MODEL = 'claude-opus-5-5';
 const MAX_FILES_IN_PROMPT = 400;
@@ -61,9 +63,18 @@ Rules:
 - Only put new folders and moved files inside the allowed destination roots.
 - Never act on files in "never" zones. Files in "ask" zones are allowed but the user will be asked.
 - Follow the user's saved preferences.
+- Don't propose deleting anything in a project with uncommitted: true or last_changed_days under 30 unless the user named that project; the validator will reject it anyway.
 - If the user says which classes or projects they're done with, delete only artifacts from those projects (use the "projects" list; course codes like "CS 3140" match folder names like cs3140-hw1). Put the project name at the start of each reason. If you can't tell which projects they mean, ask with the candidate projects as options instead of guessing.
 - If something is ambiguous or unusual (files that look like versions of each other, a request that could mean two things), do not guess: add a question with 2-4 short options and leave those files alone.
 - If you receive validator errors, fix exactly those problems and return the full corrected plan.`;
+
+// Course code, age, and uncommitted work for a project, so Claude can match "done with CS 3140"
+// and avoid proposing work in progress. The validator still checks all of it independently.
+function describeProject(project) {
+  const info = projectInfo(project);
+  const code = courseCodes(path.basename(project))[0];
+  return { course: code ? `${code.replace(/\d+$/, '').toUpperCase()} ${code.match(/\d+$/)[0]}` : null, last_changed_days: info.lastChangedDays, uncommitted: info.uncommitted };
+}
 
 function summarizeScan(scan, findings, profile, dev = [], caches = []) {
   const dupIndex = new Map();
@@ -81,8 +92,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = []) {
     files_omitted: Math.max(0, scan.files.length - MAX_FILES_IN_PROMPT),
     duplicate_groups: scan.duplicates.map((g, i) => ({ group: i + 1, files: g.files })),
     malware_findings: findings.map((f) => ({ path: f.path, evidence: f.evidence })),
-    rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason })),
-    projects: [...new Set(dev.map((d) => path.basename(d.project)))],
+    rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason, ...describeProject(d.project) })),
+    projects: [...new Set(dev.map((d) => d.project))].map((p) => ({ name: path.basename(p), ...describeProject(p) })),
     package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],

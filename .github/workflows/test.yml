@@ -20,3 +20,5 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm test
+      # A todo test that passes can't be testing its story, so fail the build.
+      - run: npm run test:todos

@@ -41,7 +41,15 @@ These nine requirements set Cleanasaurus apart, cover the MVP, and hold its LLM/
 
 **How the LLM fits in:** Claude writes the plan, and plain code decides whether it can run. Claude reads the request, file names and metadata, permission zones, and saved answers, then returns a plan in a fixed JSON format. It never touches a file, flags malware, or clears a folder for deletion. The validator, the malware scanners, and (after the pivot) the rebuild proof decide those. Without an API key, an offline rule-based planner stands in so the app can still be demoed.
 
-**What sets us apart:** tools like npkill, DevCleaner, `docker system prune`, and `conda clean` each cover one ecosystem. None of them know which projects you're done with, and none prove an item can be rebuilt before deleting it ([validation §3.3](../validation/MVP_VALIDATION.md#33-why-this-is-sensible)).
+**What sets us apart:** tools like npkill, DevCleaner, `docker system prune`, and `conda clean` each cover one ecosystem. The closest incumbent is **CleanMyMac** (MacPaw): its CLI, a developer preview, already purges `node_modules` older than 7 days and clears Xcode DerivedData, with an ignore list ([MacPaw docs](https://github.com/MacPaw/cleanmymac-cli/wiki/Find-and-Remove-Old-node_modules-on-Mac)). None of them prove an item can be rebuilt before deleting it ([validation §3.3](../validation/MVP_VALIDATION.md#33-why-this-is-sensible)).
+
+**Our moat, if an incumbent adds an LLM front end.** A chat box on top of age-based purging still deletes by age. Ours is the combination:
+1. **Proof per folder** (FR6): lockfile present and hashed, gitignored, nothing tracked, no uncommitted work, no secrets. Anything we can't prove stays NEVER.
+2. **Rebuild, not just delete** (FR9): the exact command is saved, so undo still works after the files are gone.
+3. **Intent** (FR7): the LLM maps "I'm done with CS 3140 and the hackathon" to projects; plain code decides who may skip the 30-day rule.
+4. **What it learns** (FR4): saved answers ("keep anything on my resume") carry into every later plan.
+
+Parts 1 and 2 are copyable code, so on their own they aren't a moat. The bet is that 3 and 4 together, built on a reputation for never losing work, make students prefer us over a purge tool. That's testable, so it's a Beta KPI (§6): **at least 50% of testers prefer Cleanasaurus over CleanMyMac's purge, head to head** *(proposed; team to confirm)*.
 
 ### Functional
 
