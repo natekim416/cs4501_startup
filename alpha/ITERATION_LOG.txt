@@ -70,3 +70,44 @@ report already asked for:
   failed the run-time re-check, because the "named" list wasn't kept.
   The fix came first; test REG-3 was written after it, and it says so.
   Results: 119 tests, 77 pass, 0 fail, 42 todo. UI 14/14.
+
+[R1-c] US-19, "unsigned isn't malware" (issue #20). Built and passing.
+  Why: during validation, C4's own unsigned app was flagged as malware.
+  Tests: the 2 todo tests were turned on and failed. One was a TEST BUG:
+  it passed the app's inner Contents folder, not the .app itself. Fixed.
+  Code: app/backend/malware.js. A finding whose only evidence is
+  "Unsigned app or installer" now has severity "unknown",
+  quarantine:false, and the label "Unknown: not signed by a verified
+  developer". Real findings carry quarantine:true and a plain-words
+  recommendation ("Likely unwanted software. Quarantine it.").
+  app/backend/engine.js keeps unknown apps separate (unknownApps), so
+  only real findings reach the planner and validator.
+  Results: 119 tests, 79 pass, 0 fail, 40 todo. UI 14/14.
+
+---------------------------------------------------------------------
+ROUND 1 RESULT: 5.25 / 10 (grader on snapshot 3f3ab65)
+---------------------------------------------------------------------
+Scores: Hook/validation 1 . Demo/LLM 2 . Metrics 3 . Next steps 3 .
+Delivery 3 (provisional)
+Biggest issues: placeholder validation data (needs humans), the LLM's
+central job unbuilt (fixed in R1-a), no live Claude run (needs an API
+key), and 0 human-refined tests (needs the team).
+Machine fixes it asked for, and how I handled each:
+  1  "61% of all 114" is wrong (45/114 is 39%)      -> R2 fix
+  2  #7 and #8 show Closed in the PDF, Open on GitHub -> built in R1-b;
+     the docs say "closes at merge"; no GitHub edits without approval
+  3  The doc never mentions CleanMyMac or the moat  -> R2 fix (moat KPI
+     marked "team to confirm")
+  4  Claude's prompt lacks project metadata         -> R2 fix (test first)
+  5  The offline planner deletes cs4774 for a CS 3140 request
+                                                    -> fixed by R1-a;
+     regression test on the demo folder added in R2
+  6  Script D3 narrates offline results as Claude's -> R2 rewrite
+  7  The slide 5 screenshot uses a different request -> R2 fix
+  8  "Claude path tested" / "Claude picks projects" overstated -> R2 reword
+  9  CI can't see todo tests                         -> R2: CI fails if a
+     todo test starts passing
+  10 Coverage includes scripts/                      -> R2: backend only
+  11 The LLM red-run file was committed with the green commit -> R2 note
+  12 "[UPDATE THIS PARAGRAPH]" left in the script    -> stays until the
+     team review happens
