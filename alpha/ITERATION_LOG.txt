@@ -199,3 +199,23 @@ ROUND 2 FIXES (from the round 1 report)
   check passes.
   Built on this branch, closing at merge: #4, #7, #8, #14, #16, #19,
   #20. That's 17 of 29 done.
+
+[R2-k] US-14, undo one action (#15). Built and passing.
+  Why: C3 had to drag two screenshots back by hand, and N3 undid an
+  entire 41-action plan to get back one essay.
+  Tests: 2 todo tests were turned on and failed. The third ("Undo all")
+  is a guard and still passes.
+  Code changes:
+  - app/backend/executor.js: steps record their actionId.
+    undoAction(batchId, actionId) reverses one step, recreating its
+    folder if needed. Shared reverse() logic. undoLast() skips steps
+    already undone.
+  - Engine.undoAction(), plus an "undo-one" IPC channel in main.js and
+    preload.js. The Done message has "Undo just one…" with a button for
+    each action.
+  - The UI test clicked the last ".undo-row" button, which was now a
+    per-action button. The new buttons use ".undo-one-row", so the main
+    UNDO is unchanged.
+  Results: 121 tests, 91 pass, 0 fail, 30 todo. UI 14/14.
+  Built on this branch, closing at merge: #4, #7, #8, #14, #15, #16,
+  #19, #20. That's 18 of 29 done.
