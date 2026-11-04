@@ -14,7 +14,7 @@ function deleted() {
   return { project, recipe };
 }
 
-test('US-15 Rebuild runs the recorded command in the project and reports success', TODO, () => {
+test('US-15 Rebuild runs the recorded command in the project and reports success', () => {
   const { rebuild } = require('../../backend/rebuild');
   const { project, recipe } = deleted();
   const calls = [];
@@ -23,7 +23,7 @@ test('US-15 Rebuild runs the recorded command in the project and reports success
   assert.strictEqual(res.ok, true);
 });
 
-test('US-15 if the lockfile changed since deletion, the app warns first', TODO, () => {
+test('US-15 if the lockfile changed since deletion, the app warns first', () => {
   const { rebuild } = require('../../backend/rebuild');
   const { project, recipe } = deleted();
   fs.writeFileSync(path.join(project, 'package-lock.json'), 'changed');
@@ -31,7 +31,7 @@ test('US-15 if the lockfile changed since deletion, the app warns first', TODO, 
   assert.match(res.warning, /new lockfile/i);
 });
 
-test('US-15 a failed rebuild shows the command to run by hand and is recorded', TODO, () => {
+test('US-15 a failed rebuild shows the command to run by hand and is recorded', () => {
   const { rebuild } = require('../../backend/rebuild');
   const { recipe } = deleted();
   const log = [];
