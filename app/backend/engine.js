@@ -36,7 +36,8 @@ function countOps(actions) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null } = {}) {
+    this.llmClient = llmClient;
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.executor = new Executor(dataDir);
@@ -52,7 +53,7 @@ class Engine {
   }
 
   get mode() {
-    return this.apiKey ? 'llm' : 'demo';
+    return this.apiKey || this.llmClient ? 'llm' : 'demo';
   }
 
   // Practice runs (the guided demo, --demo-folder) aren't real use, so they stay out of the usage log.
@@ -123,7 +124,7 @@ class Engine {
     let check;
 
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await makePlan({ request, ...ctx, previous, apiKey: this.apiKey });
+      const made = await makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined });
       plan = made.plan;
       check = validate(plan, ctx);
       const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };

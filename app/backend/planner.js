@@ -87,8 +87,7 @@ function summarizeScan(scan, findings, profile, dev = []) {
   };
 }
 
-async function llmPlan({ request, scan, dev, findings, profile, previous, apiKey }) {
-  const client = new Anthropic({ apiKey });
+async function llmPlan({ request, scan, dev, findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
   let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
@@ -222,8 +221,9 @@ function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
   return { summary, actions, questions };
 }
 
+// An injected client (tests, or a future server proxy) also means "use the LLM".
 async function makePlan(args) {
-  if (args.apiKey) return { mode: 'llm', plan: await llmPlan(args) };
+  if (args.apiKey || args.client) return { mode: 'llm', plan: await llmPlan(args) };
   return { mode: 'demo', plan: demoPlan(args) };
 }
 
