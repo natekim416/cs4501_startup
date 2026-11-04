@@ -46,3 +46,27 @@ report already asked for:
   Demo check: the dev demo request targets only cs3140-* and
   hoohacks-2026. hoohacks is rejected for uncommitted work, and try 2
   passes with the two cs3140 folders.
+
+[R1-b] Package caches (#7) and conda environments (#8) are now offered
+  in plans.
+  Why: both issues were reopened because their tests passed but the
+  features weren't reachable from a plan.
+  Tests: commit 91356d7 added one plan-level test to each story. Both
+  failed, then passed in d02ed7a.
+  Code changes:
+  - New action "clear_cache" (engine, validator, executor, planner, UI).
+    The validator allows it only for the npm, Yarn, and pnpm cache paths
+    from toolCaches(). Anything else fails with "not a package-manager
+    cache". The executor empties the cache but keeps its folder. The
+    offline planner offers caches when the request mentions "cache", and
+    Claude's prompt lists them as package_caches.
+  - Engine options "home" and "condaRun" (for tests). scanFolder now
+    exports inactive conda environments that have no environment.yml.
+    The export becomes the recipe, and the proof accepts it.
+  - Limitation: the Yarn and pnpm caches live in ~/Library, which is a
+    NEVER zone by default, so only the npm cache is offered unless the
+    user changes that zone.
+  BUG FOUND WHILE WIRING (REG-3): approving a named, still-active project
+  failed the run-time re-check, because the "named" list wasn't kept.
+  The fix came first; test REG-3 was written after it, and it says so.
+  Results: 119 tests, 77 pass, 0 fail, 42 todo. UI 14/14.
