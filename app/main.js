@@ -55,6 +55,7 @@ function registerIpc() {
     usage: engine.usage.status(),
     demoFolder: arg('demo-folder'),
     screenshot: Boolean(arg('screenshot')),
+    screenshotRequest: arg('screenshot-request'),
   }));
   ipcMain.handle('pick-folder', async () => {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'], defaultPath: path.join(os.homedir(), 'Downloads') });

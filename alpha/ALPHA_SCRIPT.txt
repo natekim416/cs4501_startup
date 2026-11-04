@@ -61,43 +61,48 @@ D1. (Point at the folder panel.) This is a messy code folder: eight
 D2. (Type:) "I'm done with CS 3140 and the hackathon. Free up space."
     Point at MODE: CLAUDE. This goes to Claude with file names and
     sizes only, never file contents.
-D3. (Point at the Safety Log.) Claude's first plan failed. The validator
-    rejected three folders and said exactly why. "hoohacks-2026 has
-    uncommitted changes." "Contains .env, which may hold secrets." Those
-    reasons went back to Claude, and the second plan passed.
+D3. (Point at the plan, then the Safety Log.) Claude matched "CS 3140"
+    and "the hackathon" to these projects. It ignored my other classes,
+    the secret .env, and the VM. Then the validator rejected one folder:
+    "hoohacks-2026 has uncommitted changes." That reason went back, and
+    the second plan passed. SAY WHAT YOU SEE: if Claude's run differs
+    (for example, it skips hoohacks on its own), narrate that instead.
 D4. (Point at the plan card.) Every line is a folder we can prove is
     rebuildable, with the exact command to rebuild it, like npm ci. The
     LLM decides which projects I meant. Plain code decides whether
-    anything may be deleted. Nothing runs until I approve.
+    anything may be deleted, and only projects I named may skip the
+    30-day rule. Nothing runs until I approve.
 D5. (Click APPROVE.) Done. FREED is measured on the disk, not
     estimated. That's the bug from our MVP, fixed. (Click UNDO.) Undo
     can't un-delete a build folder, so it hands me the rebuild commands.
-D6. IF THE LIVE DEMO FAILS: "Here's the same run, recorded," then go to
-    slide 5 and walk through the Safety Log in the screenshot. If you're
-    on the offline planner, say so: "This is our offline planner. With
-    Claude, it picks the projects from what you say."
+D6. IF THE LIVE DEMO FAILS: "Here's the same request on our offline
+    planner," then go to slide 5. Its screenshot is the exact scripted
+    request: only the CS 3140 and hackathon projects, hoohacks rejected,
+    and try 2 passing. Say plainly that it's the offline planner.
 
 [SLIDE 6 - ENGINEERING METRICS - 5:30-7:00]
 How we built it. Twenty-nine user stories, every one a GitHub issue.
-Twenty-nine logged, ten closed: six we'd already built in the MVP, and
-four built in the Alpha. We wrote a hundred and fourteen automated tests
-before writing the code they test, plus a fourteen-step test that clicks
-through the real app. That's about four tests per issue, and every issue
-has at least two. All sixty-nine tests that can run pass. The other
-forty-five are written for stories we haven't built, and we keep them
-red on purpose. Backend line coverage is ninety-four point five percent.
-And the honest number: one hundred percent of these tests were drafted
-by Claude. They were refined ten times after AI review, which caught
-two real bugs and four tests that could never fail. No human on our team
-has refined one yet. That review is scheduled before Beta.
+Fourteen are done: ten closed on GitHub, and four more built on our
+review branch that close when it merges. We wrote a hundred and
+twenty-one automated tests before the code they test, plus a
+fourteen-step test that clicks through the real app. That's about four
+tests per issue, and every issue has at least two. All eighty-one tests
+that can run pass. That's sixty-seven percent of everything we wrote,
+because forty tests are for stories we haven't built yet. We keep those
+red, and our CI fails if one ever passes by accident. Backend line
+coverage is ninety-five point seven percent. And the honest number: one
+hundred percent of these tests were drafted by Claude. AI review changed
+fourteen of them and caught four real bugs. No human on our team has
+refined one yet. That review is scheduled before Beta.
 [UPDATE THIS PARAGRAPH IF THE TEAM REVIEW HAPPENS BEFORE CLASS.]
 
 [SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
 For the Alpha, we finished validation and the decision, all the stories
-and issues, the rebuild proof with JavaScript and Python cleanup, honest
-space numbers, and a tested Claude path. For Beta: four sprints. First,
-"done with CS 3140" with Claude, then one-click rebuild, then Xcode,
-Docker, and ML caches, then the test kit. Then we test with twenty CS
+and issues, the rebuild proof, cleaning by intent, JavaScript, Python,
+and cache cleanup, and honest space numbers. For Beta: four weekly
+sprints starting November ninth. First, recorded live Claude runs, then
+one-click rebuild, then Xcode, Docker, and ML caches, then the test
+kit. Then we test with twenty CS
 students we don't know. We'll call it a success if at least sixty
 percent approve a plan that frees ten gigabytes, rebuilds work
 ninety-five percent of the time, nothing is ever lost, and at least half
@@ -113,10 +118,12 @@ A: Their purge deletes by age alone. We prove each folder is rebuildable
    whether students actually prefer that.
 
 Q: "What decision did Claude make that a regex couldn't?"
-A: Matching "done with CS 3140 and the hackathon" to the right projects,
-   and asking when it's ambiguous. Being honest: that matching (US-03)
-   is our next sprint. Today Claude chooses among the rebuildable items,
-   and the validator enforces safety.
+A: Plain requests like "done with CS 3140" we could handle with a regex,
+   and our offline planner does. Claude is there for phrasings a regex
+   can't handle, like "the class with the robot project" or "everything
+   from last spring," and for deciding when to ask. Our tests use a
+   simulated Claude, so today's live run is the real evidence. Safety
+   never depends on it: the validator rechecks every folder.
 
 Q: "Your tests are all AI-generated. Did you review them?"
 A: Claude reviewed them, and an independent AI review found four weak

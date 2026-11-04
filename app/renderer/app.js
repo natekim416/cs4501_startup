@@ -399,7 +399,7 @@ $('#key-form').addEventListener('submit', async (e) => {
   if (!init.usage.asked && !init.screenshot) offerUsageLog();
   if (init.demoFolder) await useFolder(init.demoFolder);
   if (init.screenshot) {
-    await sendRequest('Free up space and sort my school files by class');
+    await sendRequest(init.screenshotRequest || 'Free up space and sort my school files by class');
     setTimeout(() => {
       const users = chat.querySelectorAll('.msg.user');
       chat.scrollTop = users[users.length - 1].offsetTop - chat.offsetTop - 12;

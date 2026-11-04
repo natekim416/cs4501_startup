@@ -119,6 +119,7 @@ button { font: inherit; cursor: pointer; }
 
 /* ---------- Buttons ---------- */
 .btn {
+  white-space: nowrap;
   font-family: var(--pixel);
   font-size: 11px;
   padding: 10px 14px;
