@@ -175,6 +175,8 @@ function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
   // Similar names with different contents are versions: ask instead of guessing.
   const byStem = new Map();
   for (const f of scan.files) {
+    // Files inside code projects are source, not versions of a document.
+    if (profile.zoneFor(f.path) === 'never') continue;
     const stem = f.name.toLowerCase().replace(/\s*\(\d+\)|[-_ ]?(final|v\d+|copy)(?=[-_ .(]|$)/gi, '');
     if (!byStem.has(stem)) byStem.set(stem, []);
     byStem.get(stem).push(f);

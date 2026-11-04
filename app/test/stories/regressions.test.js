@@ -1,0 +1,31 @@
+// Bugs found while building the Alpha. Each test was written to fail before the fix.
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
+const { tmp, makeJsProject } = require('./helpers');
+const { Engine } = require('../../backend/engine');
+
+test('REG-1 identical files inside code projects are not proposed as duplicates (found by US-11 test)', async () => {
+  const root = tmp();
+  makeJsProject(root, 'a');
+  makeJsProject(root, 'b');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const plan = await engine.plan('Free up space');
+  assert.ok(plan.actions.every((a) => a.op !== 'trash_duplicate'));
+  assert.ok(plan.attempts[0].ok, 'first try should pass: nothing invalid was proposed');
+});
+
+test('REG-2 source files in different code projects do not trigger a "versions" question (found in a screenshot)', async () => {
+  const root = tmp();
+  makeJsProject(root, 'a');
+  makeJsProject(root, 'b');
+  fs.writeFileSync(path.join(root, 'b', 'index.js'), 'console.log("different")\n');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const plan = await engine.plan('Organize everything');
+  assert.ok(!plan.questions.some((q) => /versions of "index\.js"/.test(q.text)), JSON.stringify(plan.questions));
+});
