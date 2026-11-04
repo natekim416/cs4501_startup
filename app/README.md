@@ -13,7 +13,8 @@ cd app
 npm install
 npm run demo        # creates a messy fake folder at ~/CleanasaurusDemo/Downloads and opens the app on it
 npm start           # opens the app; pick any folder with SELECT FOLDER, or press ▶ DEMO for a guided tour
-npm test            # 25 backend tests, incl. 9 minimal-functionality checks (MIN-1 … MIN-9)
+npm test            # 62 backend tests (+46 todo for stories not built yet), incl. MIN-1 … MIN-9 and one file per user story
+npm run dev-demo    # creates fake dev projects at ~/CleanasaurusDemo/code (old, active, dirty, no lockfile, .env, a VM) and opens the app
 npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions, usage log
 ```
 

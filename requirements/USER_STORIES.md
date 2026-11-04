@@ -2,7 +2,7 @@
 
 **Team:** Nate Kim, Nate Park, Wesley Chang · **Builds on:** [MVP validation and pivot decision](../validation/MVP_VALIDATION.md)
 
-> These stories come from the requirements in [§2](#2-requirements): the MVP requirements we're keeping, plus what the [validation sessions](../validation/MVP_VALIDATION.md) found. The evidence column points to the draft validation sessions (C1–C5, N1–N5) or to a section of the report. If the real sessions turn out differently, update the evidence and the priorities to match.
+> These stories come from the requirements in [§2](#2-requirements): the MVP requirements we're keeping, plus what the [validation sessions](../validation/MVP_VALIDATION.md) found. The evidence column points to the validation sessions (C1–C5, N1–N5) or to a section of the report. Every story is a GitHub issue (#2–#30), and the tests for each one are listed in [tdd/README.md](../tdd/README.md#2-every-github-issue-and-its-tests).
 
 **Contents:** [1. How we derived them](#1-how-we-derived-the-stories) · [2. Requirements](#2-requirements) · [3. Personas](#3-personas) · [4. Stories](#4-user-stories) · [5. Won't do yet](#5-wont-do-this-release) · [6. Release plan](#6-release-plan) · [7. Traceability](#7-traceability)
 
