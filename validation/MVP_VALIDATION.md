@@ -1,6 +1,6 @@
 # Cleanasaurus MVP Validation
 
-**Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Test 1:** ________ · **Test 2:** ________
+**Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Testing:** October 30 – November 2, 2026 (Test 1 sessions, then 3 days of Test 2)
 
 **Decision: Pivot.** Testers trusted the app (2 of 3 trust KPIs met, and the third close), but it didn't solve a problem they cared about (0 of 2 value KPIs met). We keep the engine and aim it at CS students' rebuildable developer clutter.
 
