@@ -20,3 +20,29 @@ ROUND 1: started Nov 4, snapshot 3f3ab65
 ---------------------------------------------------------------------
 While the grader reviews the snapshot, I'm working on fixes the round 0
 report already asked for:
+
+[R1-a] US-03 clean by intent (issue #4). Built and passing.
+  Why: the earlier review said the LLM's central job ("I'm done with
+  CS 3140") wasn't built, so the demo showed the validator, not the AI.
+  Tests: commit dab3cfb turned on 3 todo tests and added 2 new ones
+  (course-code edge cases, the Claude path). 5 failing, then 5 passing
+  in commit 659210e.
+  Code changes:
+  - NEW app/backend/intent.js: matchProjects(request, names) finds
+    course codes ("CS 3140", "cs-3140", "CS_3140") and keywords
+    ("hackathon" matches "hoohacks"), ignores filler words like "space",
+    and asks "Which class do you mean?" when only a department is given.
+  - app/backend/engine.js: works out which projects the request names
+    and passes them to the validator as "named". Plain code decides who
+    may skip the 30-day rule, not the LLM. A named project changed within
+    30 days comes back unchecked, with a "still active" note.
+  - app/backend/planner.js: the offline planner limits "done with ..."
+    requests to the named projects. Claude's prompt now gets a
+    "projects" list and an instruction to match course codes or ask.
+  - app/backend/devclutter.js: exports lastChanged().
+  - app/renderer/app.js and style.css: actions marked checked:false
+    start unchecked and show their note.
+  Results: 116 tests, 74 pass, 0 fail, 42 todo. UI 14/14.
+  Demo check: the dev demo request targets only cs3140-* and
+  hoohacks-2026. hoohacks is rejected for uncommitted work, and try 2
+  passes with the two cs3140 folders.
