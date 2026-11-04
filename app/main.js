@@ -108,7 +108,8 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
-  engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData') });
+  // Removed duplicates go to the macOS Trash (US-13); tests pass --trash-dir to keep the real Trash clean.
+  engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData'), trashDir: arg('trash-dir') || path.join(os.homedir(), '.Trash') });
   // The generated demo folder is safe to change freely.
   if (arg('demo-folder')) {
     engine.profile.setZone(arg('demo-folder'), 'free');

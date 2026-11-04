@@ -5,7 +5,10 @@ const fs = require('fs');
 const path = require('path');
 
 class Executor {
-  constructor(dataDir) {
+  // trashDir: where removed personal files go. The app passes the macOS Trash (US-13); without it they go
+  // to the app's own Dino Bin, which keeps tests away from the real Trash.
+  constructor(dataDir, { trashDir = null } = {}) {
+    this.trashDir = trashDir;
     this.binDir = path.join(dataDir, 'dino-bin');
     this.quarantineDir = path.join(dataDir, 'quarantine');
     this.logFile = path.join(dataDir, 'undo-log.json');
@@ -48,6 +51,12 @@ class Executor {
     if (a.op === 'move' || a.op === 'rename') {
       const to = a.op === 'move' ? path.join(a.dest, path.basename(a.path)) : a.dest;
       if (fs.existsSync(to)) throw new Error(`${to} already exists`);
+      fs.renameSync(a.path, to);
+      return { type: 'move', from: a.path, to };
+    }
+    if (a.op === 'trash_duplicate' && this.trashDir) {
+      fs.mkdirSync(this.trashDir, { recursive: true });
+      const to = freeName(this.trashDir, path.basename(a.path));
       fs.renameSync(a.path, to);
       return { type: 'move', from: a.path, to };
     }
@@ -100,6 +109,15 @@ class Executor {
     this.saveLog();
     return { undone, needsRebuild };
   }
+}
+
+// Finder-style name for the Trash: "notes.pdf", then "notes 2.pdf", "notes 3.pdf"...
+function freeName(dir, name) {
+  const ext = path.extname(name);
+  const stem = name.slice(0, name.length - ext.length);
+  let candidate = path.join(dir, name);
+  for (let i = 2; fs.existsSync(candidate); i++) candidate = path.join(dir, `${stem} ${i}${ext}`);
+  return candidate;
 }
 
 function stripExecute(target) {

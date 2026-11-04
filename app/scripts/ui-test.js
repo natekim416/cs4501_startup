@@ -12,7 +12,7 @@ execFileSync('node', [path.join(__dirname, 'make-demo-folder.js'), folder]);
 execFileSync('node', [path.join(__dirname, 'make-demo-folder.js'), path.join(base, 'Real')]);
 
 const electron = require('electron');
-spawnSync(electron, ['.', `--demo-folder=${folder}`, `--data-dir=${path.join(base, 'data')}`, `--ui-test=${results}`], {
+spawnSync(electron, ['.', `--demo-folder=${folder}`, `--data-dir=${path.join(base, 'data')}`, `--ui-test=${results}`, `--trash-dir=${path.join(base, 'Trash')}`], {
   cwd: path.join(__dirname, '..'),
   env: { ...process.env, ANTHROPIC_API_KEY: '' }, // Stays in demo mode, even with a key in .env, so tests never call Claude.
   stdio: 'ignore',

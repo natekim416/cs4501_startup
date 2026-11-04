@@ -5,6 +5,7 @@ const path = require('path');
 const { scan } = require('./scanner');
 const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
 const { matchProjects } = require('./intent');
+const { summarize } = require('./summary');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
 const { makePlan } = require('./planner');
@@ -37,7 +38,7 @@ function countOps(actions) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null } = {}) {
     this.llmClient = llmClient;
     this.dataDir = dataDir;
     this.home = home;
@@ -46,7 +47,8 @@ class Engine {
     this.condaExports = {};
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
-    this.executor = new Executor(dataDir);
+    this.executor = new Executor(dataDir, { trashDir });
+    this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
     this.practiceFolders = new Set();
     this.apiKey = apiKey;
@@ -207,9 +209,21 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes])]);
+    const dayAgo = Date.now() - 864e5;
+    const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
+      try {
+        const st = fs.statSync(p);
+        return Math.max(st.atimeMs, st.mtimeMs) > dayAgo && st.isFile();
+      } catch {
+        return false;
+      }
+    });
+    const oneLine = summarize({ folder: this.folder, actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) })) }, { recentlyOpened });
     return {
       mode: this.mode,
       planId,
+      oneLine,
       summary: plan.summary,
       actions: plan.actions || [],
       questions,
@@ -269,7 +283,7 @@ class Engine {
     const showBoth = deletedEstimate > 0 && Math.abs(measuredFreed - deletedEstimate) / deletedEstimate > ESTIMATE_GAP;
     const notes = [];
     if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
-    if (binned) notes.push(`${formatBytes(binned)} moved to the Dino Bin frees up when you empty it.`);
+    if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
   }
 

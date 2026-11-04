@@ -235,6 +235,7 @@ function showPlan(result) {
         el('span', { class: 'badge pass' }, `PASSED CHECKS · TRY ${lastTry.attempt}/3`),
       ),
       list,
+      result.oneLine ? el('div', { class: 'one-line' }, result.oneLine) : null,
       el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Files can be undone; build folders can be rebuilt.')),
     );
     approve.addEventListener('click', () => runPlan(result.planId, list, approve));
@@ -311,7 +312,7 @@ async function runPlan(planId, list, approve) {
     `Done! ${res.results.length - failed.length} actions complete. ${formatBytes(res.bytesFreed)} freed on disk.` +
       (res.freedNote ? `\n${res.freedNote}` : '') +
       (failed.length ? `\n${failed.length} could not run.` : '') +
-      `\nRemoved files are in the Dino Bin. Deleted build folders can be rebuilt with the command I saved.`,
+      `\nRemoved files are in the Trash. Deleted build folders can be rebuilt with the command I saved.`,
   );
   body.append(el('div', { class: 'undo-row' }, undo));
   undo.addEventListener('click', async () => {
