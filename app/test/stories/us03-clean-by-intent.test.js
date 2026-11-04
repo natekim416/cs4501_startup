@@ -4,7 +4,6 @@ const assert = require('node:assert');
 const path = require('path');
 const { tmp, makeJsProject } = require('./helpers');
 const { Engine } = require('../../backend/engine');
-const TODO = { todo: 'US-03 (#4): intent-to-project matching not built yet' };
 
 function setup() {
   const root = tmp();
@@ -66,4 +65,24 @@ test('US-03 with Claude, a named project still in use passes the 30-day rule but
   assert.ok(res.attempts[0].ok, JSON.stringify(res.attempts));
   assert.strictEqual(res.actions[0].checked, false);
   assert.match(res.actions[0].note, /still active/i);
+});
+
+test('US-03 "but keep the final" excludes that project (found by grader round 2)', async () => {
+  const { engine } = setup();
+  const plan = await engine.plan("I'm done with CS 3140 but keep the final project");
+  const projects = plan.actions.map((a) => a.project).sort();
+  assert.deepStrictEqual(projects, ['cs3140-hw1', 'cs3140-hw2']);
+  const { matchProjects } = require('../../backend/intent');
+  const m = matchProjects('done with the hackathon except cs3140', ['hoohacks-2026', 'cs3140-hw1']);
+  assert.deepStrictEqual(m.matched, ['hoohacks-2026']);
+  assert.deepStrictEqual(m.kept, ['cs3140-hw1']);
+});
+
+test('US-03 a "done with" request that matches no project asks which ones, listing them (found by grader round 2)', async () => {
+  const { engine } = setup();
+  const plan = await engine.plan("I'm done with the class with the robot project");
+  assert.strictEqual(plan.actions.length, 0);
+  const q = plan.questions.find((x) => /which projects/i.test(x.text));
+  assert.ok(q, JSON.stringify(plan.questions));
+  assert.ok(q.options.includes('cs3140-hw1') && q.options.includes('hoohacks-2026'));
 });
