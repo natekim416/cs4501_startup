@@ -1,0 +1,22 @@
+CLEANASAURUS ALPHA - REVIEW ITERATION LOG
+=====================================================================
+Branch: alpha-review (forked from alpha-dev at 3f3ab65). main is not
+touched, and nothing is pushed.
+Loop: the elbaum-grader subagent reviews a frozen snapshot, I fix what
+it finds, then it reviews again. Each entry lists what changed and why.
+Every code change follows test-first: the test fails, then the code
+makes it pass.
+
+---------------------------------------------------------------------
+ROUND 0 (before this loop): mock grade 5.1/10
+---------------------------------------------------------------------
+Already fixed on alpha-dev, see the summary file:
+- LLM path tests, weak todo tests, coverage measured.
+- Honest TDD write-up, #7 and #8 reopened, rubric-shaped slides,
+  timed script.
+
+---------------------------------------------------------------------
+ROUND 1: started Nov 4, snapshot 3f3ab65
+---------------------------------------------------------------------
+While the grader reviews the snapshot, I'm working on fixes the round 0
+report already asked for:
