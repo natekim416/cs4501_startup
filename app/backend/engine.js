@@ -88,7 +88,8 @@ class Engine {
     this.caches = toolCaches(this.home);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
-    this.findings = malware.findings;
+    this.unknownApps = malware.findings.filter((f) => f.quarantine === false);
+    this.findings = malware.findings.filter((f) => f.quarantine !== false);
     const rebuildable = this.dev.filter((d) => d.label === 'rebuildable');
     return {
       rebuildableCount: rebuildable.length,
@@ -100,6 +101,7 @@ class Engine {
       duplicateBytes: this.snapshot.duplicates.reduce((s, g) => s + g.size * (g.files.length - 1), 0),
       malwareEngine: malware.engine,
       findings: this.findings,
+      unknownApps: this.unknownApps.map((f) => ({ name: f.name, label: f.label })),
       zone: this.profile.zoneFor(folder),
       zoneReason: this.profile.zoneInfo(folder).reason,
     };
