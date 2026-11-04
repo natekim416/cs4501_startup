@@ -156,3 +156,27 @@ ROUND 2 FIXES (from the round 1 report)
 [R2-h] UI: .btn has white-space:nowrap, so APPROVE no longer wraps.
   Results: 121 tests, 81 pass, 0 fail, 40 todo. UI 14/14. Both PDFs
   rebuilt.
+
+[R2-i] US-13, macOS Trash (#14), and US-18, one-sentence summary (#19).
+  Built and passing.
+  Why: the validation found that the Dino Bin frees nothing and is a
+  word nobody knows (N2-N4), and N3 approved 41 actions without reading
+  them.
+  Tests: 5 todo tests were turned on and failed, then passed.
+  Code changes:
+  - app/backend/executor.js: new option trashDir. trash_duplicate goes
+    there with Finder-style names ("notes 2.pdf"), and undo moves it
+    back. Without trashDir, it falls back to the Dino Bin, so tests
+    never touch the real Trash.
+  - app/main.js: the app passes ~/.Trash, or --trash-dir for tests.
+    app/scripts/ui-test.js passes a temporary Trash.
+  - NEW app/backend/summary.js: one sentence, for example "Delete 2
+    rebuildable folders (100 MB) and put 1 duplicate in the Trash.
+    Nothing outside code changes." It names any file opened today.
+  - app/backend/engine.js returns it as oneLine, and the plan card in
+    app/renderer/app.js shows it above Approve.
+  - Wording in the app and tour changed from "Dino Bin" to "Trash".
+  Results: 121 tests, 86 pass, 0 fail, 35 todo. UI 14/14. The todo
+  check passes.
+  Issues built on this branch, closing at merge: #4, #7, #8, #14, #19,
+  #20. That's 16 of 29 done (10 closed + 6 built).
