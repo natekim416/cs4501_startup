@@ -21,7 +21,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -53,6 +53,7 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - rename: rename file "path" to the full new path "dest".
 - trash_duplicate: remove "path" because it is byte-identical to "keep". Only use for files listed in the same duplicate group.
 - quarantine: isolate "path". Only for files listed in malware_findings.
+- delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
 
 Rules:
 - Every action needs a short, plain-English "reason".
@@ -62,7 +63,7 @@ Rules:
 - If something is ambiguous or unusual (files that look like versions of each other, a request that could mean two things), do not guess: add a question with 2-4 short options and leave those files alone.
 - If you receive validator errors, fix exactly those problems and return the full corrected plan.`;
 
-function summarizeScan(scan, findings, profile) {
+function summarizeScan(scan, findings, profile, dev = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -78,6 +79,7 @@ function summarizeScan(scan, findings, profile) {
     files_omitted: Math.max(0, scan.files.length - MAX_FILES_IN_PROMPT),
     duplicate_groups: scan.duplicates.map((g, i) => ({ group: i + 1, files: g.files })),
     malware_findings: findings.map((f) => ({ path: f.path, evidence: f.evidence })),
+    rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -85,9 +87,9 @@ function summarizeScan(scan, findings, profile) {
   };
 }
 
-async function llmPlan({ request, scan, findings, profile, previous, apiKey }) {
+async function llmPlan({ request, scan, dev, findings, profile, previous, apiKey }) {
   const client = new Anthropic({ apiKey });
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile))}`;
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -121,7 +123,7 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, findings, profile }) {
+function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
@@ -132,7 +134,15 @@ function demoPlan({ request, scan, findings, profile }) {
   const made = new Set(scan.dirs.map((d) => path.join(scan.root, d)));
   const gone = new Set();
   let n = 0;
-  const add = (a) => actions.push({ id: `a${++n}`, dest: '', keep: '', ...a });
+  // On a retry, leave out anything the validator already rejected instead of proposing it again.
+  const rejected = new Set();
+  if (previous && Array.isArray(previous.plan.actions)) {
+    const bad = new Set(previous.errors.map((e) => e.action));
+    for (const a of previous.plan.actions) if (bad.has(a.id)) rejected.add(`${a.op}:${a.path}`);
+  }
+  const add = (a) => {
+    if (!rejected.has(`${a.op}:${a.path}`)) actions.push({ id: `a${++n}`, dest: '', keep: '', ...a });
+  };
   const ensureDir = (dir) => {
     if (made.has(dir)) return;
     if (!made.has(path.dirname(dir)) && path.dirname(dir) !== scan.root) ensureDir(path.dirname(dir));
@@ -145,10 +155,18 @@ function demoPlan({ request, scan, findings, profile }) {
     gone.add(f.path);
   }
   if (dedupe) {
+    // Rebuildable dev folders first: that's where the space is.
+    for (const d of dev) {
+      if (d.label !== 'rebuildable' || rejected.has(d.path)) continue;
+      const project = path.basename(d.project);
+      add({ op: 'delete_rebuildable', path: d.path, project, reason: `${project}: ${d.reason}` });
+    }
     for (const g of scan.duplicates) {
       const [keep, ...rest] = g.files;
       for (const p of rest) {
         if (gone.has(p) || gone.has(keep)) continue;
+        // Identical files inside code projects (a LICENSE, an index.js) aren't clutter.
+        if (profile.zoneFor(p) === 'never' || profile.zoneFor(keep) === 'never') continue;
         add({ op: 'trash_duplicate', path: p, keep, reason: `Exact copy of ${path.basename(keep)}` });
         gone.add(p);
       }
@@ -157,6 +175,8 @@ function demoPlan({ request, scan, findings, profile }) {
   // Similar names with different contents are versions: ask instead of guessing.
   const byStem = new Map();
   for (const f of scan.files) {
+    // Files inside code projects are source, not versions of a document.
+    if (profile.zoneFor(f.path) === 'never') continue;
     const stem = f.name.toLowerCase().replace(/\s*\(\d+\)|[-_ ]?(final|v\d+|copy)(?=[-_ .(]|$)/gi, '');
     if (!byStem.has(stem)) byStem.set(stem, []);
     byStem.get(stem).push(f);

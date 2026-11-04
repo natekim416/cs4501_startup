@@ -1,15 +1,16 @@
 {
   "name": "cleanasaurus",
   "version": "0.1.0",
-  "description": "Local, chat-driven file cleaner, organizer, and malware checker with a validated plan loop.",
+  "description": "Local, chat-driven cleaner for developer clutter and personal files, with a validated plan loop and a rebuild proof.",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
     "demo-files": "node scripts/make-demo-folder.js",
     "demo": "node scripts/make-demo-folder.js && electron . --demo-folder=$HOME/CleanasaurusDemo/Downloads",
-    "test": "node --test test/*.test.js",
-    "test:ui": "node scripts/ui-test.js"
+    "test": "node --test test/*.test.js test/stories/*.test.js",
+    "test:ui": "node scripts/ui-test.js",
+    "dev-demo": "node scripts/make-dev-demo.js && electron . --demo-folder=$HOME/CleanasaurusDemo/code"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

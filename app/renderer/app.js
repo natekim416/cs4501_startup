@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE' };
 
 function formatBytes(n) {
   if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
@@ -109,6 +109,44 @@ function setMode(mode) {
   m.className = `mode ${mode}`;
 }
 
+// ---------- Usage log (opt-in) ----------
+
+function renderUsage(status) {
+  state.usageOn = status.enabled;
+  $('#usage-status').textContent = status.enabled
+    ? `On · ${status.events} event${status.events === 1 ? '' : 's'}, saved only on this computer. EXPORT makes a copy you can send to the team. Turning it off deletes the log.`
+    : 'Off, so nothing is recorded. If you turn it on, it keeps counts, sizes, and timings on this computer, never file names or what you type.';
+  $('#usage-toggle').textContent = status.enabled ? 'TURN OFF' : 'TURN ON';
+  $('#usage-export').hidden = !status.enabled;
+  if (status.asked) document.querySelector('.consent')?.closest('.msg').remove();
+}
+
+// Asked once, on first launch. Both answers look the same, and ignoring it leaves the log off.
+function offerUsageLog() {
+  const choice = (label, on, reply) =>
+    el('button', {
+      class: 'btn btn-pink',
+      onclick: async () => {
+        renderUsage(await api.setUsage(on));
+        botSay(reply);
+      },
+    }, label);
+  attach(
+    el(
+      'div',
+      { class: 'consent' },
+      el('p', {}, 'One question first: can I keep a usage log to help my team test me? It counts files, sizes, and timings, plus what you approve or undo. It never records file names, folder names, or what you type.'),
+      el('p', {}, 'The log stays on this computer unless you export it and send it yourself. You can change your mind any time under USAGE LOG, at the bottom of the right side.'),
+      el(
+        'div',
+        { class: 'options' },
+        choice('YES, KEEP A LOG', true, "Thanks! The log is on. When you're ready to send it, press EXPORT under USAGE LOG."),
+        choice('NO THANKS', false, 'No problem. Nothing is being recorded.'),
+      ),
+    ),
+  );
+}
+
 // ---------- Folder ----------
 
 async function useFolder(folder) {
@@ -122,6 +160,7 @@ async function useFolder(folder) {
   $('#folder-stats').textContent = `${info.fileCount} files · ${formatBytes(info.totalBytes)} · zone: ${info.zone.toUpperCase()}`;
   log(`Scanned with ${info.malwareEngine}`, 'info');
   let text = `Scanned ${info.fileCount} files (${formatBytes(info.totalBytes)}).`;
+  if (info.rebuildableCount) text += `\nFound ${info.rebuildableCount} build folders I may be able to rebuild (${formatBytes(info.rebuildableBytes)}).`;
   if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} sets of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
   if (info.findings.length) text += `\n${info.findings.length} file(s) look suspicious: ${info.findings.map((f) => f.name).join(', ')}.`;
   if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
@@ -196,7 +235,7 @@ function showPlan(result) {
         el('span', { class: 'badge pass' }, `PASSED CHECKS · TRY ${lastTry.attempt}/3`),
       ),
       list,
-      el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Everything can be undone.')),
+      el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Files can be undone; build folders can be rebuilt.')),
     );
     approve.addEventListener('click', () => runPlan(result.planId, list, approve));
     attach(card);
@@ -268,7 +307,12 @@ async function runPlan(planId, list, approve) {
   setDisk(res.disk);
   log(`Ran ${res.results.length - failed.length} actions`, 'pass');
   const undo = el('button', { class: 'btn' }, '↶ UNDO');
-  const body = botSay(`Done! ${res.results.length - failed.length} actions complete, ${formatBytes(res.bytesFreed)} freed.${failed.length ? `\n${failed.length} could not run.` : ''}\nRemoved files are in the Dino Bin, so nothing is gone for good.`);
+  const body = botSay(
+    `Done! ${res.results.length - failed.length} actions complete. ${formatBytes(res.bytesFreed)} freed on disk.` +
+      (res.freedNote ? `\n${res.freedNote}` : '') +
+      (failed.length ? `\n${failed.length} could not run.` : '') +
+      `\nRemoved files are in the Dino Bin. Deleted build folders can be rebuilt with the command I saved.`,
+  );
   body.append(el('div', { class: 'undo-row' }, undo));
   undo.addEventListener('click', async () => {
     undo.disabled = true;
@@ -277,7 +321,8 @@ async function runPlan(planId, list, approve) {
     $('#freed').textContent = formatBytes(state.freed);
     setDisk(r.disk);
     log(`Undid ${r.undone} steps`, 'info');
-    botSay(`Undone. ${r.undone} steps reversed.`);
+    const rebuild = (r.needsRebuild || []).map((x) => `- ${x.cwd}: ${x.command}`).join('\n');
+    botSay(`Undone. ${r.undone} steps reversed.${rebuild ? `\nThese build folders were deleted for real. Rebuild them with:\n${rebuild}` : ''}`);
   });
 }
 
@@ -286,6 +331,23 @@ async function runPlan(planId, list, approve) {
 api.onAttempt((a) => {
   if (a.ok) log(`TRY ${a.attempt}: PASS`, 'pass');
   else log(`TRY ${a.attempt}: FAIL (${a.errors.length} errors) → sent back. First: ${a.errors[0]}`, 'fail');
+});
+
+api.onUsage(renderUsage);
+
+$('#usage-toggle').addEventListener('click', async () => {
+  const on = !state.usageOn;
+  if (!on && !confirm('Turn off the usage log and delete what it has recorded?')) return;
+  renderUsage(await api.setUsage(on));
+});
+
+$('#usage-export').addEventListener('click', async () => {
+  try {
+    const saved = await api.exportUsage();
+    if (saved) botSay(`Saved a copy to ${short(saved)}. Open it to see exactly what's in it, then send it to the team.`);
+  } catch (err) {
+    botSay(`I couldn't export the log: ${err.message}`);
+  }
 });
 
 $('#composer').addEventListener('submit', (e) => {
@@ -330,9 +392,11 @@ $('#key-form').addEventListener('submit', async (e) => {
   setMode(init.mode);
   setDisk(init.disk);
   renderProfile(init.profile);
+  renderUsage(init.usage);
   botSay(
     `RAWR! I'm Cleanasaurus, your file maid.\nPick a folder, then tell me what you want in plain English.\nI check every plan for safety before you see it, and I never touch your NEVER zones.${init.mode === 'demo' ? '\n(No Claude API key found, so I\'m in DEMO MODE with offline rules.)' : ''}`,
   );
+  if (!init.usage.asked && !init.screenshot) offerUsageLog();
   if (init.demoFolder) await useFolder(init.demoFolder);
   if (init.screenshot) {
     await sendRequest('Free up space and sort my school files by class');

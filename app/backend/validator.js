@@ -4,8 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 const { hashFile } = require('./scanner');
+const { rebuildProof, measureFreeable } = require('./devclutter');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -15,7 +16,7 @@ function inside(child, root) {
   return c === r || c.startsWith(r + path.sep);
 }
 
-function validate(plan, { scan, findings, profile }) {
+function validate(plan, { scan, findings, profile, now, named, home }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -38,6 +39,7 @@ function validate(plan, { scan, findings, profile }) {
   const fileExists = (p) => files.has(p);
   const dirExists = (p) => dirs.has(p) || (!files.has(p) && isRealDir(p));
   const removed = new Map(); // path -> the copy that must survive
+  const recipes = {}; // action id -> how to rebuild what it deletes
   let bytesFreed = 0;
 
   plan.actions.forEach((a, i) => {
@@ -49,7 +51,8 @@ function validate(plan, { scan, findings, profile }) {
     if (!a.reason) return fail('Every action needs a "reason" the user can read.');
 
     const src = path.resolve(a.path);
-    const zone = profile.zoneFor(src);
+    // A code project is NEVER for moves, but its gitignored build folders are what the rebuild proof checks.
+    const zone = a.op === 'delete_rebuildable' ? profile.zoneFor(src, { ignoreRepos: true }) : profile.zoneFor(src);
     if (zone === 'never') return fail(`${src} is in a NEVER-touch zone. Remove this action.`);
 
     if (a.op === 'mkdir') {
@@ -82,6 +85,16 @@ function validate(plan, { scan, findings, profile }) {
       removed.set(src, keep);
       bytesFreed += sizes.get(src) || 0;
       if (zone === 'ask') needsApproval.push(id);
+    } else if (a.op === 'delete_rebuildable') {
+      if (!inside(src, scan.root)) return fail(`${src} is outside the folder being cleaned.`);
+      const proof = rebuildProof(src, { now, named, home });
+      if (!proof.ok) {
+        for (const f of proof.failures) errors.push({ action: id, condition: f.condition, message: `Rebuild proof failed: ${f.message}` });
+        return;
+      }
+      recipes[id] = proof.recipe;
+      bytesFreed += measureFreeable(src);
+      if (zone === 'ask') needsApproval.push(id);
     } else if (a.op === 'quarantine') {
       if (!fileExists(src)) return fail(`${src} does not exist.`);
       if (!flagged.has(src)) return fail(`${src} was not flagged by the malware scan. Only scanner-flagged files may be quarantined.`);
@@ -105,11 +118,11 @@ function validate(plan, { scan, findings, profile }) {
     if (files.has(f)) warnings.push(`Malware scan flagged ${path.basename(f)} but the plan leaves it in place.`);
   }
 
-  return result(errors.length === 0, errors, warnings, needsApproval, strange, bytesFreed);
+  return result(errors.length === 0, errors, warnings, needsApproval, strange, bytesFreed, recipes);
 }
 
-function result(ok, errors, warnings = [], needsApproval = [], strange = [], bytesFreed = 0) {
-  return { ok, errors, warnings, needsApproval, strange, bytesFreed };
+function result(ok, errors, warnings = [], needsApproval = [], strange = [], bytesFreed = 0, recipes = {}) {
+  return { ok, errors, warnings, needsApproval, strange, bytesFreed, recipes };
 }
 
 function sameContent(a, b) {

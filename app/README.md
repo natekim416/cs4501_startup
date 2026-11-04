@@ -13,15 +13,18 @@ cd app
 npm install
 npm run demo        # creates a messy fake folder at ~/CleanasaurusDemo/Downloads and opens the app on it
 npm start           # opens the app; pick any folder with SELECT FOLDER, or press ▶ DEMO for a guided tour
-npm test            # 16 backend tests, incl. 9 minimal-functionality checks (MIN-1 … MIN-9)
-npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions
+npm test            # 62 backend tests (+46 todo for stories not built yet), incl. MIN-1 … MIN-9 and one file per user story
+npm run dev-demo    # creates fake dev projects at ~/CleanasaurusDemo/code (old, active, dirty, no lockfile, .env, a VM) and opens the app
+npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions, usage log
 ```
 
-**Claude vs. demo mode.** With `ANTHROPIC_API_KEY` set (or a key pasted in the app's side panel), plans come from Claude (`claude-opus-5-5`, structured JSON output). Without a key, the app runs in **DEMO MODE** with an offline rule-based planner, so it still works in class with no internet. The validator, malware checks, zones, and undo are the same in both modes.
+**Claude vs. demo mode.** With `ANTHROPIC_API_KEY=your-key` in a `.env` file at the repo root (or the variable set in your shell, or a key pasted in the app's side panel), plans come from Claude (`claude-opus-5-5`, structured JSON output). Without a key, the app runs in **DEMO MODE** with an offline rule-based planner, so it still works in class with no internet. The validator, malware checks, zones, and undo are the same in both modes.
 
 **Malware checks.** Uses ClamAV if installed (`brew install clamav`), plus built-in checks: the EICAR test signature, disguised file types (`syllabus.pdf.command`), pirated-software names, and unsigned apps. The demo folder contains two harmless test files that trigger these checks.
 
 **Safety.** Nothing is permanently deleted. Duplicates go to the Dino Bin and flagged files to quarantine, both in the app's data folder, and every run can be undone. `~/Library`, `/System`, `/Applications`, and any git repo are never touched.
+
+**Usage log (opt-in).** On first launch the dino asks whether it can keep a usage log, and you can change your answer any time in the USAGE LOG panel. The log records counts, sizes, and timings for scans, plans, approvals, questions, and undos in `usage-log.jsonl` in the app's data folder. It never records file names, folder names, or what you type, and nothing uploads it: EXPORT saves a copy for you to send, and turning the log off deletes it. Practice runs (the ▶ DEMO tour and `npm run demo`) aren't logged.
 
 ## How it's split
 
@@ -32,7 +35,7 @@ npm run test:ui     # opens the real app and clicks through it: plan, approve, u
 | Engine (scan → plan → validate → retry → ask) | `backend/engine.js` | Nate Kim |
 | LLM planner + offline demo planner | `backend/planner.js` | Nate Kim |
 | Validator (the guardrail) | `backend/validator.js` | Nate Kim |
-| Scanner, malware checks, executor + undo, profile | `backend/scanner.js`, `backend/malware.js`, `backend/executor.js`, `backend/profile.js` | Nate Kim |
+| Scanner, malware checks, executor + undo, profile, usage log | `backend/scanner.js`, `backend/malware.js`, `backend/executor.js`, `backend/profile.js`, `backend/usage-log.js` | Nate Kim |
 | Demo data + tests | `scripts/make-demo-folder.js`, `test/` | Everyone |
 
 ## What the validator checks
