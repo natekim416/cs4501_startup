@@ -181,6 +181,7 @@ function demoPlan({ request, scan, dev = [], caches = [], findings, profile, pre
       if (d.label !== 'rebuildable' || rejected.has(d.path) || intent.ambiguous) continue;
       const project = path.basename(d.project);
       if (doneWith && !named.has(project)) continue;
+      if ((intent.kept || []).includes(project)) continue;
       const why = named.has(project) ? `${project}: you said you're done with it. ${d.reason}` : `${project}: ${d.reason}`;
       add({ op: 'delete_rebuildable', path: d.path, project, reason: why });
     }

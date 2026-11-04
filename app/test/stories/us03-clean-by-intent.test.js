@@ -86,3 +86,14 @@ test('US-03 a "done with" request that matches no project asks which ones, listi
   assert.ok(q, JSON.stringify(plan.questions));
   assert.ok(q.options.includes('cs3140-hw1') && q.options.includes('hoohacks-2026'));
 });
+
+test('US-03 "free up space but keep my capstone" leaves the capstone alone', async () => {
+  const root = tmp();
+  makeJsProject(root, 'capstone-team7');
+  makeJsProject(root, 'cs2150-lab');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const plan = await engine.plan('Free up space but keep my capstone');
+  assert.deepStrictEqual(plan.actions.filter((a) => a.op === 'delete_rebuildable').map((a) => a.project), ['cs2150-lab']);
+});

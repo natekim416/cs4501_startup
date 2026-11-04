@@ -24,17 +24,29 @@ function keywords(text) {
   return [...new Set(withoutCodes.toLowerCase().match(/[a-z']{4,}/g) || [])].filter((w) => !FILLER.has(w)).map((w) => w.slice(0, 4));
 }
 
-function matchProjects(request, names) {
-  const codes = courseCodes(request);
-  const stems = keywords(request);
-  const matched = names.filter((n) => {
+// "…but keep the final", "…except cs3140": everything after these words names projects to keep.
+const KEEP = /\b(?:but\s+)?(?:keep|except|other than|don'?t touch|leave)\b/i;
+const DONE_WITH = /\b(?:done|finished|over)\s+with\b/i;
+
+function find(text, names) {
+  const codes = courseCodes(text);
+  const stems = keywords(text);
+  return names.filter((n) => {
     const s = squash(n);
     return codes.some((c) => s.includes(c)) || stems.some((w) => s.includes(w));
   });
+}
+
+function matchProjects(request, names) {
+  const cut = request.search(KEEP);
+  const include = cut >= 0 ? request.slice(0, cut) : request;
+  const kept = cut >= 0 ? find(request.slice(cut), names) : [];
+  const codes = courseCodes(include);
+  let matched = find(include, names).filter((n) => !kept.includes(n));
 
   // "the CS class" without a number: ask which one instead of guessing.
   let ambiguous = null;
-  const dept = request.match(DEPT_CLASS);
+  const dept = include.match(DEPT_CLASS);
   if (!codes.length && dept) {
     const prefix = dept[1].toLowerCase();
     const options = [...new Set(names.flatMap((n) => courseCodes(n)).filter((c) => c.startsWith(prefix)))]
@@ -42,7 +54,12 @@ function matchProjects(request, names) {
       .map((c) => `${c.replace(/\d+$/, '').toUpperCase()} ${c.match(/\d+$/)[0]}`);
     if (options.length > 1) ambiguous = { text: `Which class do you mean? I found ${options.length}.`, options };
   }
-  return { matched: ambiguous ? [] : matched, ambiguous, codes, isIntent: Boolean(codes.length || stems.length || dept) };
+  // "done with <something I can't match>": list the projects instead of returning an empty plan.
+  if (!ambiguous && !matched.length && DONE_WITH.test(include) && names.length) {
+    ambiguous = { text: "Which projects do you mean? I couldn't match that to a project name.", options: [...names].sort().slice(0, 8) };
+  }
+  if (ambiguous) matched = [];
+  return { matched, kept, ambiguous, codes, isIntent: Boolean(codes.length || matched.length || dept || DONE_WITH.test(include)) };
 }
 
 module.exports = { matchProjects, courseCodes };
