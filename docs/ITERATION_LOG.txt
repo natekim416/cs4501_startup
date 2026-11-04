@@ -219,3 +219,65 @@ ROUND 2 FIXES (from the round 1 report)
   Results: 121 tests, 91 pass, 0 fail, 30 todo. UI 14/14.
   Built on this branch, closing at merge: #4, #7, #8, #14, #15, #16,
   #19, #20. That's 18 of 29 done.
+
+[R2-l] US-01, storage breakdown (#2). Built and passing.
+  Tests: 3 todo tests were turned on and failed. One engine-level test
+  ("where did my space go?" proposes nothing) was added and failed.
+  Then all passed.
+  Code changes:
+  - NEW app/backend/breakdown.js: totals by type, the 10 largest
+    projects, a progress callback, and blocked folders listed with a
+    Full Disk Access hint.
+  - app/backend/engine.js answers the question with a read-only summary.
+  - A new quick chip, "Where did my space go?", in index.html.
+  NOTE: the first try at the engine hook failed to insert (a string
+  replace silently matched nothing). The red test caught it.
+
+---------------------------------------------------------------------
+ROUND 2 RESULT: 5.25 / 10 (grader on snapshot 54d90fa)
+---------------------------------------------------------------------
+Scores, unchanged: Hook 1 . Demo 2 . Metrics 3 . Next steps 3 .
+Delivery 3
+The grader verified the round 1-2 red->green claims by replaying each
+commit: 5, 2, 2, and 1 failures, all real assertion failures.
+Its ceiling estimate: about 5.5 (at most 5.9) with machine-only fixes,
+and about 8.1-10 with the human fixes (validation evidence, a live
+Claude run, teammates refining tests, team decisions, rehearsal).
+
+---------------------------------------------------------------------
+ROUND 3 FIXES (from the round 2 report)
+---------------------------------------------------------------------
+[R3-a] Intent edge cases (US-03).
+  - "Done with CS 3140 but keep the final project" now excludes
+    cs3140-final.
+  - "Except cs3140", "leave", and "don't touch" work too.
+  - A "done with ..." request that matches no project asks "Which
+    projects do you mean?" and lists them.
+  - The offline planner also honors keep-clauses on plain "free up
+    space" requests.
+  Tests: two failed first (red), then passed. The third, "free up space
+  but keep my capstone", was written right AFTER its one-line planner
+  change. That's disclosed in the TDD log, row 14.
+  Code: app/backend/intent.js (KEEP and DONE_WITH patterns, a kept
+  list) and app/backend/planner.js.
+[R3-b] Every claim now matches git.
+  - The script and slide 6 no longer say all tests were written before
+    the code: 89 of 125 were, and the rest are explained.
+  - The issues tile says "29 / 10 closed, +9 built on branch".
+  - "21 added or changed after review" is traceable to rows 1-15 of the
+    review log.
+  - app/README counts updated. Coverage regenerated: 95.8% / 90.1%.
+  - The demo description in tdd/README and the appendix caption match
+    the current behavior.
+  - Slide 4 no longer promises a "recorded run" backup.
+[R3-c] The release plan in USER_STORIES has a status column. The Alpha
+  delivered Sprints 1-3 except US-04, and the Beta schedule matches
+  slide 7. Both are marked proposed: TEAM DECISION.
+[R3-d] MVP_VALIDATION discloses that the decision rules were rewritten
+  after the tally (commit 0e1ab0e). It states the earlier rules also gave
+  Pivot (Trust 8/8, Value 2/8).
+[R3-e] Removed the dead const TODO lines. Removed "[UPDATE THIS
+  PARAGRAPH]" and replaced it with a presenter note. Moved this log
+  from alpha/ to docs/, so it isn't part of the submission folder.
+  Results: 125 tests, 98 pass, 0 fail, 27 todo. UI 14/14. The todo
+  check passes. Both PDFs rebuilt.
