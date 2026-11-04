@@ -6,6 +6,7 @@ const { scan } = require('./scanner');
 const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
 const { matchProjects } = require('./intent');
 const { summarize } = require('./summary');
+const { rebuild } = require('./rebuild');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
 const { makePlan } = require('./planner');
@@ -285,6 +286,11 @@ class Engine {
     if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
     if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
+  }
+
+  // US-15: rebuild something we deleted, from the recipe the proof saved. Logged as a count, never a path.
+  rebuild(recipe) {
+    return rebuild(recipe, { record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
   }
 
   undo() {

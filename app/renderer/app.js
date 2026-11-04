@@ -322,8 +322,22 @@ async function runPlan(planId, list, approve) {
     $('#freed').textContent = formatBytes(state.freed);
     setDisk(r.disk);
     log(`Undid ${r.undone} steps`, 'info');
-    const rebuild = (r.needsRebuild || []).map((x) => `- ${x.cwd}: ${x.command}`).join('\n');
-    botSay(`Undone. ${r.undone} steps reversed.${rebuild ? `\nThese build folders were deleted for real. Rebuild them with:\n${rebuild}` : ''}`);
+    const needs = r.needsRebuild || [];
+    const msg = botSay(`Undone. ${r.undone} steps reversed.${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
+    for (const recipe of needs) {
+      const b = el('button', { class: 'btn' }, `↻ REBUILD ${short(recipe.cwd)}`);
+      b.title = recipe.command;
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        b.textContent = `↻ ${recipe.command}…`;
+        const res = await api.rebuild(recipe);
+        setDisk(res.disk);
+        b.textContent = res.ok ? '✓ REBUILT' : '✗ FAILED';
+        log(res.ok ? `Rebuilt ${short(recipe.cwd)}` : `Rebuild failed: ${short(recipe.cwd)}`, res.ok ? 'pass' : 'fail');
+        botSay([res.warning, res.message].filter(Boolean).join('\n'));
+      });
+      msg.append(el('div', { class: 'undo-row' }, b));
+    }
   });
 }
 

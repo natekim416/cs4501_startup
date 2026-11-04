@@ -75,6 +75,7 @@ function registerIpc() {
   ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('execute', (_e, planId, ids) => ({ ...engine.execute(planId, ids), disk: diskInfo() }));
   ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
+  ipcMain.handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));
   ipcMain.handle('set-zone', (_e, zonePath, zone) => {
     engine.profile.setZone(zonePath, zone);
     return profileView();
