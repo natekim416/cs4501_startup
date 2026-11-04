@@ -111,3 +111,21 @@ test('LLM-6 only file names and metadata are sent to Claude, never file contents
   assert.match(body, /secret-notes\.txt/);
   assert.doesNotMatch(body, /123-45-6789/);
 });
+
+test('LLM-7 Claude is told each project\'s course, how long since it changed, and whether it has uncommitted work', async () => {
+  const root = tmp();
+  makeJsProject(root, 'cs3140-hw1');
+  makeJsProject(root, 'hoohacks-2026', { dirty: true, ageDays: 3 });
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const client = fakeClient([{ summary: 's', actions: [], questions: [] }]);
+  await makePlan({ request: 'x', scan: engine.snapshot, dev: engine.dev, findings: [], profile: engine.profile, client });
+  const sent = JSON.parse(client.requests[0].messages[0].content.split('metadata only):\n')[1]);
+  const hw = sent.rebuildable_items.find((i) => i.project === 'cs3140-hw1');
+  assert.strictEqual(hw.course, 'CS 3140');
+  assert.ok(hw.last_changed_days >= 59, String(hw.last_changed_days));
+  assert.strictEqual(hw.uncommitted, false);
+  const hack = sent.projects.find((p) => p.name === 'hoohacks-2026');
+  assert.strictEqual(hack.uncommitted, true);
+});
