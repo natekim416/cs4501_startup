@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE' };
 
 function formatBytes(n) {
   if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;

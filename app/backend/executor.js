@@ -65,6 +65,11 @@ class Executor {
       fs.rmSync(a.path, { recursive: true });
       return { type: 'deleted', path: a.path, recipe: a.recipe };
     }
+    if (a.op === 'clear_cache') {
+      // Empty the cache but keep its folder; the package manager re-downloads what it needs.
+      for (const e of fs.readdirSync(a.path)) fs.rmSync(path.join(a.path, e), { recursive: true });
+      return { type: 'deleted', path: a.path, recipe: a.recipe || { command: 're-downloads automatically on the next install', cwd: a.path } };
+    }
     throw new Error(`Unknown op ${a.op}`);
   }
 

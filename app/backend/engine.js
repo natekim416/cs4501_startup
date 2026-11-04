@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
-const { findArtifacts, lastChanged, INACTIVE_DAYS } = require('./devclutter');
+const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
 const { matchProjects } = require('./intent');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
@@ -13,7 +13,7 @@ const { Profile } = require('./profile');
 const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
-const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable'];
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'];
 const ESTIMATE_GAP = 0.1;
 
 // Free space on the disk that holds p, measured by the OS.
@@ -37,8 +37,13 @@ function countOps(actions) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun } = {}) {
     this.llmClient = llmClient;
+    this.dataDir = dataDir;
+    this.home = home;
+    this.condaRun = condaRun;
+    this.caches = [];
+    this.condaExports = {};
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.executor = new Executor(dataDir);
@@ -80,6 +85,8 @@ class Engine {
     this.folder = folder;
     this.snapshot = scan(folder);
     this.dev = findArtifacts(folder);
+    this.caches = toolCaches(this.home);
+    this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
     this.findings = malware.findings;
     const rebuildable = this.dev.filter((d) => d.label === 'rebuildable');
@@ -96,6 +103,23 @@ class Engine {
       zone: this.profile.zoneFor(folder),
       zoneReason: this.profile.zoneInfo(folder).reason,
     };
+  }
+
+  // US-07: an inactive conda environment with no environment.yml is exported first, so the export can be
+  // its rebuild recipe. Skipped quietly if conda isn't installed.
+  exportCondaEnvs() {
+    for (const d of this.dev) {
+      if (d.type !== 'conda-env' || d.label === 'rebuildable') continue;
+      if (Date.now() - lastChanged(d.project) < INACTIVE_DAYS * 864e5) continue;
+      try {
+        const recipe = this.condaExports[d.path] ? null : exportCondaEnv(d.path, { dataDir: this.dataDir, ...(this.condaRun && { run: this.condaRun }) });
+        if (recipe) this.condaExports[d.path] = recipe.lockfile;
+      } catch {
+        continue;
+      }
+      const label = labelPath(d.path, { condaExports: this.condaExports });
+      Object.assign(d, { label: label.label, reason: label.reason, rebuild: label.rebuild || null });
+    }
   }
 
   // Plans, validates, and feeds errors back to the planner until the plan passes or attempts run out.
@@ -121,7 +145,7 @@ class Engine {
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
     const projectNames = [...new Set(this.dev.map((d) => path.basename(d.project)))];
     const intent = matchProjects(request, projectNames);
-    const ctx = { scan: this.snapshot, dev: this.dev, findings: this.findings, profile: this.profile, named: intent.matched, intent };
+    const ctx = { scan: this.snapshot, dev: this.dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports };
     const attempts = [];
     let previous = null;
     let plan;
@@ -168,7 +192,7 @@ class Engine {
     }
 
     const planId = ++this.planCount;
-    this.lastPlan = { id: planId, request, plan, check };
+    this.lastPlan = { id: planId, request, plan, check, named: ctx.named };
     this.track('plan', {
       zone: this.profile.zoneFor(this.folder),
       tries: attempts.length,
@@ -209,7 +233,7 @@ class Engine {
     }
     const chosen = this.lastPlan.plan.actions.filter((a) => actionIds.includes(a.id));
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };

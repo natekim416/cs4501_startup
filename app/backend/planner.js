@@ -21,7 +21,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -53,6 +53,7 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - rename: rename file "path" to the full new path "dest".
 - trash_duplicate: remove "path" because it is byte-identical to "keep". Only use for files listed in the same duplicate group.
 - quarantine: isolate "path". Only for files listed in malware_findings.
+- clear_cache: empty the package-manager cache folder "path". Only for paths listed in package_caches, and only if the user asks about caches or wants as much space as possible.
 - delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
 
 Rules:
@@ -64,7 +65,7 @@ Rules:
 - If something is ambiguous or unusual (files that look like versions of each other, a request that could mean two things), do not guess: add a question with 2-4 short options and leave those files alone.
 - If you receive validator errors, fix exactly those problems and return the full corrected plan.`;
 
-function summarizeScan(scan, findings, profile, dev = []) {
+function summarizeScan(scan, findings, profile, dev = [], caches = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -82,6 +83,7 @@ function summarizeScan(scan, findings, profile, dev = []) {
     malware_findings: findings.map((f) => ({ path: f.path, evidence: f.evidence })),
     rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason })),
     projects: [...new Set(dev.map((d) => path.basename(d.project)))],
+    package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -89,8 +91,8 @@ function summarizeScan(scan, findings, profile, dev = []) {
   };
 }
 
-async function llmPlan({ request, scan, dev, findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev))}`;
+async function llmPlan({ request, scan, dev, caches, findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -124,7 +126,7 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, dev = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
+function demoPlan({ request, scan, dev = [], caches = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
@@ -152,6 +154,9 @@ function demoPlan({ request, scan, dev = [], findings, profile, previous, intent
     add({ op: 'mkdir', path: dir, reason: `New folder for ${path.basename(dir)}` });
   };
 
+  if (want(/cache/i)) {
+    for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
+  }
   for (const f of findings) {
     add({ op: 'quarantine', path: f.path, reason: f.evidence.join('; ') });
     gone.add(f.path);

@@ -29,3 +29,15 @@ test('REG-2 source files in different code projects do not trigger a "versions" 
   const plan = await engine.plan('Organize everything');
   assert.ok(!plan.questions.some((q) => /versions of "index\.js"/.test(q.text)), JSON.stringify(plan.questions));
 });
+
+test('REG-3 approving a named, still-active project passes the re-check at run time (found while wiring US-06/07; test written after the fix)', async () => {
+  const root = tmp();
+  makeJsProject(root, 'cs3140-final', { ageDays: 4 });
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const plan = await engine.plan("I'm done with CS 3140");
+  const run = engine.execute(plan.planId, plan.actions.map((a) => a.id));
+  assert.ok(run.ok, JSON.stringify(run.errors));
+  assert.ok(!fs.existsSync(path.join(root, 'cs3140-final', 'node_modules')));
+});
