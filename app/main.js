@@ -6,6 +6,13 @@ const path = require('path');
 const { Engine } = require('./backend/engine');
 const { makeDemoFolder } = require('./scripts/make-demo-folder');
 
+// Load the API key from the repo's root .env, if there is one. A key already set in the shell wins.
+try {
+  process.loadEnvFile(path.join(__dirname, '..', '.env'));
+} catch {
+  // No .env file: the app runs in demo mode, or with a key pasted in the side panel.
+}
+
 const arg = (name) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.slice(name.length + 3) : null;

@@ -17,7 +17,7 @@ npm test            # 25 backend tests, incl. 9 minimal-functionality checks (MI
 npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions, usage log
 ```
 
-**Claude vs. demo mode.** With `ANTHROPIC_API_KEY` set (or a key pasted in the app's side panel), plans come from Claude (`claude-opus-5-5`, structured JSON output). Without a key, the app runs in **DEMO MODE** with an offline rule-based planner, so it still works in class with no internet. The validator, malware checks, zones, and undo are the same in both modes.
+**Claude vs. demo mode.** With `ANTHROPIC_API_KEY=your-key` in a `.env` file at the repo root (or the variable set in your shell, or a key pasted in the app's side panel), plans come from Claude (`claude-opus-5-5`, structured JSON output). Without a key, the app runs in **DEMO MODE** with an offline rule-based planner, so it still works in class with no internet. The validator, malware checks, zones, and undo are the same in both modes.
 
 **Malware checks.** Uses ClamAV if installed (`brew install clamav`), plus built-in checks: the EICAR test signature, disguised file types (`syllabus.pdf.command`), pirated-software names, and unsigned apps. The demo folder contains two harmless test files that trigger these checks.
 
