@@ -315,6 +315,24 @@ async function runPlan(planId, list, approve) {
       `\nRemoved files are in the Trash. Deleted build folders can be rebuilt with the command I saved.`,
   );
   body.append(el('div', { class: 'undo-row' }, undo));
+  // US-14: undo a single action, leaving the rest done.
+  const ran = res.results.filter((r) => r.ok).map((r) => list.querySelector(`input[data-id="${r.id}"]`)).filter(Boolean);
+  if (ran.length > 1) {
+    const one = el('details', { class: 'undo-one' }, el('summary', {}, 'Undo just one…'));
+    for (const box of ran) {
+      const label = box.closest('li').querySelector('.file').textContent;
+      const b = el('button', { class: 'btn' }, `↶ ${label}`);
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        const r = await api.undoOne(res.batchId, box.dataset.id);
+        setDisk(r.disk);
+        log(r.undone ? `Undid ${label}` : `Could not undo ${label}`, r.undone ? 'info' : 'fail');
+        b.textContent = r.undone ? `✓ undone: ${label}` : r.needsRebuild.length ? `↻ rebuild with: ${r.needsRebuild[0].command}` : `✗ ${label}`;
+      });
+      one.append(el('div', { class: 'undo-one-row' }, b));
+    }
+    body.append(one);
+  }
   undo.addEventListener('click', async () => {
     undo.disabled = true;
     const r = await api.undo();

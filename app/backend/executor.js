@@ -31,7 +31,7 @@ class Executor {
     for (const a of actions) {
       try {
         const step = this.apply(a, batch.id);
-        if (step) batch.steps.push(step);
+        if (step) batch.steps.push({ ...step, actionId: a.id });
         results.push({ id: a.id, ok: true });
       } catch (err) {
         results.push({ id: a.id, ok: false, error: err.message });
@@ -82,29 +82,45 @@ class Executor {
     throw new Error(`Unknown op ${a.op}`);
   }
 
+  // US-14: reverses one action from a run and leaves every other action done.
+  undoAction(batchId, actionId) {
+    const batch = this.history.find((b) => b.id === batchId);
+    const step = batch && batch.steps.find((st) => st.actionId === actionId && !st.undone);
+    if (!step) return { undone: 0, needsRebuild: [] };
+    const res = this.reverse(step);
+    if (res.undone) step.undone = true;
+    this.saveLog();
+    return res;
+  }
+
+  // Undoes one logged step. A deleted build folder can't be moved back, so it's returned for rebuilding.
+  reverse(step) {
+    if (step.type === 'deleted') return { undone: 0, needsRebuild: [{ path: step.path, ...step.recipe }] };
+    try {
+      if (step.type === 'move') {
+        fs.mkdirSync(path.dirname(step.from), { recursive: true });
+        fs.renameSync(step.to, step.from);
+      } else if (step.type === 'mkdir' && fs.readdirSync(step.path).length === 0) {
+        fs.rmdirSync(step.path);
+      }
+      return { undone: 1, needsRebuild: [] };
+    } catch {
+      return { undone: 0, needsRebuild: [] };
+    }
+  }
+
   // Reverses the most recent batch, newest step first.
   undoLast() {
     const batch = this.history.pop();
     if (!batch) return { undone: 0, needsRebuild: [] };
     let undone = 0;
     const needsRebuild = [];
+    // Keep undoing the rest even if one step can't be reversed; skip steps already undone one by one.
     for (const step of [...batch.steps].reverse()) {
-      try {
-        if (step.type === 'deleted') {
-          // Deleted for real: it comes back by rebuilding, not by moving files.
-          needsRebuild.push({ path: step.path, ...step.recipe });
-          continue;
-        }
-        if (step.type === 'move') {
-          fs.mkdirSync(path.dirname(step.from), { recursive: true });
-          fs.renameSync(step.to, step.from);
-        } else if (step.type === 'mkdir' && fs.readdirSync(step.path).length === 0) {
-          fs.rmdirSync(step.path);
-        }
-        undone++;
-      } catch {
-        // Keep undoing the rest even if one step can't be reversed.
-      }
+      if (step.undone) continue;
+      const res = this.reverse(step);
+      undone += res.undone;
+      needsRebuild.push(...res.needsRebuild);
     }
     this.saveLog();
     return { undone, needsRebuild };

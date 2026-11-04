@@ -293,6 +293,12 @@ class Engine {
     return rebuild(recipe, { record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
   }
 
+  undoAction(batchId, actionId) {
+    const result = this.executor.undoAction(batchId, actionId);
+    this.track('undo_one', { undone: result.undone });
+    return result;
+  }
+
   undo() {
     const result = this.executor.undoLast();
     this.track('undo', { undone: result.undone, needsRebuild: result.needsRebuild.length });
