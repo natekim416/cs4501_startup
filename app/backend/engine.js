@@ -7,6 +7,7 @@ const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACT
 const { matchProjects } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
+const { breakdown } = require('./breakdown');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
 const { makePlan } = require('./planner');
@@ -147,6 +148,8 @@ class Engine {
       };
     }
     this.scanFolder(this.folder);
+    // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
+    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown();
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
     const projectNames = [...new Set(this.dev.map((d) => path.basename(d.project)))];
     const intent = matchProjects(request, projectNames);
@@ -286,6 +289,17 @@ class Engine {
     if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
     if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
+  }
+
+  answerBreakdown() {
+    const b = breakdown(this.folder);
+    const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker', ml: 'ML model caches' };
+    const types = Object.entries(b.byType).map(([k, v]) => `${names[k]}: ${formatBytes(v)}`).join('\n');
+    const top = b.topProjects.map((p, i) => `${i + 1}. ${path.basename(p.path)}: ${formatBytes(p.bytes)}`).join('\n');
+    const blocked = b.unreadable.map((u) => `${u.path}: ${u.howToFix}`).join('\n');
+    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest projects:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}`;
+    this.track('breakdown', { projects: b.topProjects.length, unreadable: b.unreadable.length });
+    return { mode: this.mode, planId: null, summary, breakdown: b, actions: [], questions: [], attempts: [], bytesFreed: 0, needsApproval: [], warnings: [] };
   }
 
   // US-15: rebuild something we deleted, from the recipe the proof saved. Logged as a count, never a path.
