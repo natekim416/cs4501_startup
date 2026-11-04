@@ -160,6 +160,7 @@ async function useFolder(folder) {
   $('#folder-stats').textContent = `${info.fileCount} files · ${formatBytes(info.totalBytes)} · zone: ${info.zone.toUpperCase()}`;
   log(`Scanned with ${info.malwareEngine}`, 'info');
   let text = `Scanned ${info.fileCount} files (${formatBytes(info.totalBytes)}).`;
+  if (info.rebuildableCount) text += `\nFound ${info.rebuildableCount} build folders I may be able to rebuild (${formatBytes(info.rebuildableBytes)}).`;
   if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} sets of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
   if (info.findings.length) text += `\n${info.findings.length} file(s) look suspicious: ${info.findings.map((f) => f.name).join(', ')}.`;
   if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
@@ -234,7 +235,7 @@ function showPlan(result) {
         el('span', { class: 'badge pass' }, `PASSED CHECKS · TRY ${lastTry.attempt}/3`),
       ),
       list,
-      el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Everything can be undone.')),
+      el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Files can be undone; build folders can be rebuilt.')),
     );
     approve.addEventListener('click', () => runPlan(result.planId, list, approve));
     attach(card);
