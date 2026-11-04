@@ -82,26 +82,26 @@ D6. IF THE LIVE DEMO FAILS: "Here's the same request on our offline
 
 [SLIDE 6 - ENGINEERING METRICS - 5:30-7:00]
 How we built it. Twenty-nine user stories, every one a GitHub issue.
-Ten are closed on GitHub, and nine more are built on our branch and
-close when it merges, so nineteen of twenty-nine are done. We have a
-hundred and twenty-five automated tests, plus a fourteen-step test that
-clicks through the real app. Eighty-nine of them were written before the
+Ten are closed on GitHub. Eight more are built on our branch, and one
+is partly built, so eighteen of twenty-nine are done. We have a
+hundred and twenty-nine automated tests, plus a fourteen-step test that
+clicks through the real app. Ninety-three of them were written before the
 code they test. The rest came with our MVP code or with a bug fix, and
 our TDD log says which. That's about four tests per issue, and every
-issue has at least two. All ninety-eight tests that can run pass. That's
-seventy-eight percent of everything we wrote, because twenty-seven
+issue has at least two. All hundred and one tests that can run pass. That's
+seventy-eight percent of everything we wrote, because twenty-eight
 tests are for stories we haven't built yet. We keep those red, and CI
 fails if one ever passes by accident. Backend line coverage is
-ninety-five point eight percent. And the honest number: one hundred
+ninety-six percent. And the honest number: one hundred
 percent of these tests were drafted by Claude. Review added or changed
-twenty-one of them and caught four real bugs. No one on our team has
+twenty-five of them and caught eight real bugs. No one on our team has
 refined a test by hand yet. That review is scheduled before Beta.
 (Presenter: if the team review has happened, give its real count
 instead of the last two sentences.)
 
 [SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
 For the Alpha, we finished validation and the decision, all the stories
-and issues, and nineteen of them built: the rebuild proof, cleaning by
+and issues, and eighteen of them built: the rebuild proof, cleaning by
 intent, one-click rebuild, undo for a single action, the Trash, a
 one-line summary, and honest space numbers. For Beta: four weekly
 sprints starting November ninth. First, protecting your projects and

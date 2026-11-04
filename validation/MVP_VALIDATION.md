@@ -2,6 +2,18 @@
 
 **Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Testing:** October 30 – November 2, 2026 (Test 1 sessions, then 3 days of Test 2)
 
+> ⚠️ **Status: unconfirmed.** The per-tester numbers below match a draft written before testing (commit `c697e76`, labeled "placeholders to replace with real session data"). We are collecting the raw session evidence (notes, exported logs) from the team member who ran the sessions. Until it's in this repo, treat these results as unconfirmed.
+>
+> **Known issues we're resolving:**
+> - **The measurement tool postdates the test.** Test 2 is described as measured with the opt-in usage log, but that log was first committed on Nov 4, after the Oct 30 – Nov 2 testing window.
+> - **The undo denominators don't reconcile.** The "Actions kept" column sums to 267 actions, but the undo rate uses 361 (212 CS, 149 non-CS).
+> - **N3's row is inconsistent.** N3 is listed as "41/41 kept" even though all 41 were undone.
+> - **Three KPIs changed from the MVP plan:**
+>   - Repeat use was "within 7 days" in the MVP plan and is "within 3 days" here.
+>   - First-session approval was "run a full plan" and is "ran at least 80% of a plan" here. Under the original definition, 3 of 10 testers qualify (30%), which is below the MVP's 40% fail line.
+>   - "Space freed" is a new KPI that wasn't in the MVP plan.
+
+
 **Decision: Pivot.** Testers trusted the app (2 of 3 trust KPIs met, and the third close), but it didn't solve a problem they cared about (0 of 2 value KPIs met). We keep the engine and aim it at CS students' rebuildable developer clutter.
 
 ---
