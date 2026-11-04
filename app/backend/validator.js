@@ -4,9 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 const { hashFile } = require('./scanner');
-const { rebuildProof, measureFreeable } = require('./devclutter');
+const { rebuildProof, measureFreeable, toolCaches } = require('./devclutter');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -16,7 +16,7 @@ function inside(child, root) {
   return c === r || c.startsWith(r + path.sep);
 }
 
-function validate(plan, { scan, findings, profile, now, named, home }) {
+function validate(plan, { scan, findings, profile, now, named, home, condaExports }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -87,13 +87,20 @@ function validate(plan, { scan, findings, profile, now, named, home }) {
       if (zone === 'ask') needsApproval.push(id);
     } else if (a.op === 'delete_rebuildable') {
       if (!inside(src, scan.root)) return fail(`${src} is outside the folder being cleaned.`);
-      const proof = rebuildProof(src, { now, named, home });
+      const proof = rebuildProof(src, { now, named, home, condaExports });
       if (!proof.ok) {
         for (const f of proof.failures) errors.push({ action: id, condition: f.condition, message: `Rebuild proof failed: ${f.message}` });
         return;
       }
       recipes[id] = proof.recipe;
       bytesFreed += measureFreeable(src);
+      if (zone === 'ask') needsApproval.push(id);
+    } else if (a.op === 'clear_cache') {
+      // Only the package-manager caches we know re-download on demand; nothing else, wherever it is.
+      const known = toolCaches(home).find((c) => path.resolve(c.path) === src);
+      if (!known) return fail(`${src} is not a package-manager cache I know is safe to clear.`);
+      recipes[id] = known.rebuild;
+      bytesFreed += known.bytes;
       if (zone === 'ask') needsApproval.push(id);
     } else if (a.op === 'quarantine') {
       if (!fileExists(src)) return fail(`${src} does not exist.`);

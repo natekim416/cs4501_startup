@@ -250,6 +250,20 @@ function rebuildProof(dir, { now = Date.now(), named = [], home = os.homedir(), 
   return { ok: failures.length === 0, failures, recipe, type };
 }
 
+// What Claude (and the user) should know about a project before cleaning it.
+function projectInfo(project, { now = Date.now(), home = os.homedir() } = {}) {
+  const repo = repoFor(project, home);
+  let uncommitted = false;
+  if (repo) {
+    try {
+      uncommitted = Boolean(git(repo, ['status', '--porcelain']));
+    } catch {
+      uncommitted = false;
+    }
+  }
+  return { lastChangedDays: Math.floor((now - lastChanged(project)) / DAY), uncommitted };
+}
+
 // US-07: a conda environment with no environment.yml gets exported first; the export is the recipe.
 function exportCondaEnv(env, { dataDir, run = (cmd, args) => execFileSync(cmd, args, { stdio: 'pipe' }).toString() }) {
   const yml = run('conda', ['env', 'export', '-p', env]);
@@ -296,4 +310,4 @@ function findArtifacts(root, opts = {}) {
   return items.sort((a, b) => b.bytes - a.bytes);
 }
 
-module.exports = { typeOf, labelPath, rebuildProof, measureFreeable, toolCaches, exportCondaEnv, findArtifacts, INACTIVE_DAYS };
+module.exports = { typeOf, labelPath, rebuildProof, measureFreeable, toolCaches, exportCondaEnv, findArtifacts, lastChanged, projectInfo, INACTIVE_DAYS };

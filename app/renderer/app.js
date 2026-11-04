@@ -3,12 +3,13 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE' };
 
+// Decimal units, the way macOS Finder and the plan's one-line summary report sizes.
 function formatBytes(n) {
-  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
-  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
-  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)} MB`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)} KB`;
   return `${n} B`;
 }
 
@@ -161,7 +162,7 @@ async function useFolder(folder) {
   log(`Scanned with ${info.malwareEngine}`, 'info');
   let text = `Scanned ${info.fileCount} files (${formatBytes(info.totalBytes)}).`;
   if (info.rebuildableCount) text += `\nFound ${info.rebuildableCount} build folders I may be able to rebuild (${formatBytes(info.rebuildableBytes)}).`;
-  if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} sets of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
+  if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} ${info.duplicateGroups === 1 ? 'set' : 'sets'} of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
   if (info.findings.length) text += `\n${info.findings.length} file(s) look suspicious: ${info.findings.map((f) => f.name).join(', ')}.`;
   if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
   text += '\nWhat should I do?';
@@ -212,7 +213,7 @@ function showPlan(result) {
     const askFirst = new Set(result.needsApproval);
     const items = result.actions.map((a) => {
       const box = el('input', { type: 'checkbox', 'data-id': a.id, 'aria-label': `Include ${OP_LABEL[a.op]} ${a.path}` });
-      box.checked = !askFirst.has(a.id);
+      box.checked = !askFirst.has(a.id) && a.checked !== false;
       const dest = a.dest === state.folder ? './' : short(a.dest) + '/';
       const target = a.op === 'move' ? `${short(a.path)}  →  ${dest}` : a.op === 'rename' ? `${short(a.path)}  →  ${short(a.dest)}` : short(a.path);
       return el(
@@ -220,7 +221,7 @@ function showPlan(result) {
         { class: 'action' },
         box,
         el('span', { class: `op ${a.op}` }, OP_LABEL[a.op] || a.op),
-        el('div', {}, el('div', { class: 'file' }, target, askFirst.has(a.id) ? el('span', { class: 'ask-tag' }, 'ASK FIRST') : null), el('div', { class: 'why' }, a.reason)),
+        el('div', {}, el('div', { class: 'file' }, target, askFirst.has(a.id) ? el('span', { class: 'ask-tag' }, 'ASK FIRST') : null), el('div', { class: 'why' }, a.reason), a.note ? el('div', { class: 'why note' }, a.note) : null),
       );
     });
     const list = el('ul', { class: 'actions' }, items);
@@ -235,6 +236,7 @@ function showPlan(result) {
         el('span', { class: 'badge pass' }, `PASSED CHECKS · TRY ${lastTry.attempt}/3`),
       ),
       list,
+      result.oneLine ? el('div', { class: 'one-line' }, result.oneLine) : null,
       el('div', { class: 'card-foot' }, approve, el('span', { class: 'muted' }, 'Uncheck anything you want to skip. Files can be undone; build folders can be rebuilt.')),
     );
     approve.addEventListener('click', () => runPlan(result.planId, list, approve));
@@ -311,9 +313,27 @@ async function runPlan(planId, list, approve) {
     `Done! ${res.results.length - failed.length} actions complete. ${formatBytes(res.bytesFreed)} freed on disk.` +
       (res.freedNote ? `\n${res.freedNote}` : '') +
       (failed.length ? `\n${failed.length} could not run.` : '') +
-      `\nRemoved files are in the Dino Bin. Deleted build folders can be rebuilt with the command I saved.`,
+      `\nRemoved files are in the Trash. Deleted build folders can be rebuilt with the command I saved.`,
   );
   body.append(el('div', { class: 'undo-row' }, undo));
+  // US-14: undo a single action, leaving the rest done.
+  const ran = res.results.filter((r) => r.ok).map((r) => list.querySelector(`input[data-id="${r.id}"]`)).filter(Boolean);
+  if (ran.length > 1) {
+    const one = el('details', { class: 'undo-one' }, el('summary', {}, 'Undo just one…'));
+    for (const box of ran) {
+      const label = box.closest('li').querySelector('.file').textContent;
+      const b = el('button', { class: 'btn' }, `↶ ${label}`);
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        const r = await api.undoOne(res.batchId, box.dataset.id);
+        setDisk(r.disk);
+        log(r.undone ? `Undid ${label}` : `Could not undo ${label}`, r.undone ? 'info' : 'fail');
+        b.textContent = r.undone ? `✓ undone: ${label}` : r.needsRebuild.length ? `↻ rebuild with: ${r.needsRebuild[0].command}` : `✗ ${label}`;
+      });
+      one.append(el('div', { class: 'undo-one-row' }, b));
+    }
+    body.append(one);
+  }
   undo.addEventListener('click', async () => {
     undo.disabled = true;
     const r = await api.undo();
@@ -321,8 +341,22 @@ async function runPlan(planId, list, approve) {
     $('#freed').textContent = formatBytes(state.freed);
     setDisk(r.disk);
     log(`Undid ${r.undone} steps`, 'info');
-    const rebuild = (r.needsRebuild || []).map((x) => `- ${x.cwd}: ${x.command}`).join('\n');
-    botSay(`Undone. ${r.undone} steps reversed.${rebuild ? `\nThese build folders were deleted for real. Rebuild them with:\n${rebuild}` : ''}`);
+    const needs = r.needsRebuild || [];
+    const msg = botSay(`Undone. ${r.undone} steps reversed.${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
+    for (const recipe of needs) {
+      const b = el('button', { class: 'btn' }, `↻ REBUILD ${short(recipe.cwd)}`);
+      b.title = recipe.command;
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        b.textContent = `↻ ${recipe.command}…`;
+        const res = await api.rebuild(recipe);
+        setDisk(res.disk);
+        b.textContent = res.ok ? '✓ REBUILT' : '✗ FAILED';
+        log(res.ok ? `Rebuilt ${short(recipe.cwd)}` : `Rebuild failed: ${short(recipe.cwd)}`, res.ok ? 'pass' : 'fail');
+        botSay([res.warning, res.message].filter(Boolean).join('\n'));
+      });
+      msg.append(el('div', { class: 'undo-row' }, b));
+    }
   });
 }
 
@@ -399,7 +433,7 @@ $('#key-form').addEventListener('submit', async (e) => {
   if (!init.usage.asked && !init.screenshot) offerUsageLog();
   if (init.demoFolder) await useFolder(init.demoFolder);
   if (init.screenshot) {
-    await sendRequest('Free up space and sort my school files by class');
+    await sendRequest(init.screenshotRequest || 'Free up space and sort my school files by class');
     setTimeout(() => {
       const users = chat.querySelectorAll('.msg.user');
       chat.scrollTop = users[users.length - 1].offsetTop - chat.offsetTop - 12;

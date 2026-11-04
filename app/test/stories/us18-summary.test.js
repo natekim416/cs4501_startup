@@ -1,7 +1,6 @@
 // US-18 (#19) · One-sentence summary above Approve.
 const test = require('node:test');
 const assert = require('node:assert');
-const TODO = { todo: 'US-18 (#19): one-sentence summary not built yet' };
 
 const plan = {
   folder: '/Users/s/Downloads',
@@ -11,7 +10,7 @@ const plan = {
   ],
 };
 
-test('US-18 one sentence says what changes', TODO, () => {
+test('US-18 one sentence says what changes', () => {
   const { summarize } = require('../../backend/summary');
   const s = summarize(plan, { recentlyOpened: [] });
   assert.match(s, /Delete 6 rebuildable folders \(12 GB\)/);
@@ -19,13 +18,13 @@ test('US-18 one sentence says what changes', TODO, () => {
   assert.strictEqual(s.split(/(?<=\.)\s/).length <= 2, true);
 });
 
-test('US-18 a file opened in the last 24 hours is named in the summary', TODO, () => {
+test('US-18 a file opened in the last 24 hours is named in the summary', () => {
   const { summarize } = require('../../backend/summary');
   const s = summarize(plan, { recentlyOpened: ['/Users/s/Downloads/f3.pdf'] });
   assert.match(s, /f3\.pdf.*opened today/);
 });
 
-test('US-18 the summary uses plain words ("Trash", not "Dino Bin")', TODO, () => {
+test('US-18 the summary uses plain words ("Trash", not "Dino Bin")', () => {
   const { summarize } = require('../../backend/summary');
   const s = summarize({ folder: '/x', actions: [{ op: 'trash_duplicate', path: '/x/a (1).pdf' }] }, { recentlyOpened: [] });
   assert.doesNotMatch(s, /Dino Bin/);

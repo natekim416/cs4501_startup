@@ -1,6 +1,18 @@
 # Cleanasaurus MVP Validation
 
-**Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Test 1:** ________ · **Test 2:** ________
+**Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Testing:** October 30 – November 2, 2026 (Test 1 sessions, then 3 days of Test 2)
+
+> ⚠️ **Status: unconfirmed.** The per-tester numbers below match a draft written before testing (commit `c697e76`, labeled "placeholders to replace with real session data"). We are collecting the raw session evidence (notes, exported logs) from the team member who ran the sessions. Until it's in this repo, treat these results as unconfirmed.
+>
+> **Known issues we're resolving:**
+> - **The measurement tool postdates the test.** Test 2 is described as measured with the opt-in usage log, but that log was first committed on Nov 4, after the Oct 30 – Nov 2 testing window.
+> - **The undo denominators don't reconcile.** The "Actions kept" column sums to 267 actions, but the undo rate uses 361 (212 CS, 149 non-CS).
+> - **N3's row is inconsistent.** N3 is listed as "41/41 kept" even though all 41 were undone.
+> - **Three KPIs changed from the MVP plan:**
+>   - Repeat use was "within 7 days" in the MVP plan and is "within 3 days" here.
+>   - First-session approval was "run a full plan" and is "ran at least 80% of a plan" here. Under the original definition, 3 of 10 testers qualify (30%), which is below the MVP's 40% fail line.
+>   - "Space freed" is a new KPI that wasn't in the MVP plan.
+
 
 **Decision: Pivot.** Testers trusted the app (2 of 3 trust KPIs met, and the third close), but it didn't solve a problem they cared about (0 of 2 value KPIs met). We keep the engine and aim it at CS students' rebuildable developer clutter.
 
@@ -52,6 +64,8 @@ Trust KPIs ask whether people will let the app act. Value KPIs ask whether it wa
 | Value | Space freed | Median space reported freed ÷ median space wanted back | ≥50% | **0.6 ÷ 27.5 GB ≈ 2%** | 1.4 ÷ 30 GB ≈ 5% | 0.3 ÷ 15 GB = 2% | 🔴 |
 
 **Scale:** 🟢 met the target · 🟡 close, within 15 points · 🔴 missed by more, or any unsafe action.
+
+> **Disclosure:** these KPI ratings and decision rules were rewritten on Nov 4 (commit `0e1ab0e`), after the results were tallied. The earlier version used a points scorecard (green 2, yellow 1, red 0) and put the undo rate under Accuracy. Under that earlier version the decision was also **Pivot** (Trust 8/8, Value 2/8), so the change did not change the outcome.
 
 **Decision rules:**
 - **Validated:** no trust KPI is 🔴, and every value KPI is 🟢.
@@ -151,6 +165,8 @@ This is a **customer-segment pivot** (from everyone with a Mac to CS students) p
 **New hypothesis:**
 
 > CS students whose laptops are over 80% full will, without us in the room, approve a validated plan that actually frees at least 10 GB of rebuildable developer clutter in their first session (≥60% of testers), and at least 40% will run it again within 30 days.
+>
+> **Moat KPI** *(proposed; team to confirm)*: in a head-to-head with CleanMyMac's purge on their own laptops, at least 50% of those testers prefer Cleanasaurus, and none lose work with it.
 
 **What it looks like:**
 
@@ -200,7 +216,7 @@ This is the MVP's duplicate proof made broader. Today the app may delete a file 
 5. **It fixes the MVP's two biggest value flaws.** Rebuildables are actually deleted, so space is actually freed. And the app can finally remove things that aren't duplicates, with proof.
 6. **We are the customer, and we can reach more of them.** All three of us have this problem, and we can recruit through CS classes, clubs, and hackathons.
 7. **There's room to grow.** SlashData estimates [48.4 million developers worldwide](https://www.slashdata.co/post/global-developer-population-trends-2025-how-many-developers-are-there) as of Q3 2025. Students are the beachhead, and working developers come next.
-8. **The competition proves the pain but leaves a gap.** Tools like npkill (only `node_modules`), DevCleaner (only Xcode), `docker system prune`, and `conda clean` each cover one ecosystem. None of them know which projects you're done with, and none prove an item can be rebuilt before deleting it.
+8. **The competition proves the pain but leaves a gap.** Tools like npkill (only `node_modules`), DevCleaner (only Xcode), `docker system prune`, and `conda clean` each cover one ecosystem. The closest incumbent, **CleanMyMac's CLI** (MacPaw, developer preview), already purges `node_modules` older than 7 days and clears Xcode DerivedData, so age-based cleanup alone is not a gap. None of them know which projects you're done with, and none prove an item can be rebuilt before deleting it. Whether that difference matters to students is the moat question, tested head to head in Beta (see the moat KPI under the new hypothesis).
 
 **Why not the other directions?**
 

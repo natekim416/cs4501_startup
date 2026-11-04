@@ -3,6 +3,8 @@
 // rule-based planner so the app can still be demoed (shown as DEMO MODE in the UI).
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { projectInfo } = require('./devclutter');
+const { courseCodes } = require('./intent');
 
 const MODEL = 'claude-opus-5-5';
 const MAX_FILES_IN_PROMPT = 400;
@@ -21,7 +23,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -53,6 +55,7 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - rename: rename file "path" to the full new path "dest".
 - trash_duplicate: remove "path" because it is byte-identical to "keep". Only use for files listed in the same duplicate group.
 - quarantine: isolate "path". Only for files listed in malware_findings.
+- clear_cache: empty the package-manager cache folder "path". Only for paths listed in package_caches, and only if the user asks about caches or wants as much space as possible.
 - delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
 
 Rules:
@@ -60,10 +63,20 @@ Rules:
 - Only put new folders and moved files inside the allowed destination roots.
 - Never act on files in "never" zones. Files in "ask" zones are allowed but the user will be asked.
 - Follow the user's saved preferences.
+- Don't propose deleting anything in a project with uncommitted: true or last_changed_days under 30 unless the user named that project; the validator will reject it anyway.
+- If the user says which classes or projects they're done with, delete only artifacts from those projects (use the "projects" list; course codes like "CS 3140" match folder names like cs3140-hw1). Put the project name at the start of each reason. If you can't tell which projects they mean, ask with the candidate projects as options instead of guessing.
 - If something is ambiguous or unusual (files that look like versions of each other, a request that could mean two things), do not guess: add a question with 2-4 short options and leave those files alone.
 - If you receive validator errors, fix exactly those problems and return the full corrected plan.`;
 
-function summarizeScan(scan, findings, profile, dev = []) {
+// Course code, age, and uncommitted work for a project, so Claude can match "done with CS 3140"
+// and avoid proposing work in progress. The validator still checks all of it independently.
+function describeProject(project) {
+  const info = projectInfo(project);
+  const code = courseCodes(path.basename(project))[0];
+  return { course: code ? `${code.replace(/\d+$/, '').toUpperCase()} ${code.match(/\d+$/)[0]}` : null, last_changed_days: info.lastChangedDays, uncommitted: info.uncommitted };
+}
+
+function summarizeScan(scan, findings, profile, dev = [], caches = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -79,7 +92,9 @@ function summarizeScan(scan, findings, profile, dev = []) {
     files_omitted: Math.max(0, scan.files.length - MAX_FILES_IN_PROMPT),
     duplicate_groups: scan.duplicates.map((g, i) => ({ group: i + 1, files: g.files })),
     malware_findings: findings.map((f) => ({ path: f.path, evidence: f.evidence })),
-    rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason })),
+    rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason, ...describeProject(d.project) })),
+    projects: [...new Set(dev.map((d) => d.project))].map((p) => ({ name: path.basename(p), ...describeProject(p) })),
+    package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -87,9 +102,8 @@ function summarizeScan(scan, findings, profile, dev = []) {
   };
 }
 
-async function llmPlan({ request, scan, dev, findings, profile, previous, apiKey }) {
-  const client = new Anthropic({ apiKey });
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev))}`;
+async function llmPlan({ request, scan, dev, caches, findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -123,11 +137,12 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
+function demoPlan({ request, scan, dev = [], caches = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
-  const dedupe = want(/dup|space|storage|clean|free|copies/i);
+  const doneWith = want(/done with|finished with|over with/i);
+  const dedupe = want(/dup|space|storage|clean|free|copies/i) || doneWith;
   const root = profile.data.targetPlan.destRoots[0] || scan.root;
   const actions = [];
   const questions = [];
@@ -150,18 +165,27 @@ function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
     add({ op: 'mkdir', path: dir, reason: `New folder for ${path.basename(dir)}` });
   };
 
+  if (want(/cache/i)) {
+    for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
+  }
   for (const f of findings) {
     add({ op: 'quarantine', path: f.path, reason: f.evidence.join('; ') });
     gone.add(f.path);
   }
   if (dedupe) {
-    // Rebuildable dev folders first: that's where the space is.
+    // Rebuildable dev folders first: that's where the space is. If the request names projects
+    // ("done with CS 3140"), only those; if it's ambiguous, ask instead.
+    if (intent.ambiguous) questions.push(intent.ambiguous);
+    const named = new Set(intent.matched);
     for (const d of dev) {
-      if (d.label !== 'rebuildable' || rejected.has(d.path)) continue;
+      if (d.label !== 'rebuildable' || rejected.has(d.path) || intent.ambiguous) continue;
       const project = path.basename(d.project);
-      add({ op: 'delete_rebuildable', path: d.path, project, reason: `${project}: ${d.reason}` });
+      if (doneWith && !named.has(project)) continue;
+      if ((intent.kept || []).includes(project)) continue;
+      const why = named.has(project) ? `${project}: you said you're done with it. ${d.reason}` : `${project}: ${d.reason}`;
+      add({ op: 'delete_rebuildable', path: d.path, project, reason: why });
     }
-    for (const g of scan.duplicates) {
+    for (const g of doneWith ? [] : scan.duplicates) {
       const [keep, ...rest] = g.files;
       for (const p of rest) {
         if (gone.has(p) || gone.has(keep)) continue;
@@ -222,8 +246,9 @@ function demoPlan({ request, scan, dev = [], findings, profile, previous }) {
   return { summary, actions, questions };
 }
 
+// An injected client (tests, or a future server proxy) also means "use the LLM".
 async function makePlan(args) {
-  if (args.apiKey) return { mode: 'llm', plan: await llmPlan(args) };
+  if (args.apiKey || args.client) return { mode: 'llm', plan: await llmPlan(args) };
   return { mode: 'demo', plan: demoPlan(args) };
 }
 

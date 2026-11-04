@@ -4,9 +4,8 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { tmp, write, makeJsProject, makePyProject } = require('./helpers');
-const TODO = { todo: 'US-01 (#2): storage breakdown not built yet' };
 
-test('US-01 shows measured totals by type and the 10 largest projects, and modifies nothing', TODO, () => {
+test('US-01 shows measured totals by type and the 10 largest projects, and modifies nothing', () => {
   const { breakdown } = require('../../backend/breakdown');
   const root = tmp();
   for (let i = 0; i < 12; i++) makeJsProject(root, `proj-${i}`, { kb: 8 * (i + 1) });
@@ -20,7 +19,7 @@ test('US-01 shows measured totals by type and the 10 largest projects, and modif
   assert.strictEqual(fs.statSync(path.join(root, 'proj-0', 'node_modules')).mtimeMs, before);
 });
 
-test('US-01 scans about 50 projects within 60 seconds and reports progress', TODO, () => {
+test('US-01 scans about 50 projects within 60 seconds and reports progress', () => {
   const { breakdown } = require('../../backend/breakdown');
   const root = tmp();
   for (let i = 0; i < 50; i++) makeJsProject(root, `p${i}`, { repo: false, kb: 4 });
@@ -31,7 +30,7 @@ test('US-01 scans about 50 projects within 60 seconds and reports progress', TOD
   assert.ok(progress.length > 1);
 });
 
-test('US-01 a folder macOS blocks is named with how to grant access, not silently skipped', TODO, () => {
+test('US-01 a folder macOS blocks is named with how to grant access, not silently skipped', () => {
   const { breakdown } = require('../../backend/breakdown');
   const root = tmp();
   const blocked = path.dirname(write(path.join(root, 'Documents', 'x.txt')));
@@ -44,4 +43,27 @@ test('US-01 a folder macOS blocks is named with how to grant access, not silentl
   } finally {
     fs.chmodSync(blocked, 0o755);
   }
+});
+
+test('US-01 asking "where did my space go?" answers with the breakdown and proposes nothing', async () => {
+  const { Engine } = require('../../backend/engine');
+  const root = tmp();
+  makeJsProject(root, 'big-app', { kb: 200 });
+  makePyProject(root, 'ds');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const res = await engine.plan('Where did my space go?');
+  assert.strictEqual(res.actions.length, 0);
+  assert.match(res.summary, /JavaScript packages/);
+  assert.match(res.summary, /big-app/);
+  assert.ok(res.breakdown && res.breakdown.byType.javascript > 0);
+});
+
+test('US-01 Xcode, Docker, and ML totals are measured, not just present as keys (partial until US-08–10)', { todo: 'US-01 (#2): needs US-08, US-09, US-10' }, () => {
+  const { breakdown } = require('../../backend/breakdown');
+  const root = tmp();
+  write(path.join(root, 'Library', 'Developer', 'Xcode', 'DerivedData', 'App-abc', 'Build', 'x.o'), 'x'.repeat(4096));
+  const b = breakdown(root);
+  assert.ok(b.byType.xcode > 0, 'DerivedData should count toward Xcode');
 });

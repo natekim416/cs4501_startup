@@ -105,7 +105,7 @@ button { font: inherit; cursor: pointer; }
 .op.move, .op.rename { background: var(--mint); }
 .op.trash_duplicate { background: var(--gold); }
 .op.quarantine { background: var(--pink); }
-.op.delete_rebuildable { background: #CDB8FF; }
+.op.delete_rebuildable, .op.clear_cache { background: #CDB8FF; }
 .action .file { font-size: 21px; word-break: break-all; }
 .action .why { font-size: 18px; color: #5A5870; }
 .ask-tag { font-family: var(--pixel); font-size: 8px; background: var(--gold); padding: 3px 5px; margin-left: 6px; }
@@ -119,6 +119,7 @@ button { font: inherit; cursor: pointer; }
 
 /* ---------- Buttons ---------- */
 .btn {
+  white-space: nowrap;
   font-family: var(--pixel);
   font-size: 11px;
   padding: 10px 14px;
@@ -219,3 +220,8 @@ body.tour-talking #tour-guide .dino { animation: talk 0.25s steps(2) infinite; }
 .tour-actions .btn { box-shadow: 4px 4px 0 var(--ink); }
 .dust { position: fixed; width: 10px; height: 10px; z-index: 70; pointer-events: none; animation: dust 0.9s steps(6) forwards; }
 @keyframes dust { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+
+.why.note { color: #B0306E; font-weight: 700; }
+.one-line { padding: 10px 14px; font-weight: 700; border-top: 2px dashed var(--ink); }
+.undo-one summary { cursor: pointer; margin-top: 6px; }
+.undo-one .btn { white-space: normal; text-align: left; }

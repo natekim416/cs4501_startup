@@ -212,7 +212,7 @@
     },
     {
       target: () => document.querySelector('#freed').closest('.hud-stat'),
-      text: 'Done! The space I freed shows up up here. Nothing is deleted for good: removed files go to my Dino Bin and suspicious ones go to quarantine.',
+      text: 'Done! FREED up here is measured on your disk. Removed files go to the Trash, suspicious ones go to quarantine, and build folders I delete come with the command to rebuild them.',
     },
     {
       target: () => buttonNamed('↶ UNDO'),

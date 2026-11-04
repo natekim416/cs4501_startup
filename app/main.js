@@ -55,6 +55,7 @@ function registerIpc() {
     usage: engine.usage.status(),
     demoFolder: arg('demo-folder'),
     screenshot: Boolean(arg('screenshot')),
+    screenshotRequest: arg('screenshot-request'),
   }));
   ipcMain.handle('pick-folder', async () => {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'], defaultPath: path.join(os.homedir(), 'Downloads') });
@@ -74,6 +75,8 @@ function registerIpc() {
   ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('execute', (_e, planId, ids) => ({ ...engine.execute(planId, ids), disk: diskInfo() }));
   ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
+  ipcMain.handle('undo-one', (_e, batchId, actionId) => ({ ...engine.undoAction(batchId, actionId), disk: diskInfo() }));
+  ipcMain.handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));
   ipcMain.handle('set-zone', (_e, zonePath, zone) => {
     engine.profile.setZone(zonePath, zone);
     return profileView();
@@ -107,7 +110,8 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
-  engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData') });
+  // Removed duplicates go to the macOS Trash (US-13); tests pass --trash-dir to keep the real Trash clean.
+  engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData'), trashDir: arg('trash-dir') || path.join(os.homedir(), '.Trash') });
   // The generated demo folder is safe to change freely.
   if (arg('demo-folder')) {
     engine.profile.setZone(arg('demo-folder'), 'free');

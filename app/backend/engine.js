@@ -3,7 +3,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
-const { findArtifacts } = require('./devclutter');
+const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
+const { matchProjects } = require('./intent');
+const { summarize } = require('./summary');
+const { rebuild } = require('./rebuild');
+const { breakdown } = require('./breakdown');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
 const { makePlan } = require('./planner');
@@ -12,7 +16,7 @@ const { Profile } = require('./profile');
 const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
-const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable'];
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'];
 const ESTIMATE_GAP = 0.1;
 
 // Free space on the disk that holds p, measured by the OS.
@@ -21,11 +25,12 @@ function diskFreeBytes(p) {
   return s.bavail * s.bsize;
 }
 
+// Decimal units, matching macOS and the UI.
 function formatBytes(n) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let i = 0;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
+  while (n >= 1000 && i < units.length - 1) {
+    n /= 1000;
     i++;
   }
   return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
@@ -36,10 +41,17 @@ function countOps(actions) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null } = {}) {
+    this.llmClient = llmClient;
+    this.dataDir = dataDir;
+    this.home = home;
+    this.condaRun = condaRun;
+    this.caches = [];
+    this.condaExports = {};
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
-    this.executor = new Executor(dataDir);
+    this.executor = new Executor(dataDir, { trashDir });
+    this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
     this.practiceFolders = new Set();
     this.apiKey = apiKey;
@@ -52,7 +64,7 @@ class Engine {
   }
 
   get mode() {
-    return this.apiKey ? 'llm' : 'demo';
+    return this.apiKey || this.llmClient ? 'llm' : 'demo';
   }
 
   // Practice runs (the guided demo, --demo-folder) aren't real use, so they stay out of the usage log.
@@ -78,8 +90,11 @@ class Engine {
     this.folder = folder;
     this.snapshot = scan(folder);
     this.dev = findArtifacts(folder);
+    this.caches = toolCaches(this.home);
+    this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
-    this.findings = malware.findings;
+    this.unknownApps = malware.findings.filter((f) => f.quarantine === false);
+    this.findings = malware.findings.filter((f) => f.quarantine !== false);
     const rebuildable = this.dev.filter((d) => d.label === 'rebuildable');
     return {
       rebuildableCount: rebuildable.length,
@@ -91,9 +106,27 @@ class Engine {
       duplicateBytes: this.snapshot.duplicates.reduce((s, g) => s + g.size * (g.files.length - 1), 0),
       malwareEngine: malware.engine,
       findings: this.findings,
+      unknownApps: this.unknownApps.map((f) => ({ name: f.name, label: f.label })),
       zone: this.profile.zoneFor(folder),
       zoneReason: this.profile.zoneInfo(folder).reason,
     };
+  }
+
+  // US-07: an inactive conda environment with no environment.yml is exported first, so the export can be
+  // its rebuild recipe. Skipped quietly if conda isn't installed.
+  exportCondaEnvs() {
+    for (const d of this.dev) {
+      if (d.type !== 'conda-env' || d.label === 'rebuildable') continue;
+      if (Date.now() - lastChanged(d.project) < INACTIVE_DAYS * 864e5) continue;
+      try {
+        const recipe = this.condaExports[d.path] ? null : exportCondaEnv(d.path, { dataDir: this.dataDir, ...(this.condaRun && { run: this.condaRun }) });
+        if (recipe) this.condaExports[d.path] = recipe.lockfile;
+      } catch {
+        continue;
+      }
+      const label = labelPath(d.path, { condaExports: this.condaExports });
+      Object.assign(d, { label: label.label, reason: label.reason, rebuild: label.rebuild || null });
+    }
   }
 
   // Plans, validates, and feeds errors back to the planner until the plan passes or attempts run out.
@@ -116,14 +149,21 @@ class Engine {
       };
     }
     this.scanFolder(this.folder);
-    const ctx = { scan: this.snapshot, dev: this.dev, findings: this.findings, profile: this.profile };
+    // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
+    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown();
+    // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
+    // The scanned folder itself isn't a project (a VM bundle at the top level would otherwise make it one).
+    const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
+    const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
+    this.pendingProjects = null;
+    const ctx = { scan: this.snapshot, dev: this.dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports };
     const attempts = [];
     let previous = null;
     let plan;
     let check;
 
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await makePlan({ request, ...ctx, previous, apiKey: this.apiKey });
+      const made = await makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined });
       plan = made.plan;
       check = validate(plan, ctx);
       const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
@@ -155,8 +195,15 @@ class Engine {
     }
     for (const s of check.strange) questions.push({ text: s.text, options: ['Yes, go ahead', 'No, leave it'], action: s.action });
 
+    // A project the user named but touched recently is allowed, and shown unchecked so they decide.
+    for (const a of plan.actions || []) {
+      if (a.op !== 'delete_rebuildable') continue;
+      const days = Math.floor((Date.now() - lastChanged(path.dirname(a.path))) / 864e5);
+      if (days < INACTIVE_DAYS) Object.assign(a, { checked: false, note: `${path.basename(path.dirname(a.path))} is still active (changed ${days} day${days === 1 ? '' : 's'} ago). Check it only if you're sure.` });
+    }
+
     const planId = ++this.planCount;
-    this.lastPlan = { id: planId, request, plan, check };
+    this.lastPlan = { id: planId, request, plan, check, named: ctx.named };
     this.track('plan', {
       zone: this.profile.zoneFor(this.folder),
       tries: attempts.length,
@@ -169,9 +216,21 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes])]);
+    const dayAgo = Date.now() - 864e5;
+    const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
+      try {
+        const st = fs.statSync(p);
+        return Math.max(st.atimeMs, st.mtimeMs) > dayAgo && st.isFile();
+      } catch {
+        return false;
+      }
+    });
+    const oneLine = summarize({ folder: this.folder, actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) })) }, { recentlyOpened });
     return {
       mode: this.mode,
       planId,
+      oneLine,
       summary: plan.summary,
       actions: plan.actions || [],
       questions,
@@ -185,6 +244,13 @@ class Engine {
   // Saves the answer to the profile so the same question isn't asked twice, then re-plans.
   async answer(question, choice, onAttempt) {
     this.track('question_answered');
+    // Picking a project from "Which projects do you mean?" names exactly that project; re-parsing the
+    // combined text would let a course code widen it to the project's siblings.
+    if (/which projects/i.test(question)) {
+      this.pendingProjects = [choice];
+      const request = this.lastPlan ? this.lastPlan.request : '';
+      return this.plan(`${request} (User picked ${choice})`, onAttempt);
+    }
     this.profile.remember(`${question.replace(/\?$/, '')}: ${choice}`);
     const request = this.lastPlan ? this.lastPlan.request : '';
     return this.plan(`${request} (User answered "${question}" with "${choice}")`, onAttempt);
@@ -197,7 +263,7 @@ class Engine {
     }
     const chosen = this.lastPlan.plan.actions.filter((a) => actionIds.includes(a.id));
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };
@@ -231,8 +297,30 @@ class Engine {
     const showBoth = deletedEstimate > 0 && Math.abs(measuredFreed - deletedEstimate) / deletedEstimate > ESTIMATE_GAP;
     const notes = [];
     if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
-    if (binned) notes.push(`${formatBytes(binned)} moved to the Dino Bin frees up when you empty it.`);
+    if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
+  }
+
+  answerBreakdown() {
+    const b = breakdown(this.folder);
+    const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker', ml: 'ML model caches' };
+    const types = Object.entries(b.byType).map(([k, v]) => `${names[k]}: ${formatBytes(v)}`).join('\n');
+    const top = b.topProjects.map((p, i) => `${i + 1}. ${path.basename(p.path)}: ${formatBytes(p.bytes)}`).join('\n');
+    const blocked = b.unreadable.map((u) => `${u.path}: ${u.howToFix}`).join('\n');
+    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest projects:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}`;
+    this.track('breakdown', { projects: b.topProjects.length, unreadable: b.unreadable.length });
+    return { mode: this.mode, planId: null, summary, breakdown: b, actions: [], questions: [], attempts: [], bytesFreed: 0, needsApproval: [], warnings: [] };
+  }
+
+  // US-15: rebuild something we deleted, from the recipe the proof saved. Logged as a count, never a path.
+  rebuild(recipe) {
+    return rebuild(recipe, { record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
+  }
+
+  undoAction(batchId, actionId) {
+    const result = this.executor.undoAction(batchId, actionId);
+    this.track('undo_one', { undone: result.undone });
+    return result;
   }
 
   undo() {
