@@ -114,3 +114,13 @@ test('US-05 a delete_rebuildable inside a user-set NEVER zone is still rejected'
   assert.strictEqual(res.ok, false);
   assert.match(res.errors[0].message, /NEVER/);
 });
+
+test('US-05 a git repo at the home folder (dotfiles) does not make every project look "not gitignored" (edge case)', () => {
+  const { gitCommitAll } = require('./helpers');
+  const home = tmp();
+  write(path.join(home, '.zshrc'), 'export X=1\n');
+  gitCommitAll(home);
+  const project = makeJsProject(home, 'no-own-repo', { repo: false });
+  const proof = rebuildProof(path.join(project, 'node_modules'), { home });
+  assert.deepStrictEqual(proof.failures, []);
+});
