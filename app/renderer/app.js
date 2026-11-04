@@ -5,10 +5,11 @@ const state = { folder: null, freed: 0, home: '', currentCard: null };
 
 const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE' };
 
+// Decimal units, the way macOS Finder and the plan's one-line summary report sizes.
 function formatBytes(n) {
-  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
-  if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
-  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)} MB`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)} KB`;
   return `${n} B`;
 }
 
@@ -161,7 +162,7 @@ async function useFolder(folder) {
   log(`Scanned with ${info.malwareEngine}`, 'info');
   let text = `Scanned ${info.fileCount} files (${formatBytes(info.totalBytes)}).`;
   if (info.rebuildableCount) text += `\nFound ${info.rebuildableCount} build folders I may be able to rebuild (${formatBytes(info.rebuildableBytes)}).`;
-  if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} sets of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
+  if (info.duplicateGroups) text += `\nFound ${info.duplicateGroups} ${info.duplicateGroups === 1 ? 'set' : 'sets'} of duplicates wasting ${formatBytes(info.duplicateBytes)}.`;
   if (info.findings.length) text += `\n${info.findings.length} file(s) look suspicious: ${info.findings.map((f) => f.name).join(', ')}.`;
   if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
   text += '\nWhat should I do?';

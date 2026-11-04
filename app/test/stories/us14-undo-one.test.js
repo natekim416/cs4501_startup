@@ -5,7 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const { tmp, write } = require('./helpers');
 const { Executor } = require('../../backend/executor');
-const TODO = { todo: 'US-14 (#15): per-action undo not built yet' };
 
 function twoMoves() {
   const dir = tmp();

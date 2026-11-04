@@ -25,11 +25,12 @@ function diskFreeBytes(p) {
   return s.bavail * s.bsize;
 }
 
+// Decimal units, matching macOS and the UI.
 function formatBytes(n) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let i = 0;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
+  while (n >= 1000 && i < units.length - 1) {
+    n /= 1000;
     i++;
   }
   return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
@@ -151,8 +152,10 @@ class Engine {
     // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
     if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown();
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
-    const projectNames = [...new Set(this.dev.map((d) => path.basename(d.project)))];
-    const intent = matchProjects(request, projectNames);
+    // The scanned folder itself isn't a project (a VM bundle at the top level would otherwise make it one).
+    const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
+    const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
+    this.pendingProjects = null;
     const ctx = { scan: this.snapshot, dev: this.dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports };
     const attempts = [];
     let previous = null;
@@ -241,6 +244,13 @@ class Engine {
   // Saves the answer to the profile so the same question isn't asked twice, then re-plans.
   async answer(question, choice, onAttempt) {
     this.track('question_answered');
+    // Picking a project from "Which projects do you mean?" names exactly that project; re-parsing the
+    // combined text would let a course code widen it to the project's siblings.
+    if (/which projects/i.test(question)) {
+      this.pendingProjects = [choice];
+      const request = this.lastPlan ? this.lastPlan.request : '';
+      return this.plan(`${request} (User picked ${choice})`, onAttempt);
+    }
     this.profile.remember(`${question.replace(/\?$/, '')}: ${choice}`);
     const request = this.lastPlan ? this.lastPlan.request : '';
     return this.plan(`${request} (User answered "${question}" with "${choice}")`, onAttempt);

@@ -5,7 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const { tmp, write } = require('./helpers');
 const { Executor } = require('../../backend/executor');
-const TODO = { todo: 'US-13 (#14): macOS Trash not built yet' };
 
 test('US-13 a removed duplicate appears in the Trash under its original name, and undo brings it back', () => {
   const trash = tmp();

@@ -4,7 +4,6 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { tmp, makeJsProject } = require('./helpers');
-const TODO = { todo: 'US-15 (#16): one-click rebuild not built yet' };
 
 function deleted() {
   const project = makeJsProject(tmp(), 'old-app');

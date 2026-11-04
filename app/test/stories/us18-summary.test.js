@@ -1,7 +1,6 @@
 // US-18 (#19) · One-sentence summary above Approve.
 const test = require('node:test');
 const assert = require('node:assert');
-const TODO = { todo: 'US-18 (#19): one-sentence summary not built yet' };
 
 const plan = {
   folder: '/Users/s/Downloads',
