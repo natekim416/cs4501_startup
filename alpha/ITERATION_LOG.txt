@@ -180,3 +180,22 @@ ROUND 2 FIXES (from the round 1 report)
   check passes.
   Issues built on this branch, closing at merge: #4, #7, #8, #14, #19,
   #20. That's 16 of 29 done (10 closed + 6 built).
+
+[R2-j] US-15, one-click rebuild (#16). Built and passing.
+  Why: "rebuild, not just delete" is one of our moat claims against
+  CleanMyMac's purge, and it was unbuilt.
+  Tests: 3 todo tests were turned on and failed, then passed.
+  Code changes:
+  - NEW app/backend/rebuild.js: rebuild(recipe) runs the saved command
+    (from our recipe table, never from the LLM) in the project. It warns
+    if the lockfile hash changed, and on failure it shows the command to
+    run by hand.
+  - Logs "rebuild" or "rebuild_failed" with ok and ms only. That gives
+    us the >=95% rebuild KPI for Beta.
+  - Engine.rebuild(), plus a "rebuild" IPC channel in main.js and
+    preload.js. After an undo, the chat shows a REBUILD button for each
+    deleted folder.
+  Results: 121 tests, 89 pass, 0 fail, 32 todo. UI 14/14. The todo
+  check passes.
+  Built on this branch, closing at merge: #4, #7, #8, #14, #16, #19,
+  #20. That's 17 of 29 done.
