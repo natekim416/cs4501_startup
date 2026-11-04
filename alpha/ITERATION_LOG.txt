@@ -111,3 +111,48 @@ Machine fixes it asked for, and how I handled each:
   11 The LLM red-run file was committed with the green commit -> R2 note
   12 "[UPDATE THIS PARAGRAPH]" left in the script    -> stays until the
      team review happens
+
+---------------------------------------------------------------------
+ROUND 2 FIXES (from the round 1 report)
+---------------------------------------------------------------------
+[R2-a] Claude gets each project's metadata.
+  Test: LLM-7 failed, then passed.
+  Code: app/backend/planner.js. rebuildable_items and the projects list
+  now include course ("CS 3140"), last_changed_days, and uncommitted.
+  SYSTEM tells Claude not to propose active or uncommitted projects
+  unless they're named. app/backend/devclutter.js gets projectInfo().
+[R2-b] REG-4 is a guard test. The exact demo request, run on the demo
+  folder, plans only cs3140-final and cs3140-hw1, and rejects hoohacks
+  for uncommitted work. It already passed, because R1-a fixed the bug.
+[R2-c] CI fails if a todo test passes.
+  NEW app/scripts/check-todos.js, plus "npm run test:todos", plus a
+  step in .github/workflows/test.yml. Currently 40 todo tests are red.
+[R2-d] Coverage covers backend/ only (scripts are excluded).
+  95.7% lines, 90.5% branches, 94.6% functions.
+[R2-e] tdd/README.md
+  - Fixed the 61% error. Pass rate is shown both ways: 81/81 runnable,
+    and 67% (81/121) overall.
+  - Added the new commits and statuses, and review-log rows 9-12.
+  - Notes that the LLM red-run file was committed with its green commit.
+[R2-f] The written docs now name CleanMyMac's CLI (MacPaw) and state the
+  moat.
+  - requirements/USER_STORIES.md "What sets us apart" has a new moat
+    section.
+  - validation/MVP_VALIDATION.md §3.3 item 8 names CleanMyMac.
+  - A Moat KPI was added under the new hypothesis (head to head,
+    >=50% prefer us).
+  - Marked "(proposed; team to confirm)". That's a TEAM DECISION.
+[R2-g] Demo and slides match reality.
+  - main.js and app.js: screenshot mode takes --screenshot-request.
+  - Slide 5 shows the exact scripted request on the offline planner.
+  - Script D3 and D6 narrate the real outcome: one rejection, for
+    uncommitted work.
+  - Slide 4's step 3 is now accurate (Claude matches courses).
+  - Slide 7 says "tested with a simulated client".
+  - The Beta sprints have dates: weeks of Nov 9, 16, 23, 30, marked
+    proposed. That's a TEAM DECISION.
+  - The Q&A answer about Claude vs. a regex no longer claims untested
+    abilities.
+[R2-h] UI: .btn has white-space:nowrap, so APPROVE no longer wraps.
+  Results: 121 tests, 81 pass, 0 fail, 40 todo. UI 14/14. Both PDFs
+  rebuilt.
