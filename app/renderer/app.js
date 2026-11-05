@@ -348,7 +348,9 @@ async function runPlan(planId, list, approve) {
     setDisk(r.disk);
     log(`Undid ${r.undone} steps`, 'info');
     const needs = r.needsRebuild || [];
-    const msg = botSay(`Undone. ${r.undone} steps reversed.${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
+    const kept = r.keptFolders || [];
+    const keptNote = kept.length ? `\nI kept ${kept.map(short).join(', ')} because you've put your own files in ${kept.length === 1 ? 'it' : 'them'} since.` : '';
+    const msg = botSay(`Undone. ${r.undone} steps reversed.${keptNote}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
     for (const recipe of needs) {
       const b = el('button', { class: 'btn' }, `↻ REBUILD ${short(recipe.cwd)}`);
       b.title = recipe.command;
