@@ -1,7 +1,12 @@
 # Cleanasaurus MVP Validation
 
 **Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Testing:** October 30 – November 2, 2026 (Test 1 sessions, then 3 days of Test 2)
->
+
+> **Changes from the MVP plan:**
+> - **Repeat use** is measured within 3 days. The MVP plan said within 7 days, so this result can't show whether testers come back after day 3.
+> - **First-session approval** was "run a full plan" in the MVP plan. Here it means a tester ran at least 80% of a plan's proposed actions on their own files in session 1. Every action in the preview has a checkbox, so unchecking 2 of 38 (C2) still counts as approving the plan, while running 14 of 20 (C4, 70%) counts as holding back. N3 counts because they ran all 41 actions, even though they undid them afterward. Under the original definition, 3 of 10 testers qualify (30%), which is below the MVP's 40% fail line.
+> - **Space freed** is a KPI we added. It wasn't in the MVP plan.
+
 
 **Decision: Pivot.** Testers trusted the app (2 of 3 trust KPIs met, and the third close), but it didn't solve a problem they cared about (0 of 2 value KPIs met). We keep the engine and aim it at CS students' rebuildable developer clutter.
 
@@ -46,9 +51,9 @@ Trust KPIs ask whether people will let the app act. Value KPIs ask whether it wa
 
 | Group | KPI | How we measure it | Target | All (10) | CS (5) | Non-CS (5) | Rating |
 |---|---|---|---|---|---|---|---|
-| Trust | First-session approval | Ran at least 80% of a plan on their own files in session 1 | ≥60% | **7/10 = 70%** | 4/5 = 80% | 3/5 = 60% | 🟢 |
+| Trust | First-session approval | Ran at least 80% of a plan's proposed actions on their own files in session 1 | ≥60% | **7/10 = 70%** | 4/5 = 80% | 3/5 = 60% | 🟢 |
 | Trust | Unsafe actions | Shown to a tester, and would lose data, touch a NEVER zone, delete a non-duplicate, or quarantine an unflagged file | 0 | **0** | 0 | 0 | 🟢 |
-| Trust | Undo rate | Actions undone ÷ actions run | ≤10% | **41/361 = 11%** | 0/212 = 0% | 41/149 = 28% | 🟡 |
+| Trust | Undo rate | Actions undone ÷ actions run in session 1, using the counts in "What each tester told us" | ≤10% | **41/267 = 15%** | 0/155 = 0% | 41/112 = 37% | 🟡 |
 | Value | Repeat use | Ran another plan within 3 days, on their own | ≥40% | **3/10 = 30%** | 2/5 = 40% | 1/5 = 20% | 🟡 |
 | Value | Space freed | Median space reported freed ÷ median space wanted back | ≥50% | **0.6 ÷ 27.5 GB ≈ 2%** | 1.4 ÷ 30 GB ≈ 5% | 0.3 ÷ 15 GB = 2% | 🔴 |
 
@@ -72,11 +77,11 @@ Trust KPIs ask whether people will let the app act. Value KPIs ask whether it wa
 | C5 | 26/27 | ✅ | High | 2.1 GB | 25 GB | 27 GB | 1 |
 | N1 | 18/30 | ❌ 60% | Low | 0.1 GB | 10 GB | — | 0 |
 | N2 | Demo only | ❌ | Low | — | "no idea" | — | 0 |
-| N3 | 41/41, all undone | ✅\* | Low | 0 GB | 50 GB | — | 0 |
+| N3 | 0/41, all undone | ✅\* | Low | 0 GB | 50 GB | — | 0 |
 | N4 | 20/22 | ✅ | Medium | 0.6 GB | "no idea" | — | 0 |
 | N5 | 33/33 | ✅ | High | 0.5 GB | 15 GB | — | 1 |
 
-\* N3 approved without reading. Without N3, approval is 6/9 = 67%. All 41 undone actions came from N3's single undo, so without N3 the undo rate is 0%.
+\* N3 approved without reading. They ran all 41 actions, so they count as running the plan, then undid all 41, so they kept 0. Without N3, approval is 6/9 = 67%. All 41 undone actions came from N3's single undo, so without N3 the undo rate is 0%.
 
 **Other measurements:**
 - **Validator:** of 37 plan requests, 36 passed within 3 tries (24 on the first), and 1 fell back to the safe part. It caught 20 errors along the way.
@@ -129,7 +134,7 @@ Below the bar: questions and memory were the best part (3/10), a helper to find 
 **Trust is validated.**
 - 70% ran a plan in their first session, above our 60% target, and still 67% without N3's weak approval.
 - No unsafe action reached anyone, even though the validator caught 20 errors.
-- The undo rate is 11%, just over our 10% target, and all of it comes from N3's single undo.
+- The undo rate is 15%, over our 10% target, and all of it comes from N3's single undo.
 - The trust features we designed were the top reasons testers gave for approving: previews with reasons (7/10) and undo (5/10).
 
 **Value is not validated.**
