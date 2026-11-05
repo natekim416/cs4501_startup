@@ -104,7 +104,7 @@
 - **Every failure names its condition**, for example "no lockfile (package-lock.json, yarn.lock, or pnpm-lock.yaml) in hoohacks-2026". The reason goes back to the planner (Claude or the offline planner) and shows in the Safety Log.
 - **Real space freed.** Proven folders are deleted, and FREED is the measured change in free disk space. Duplicates go to the macOS Trash and are reported as "frees up when you empty it."
 - **Honest sizes.** Files hard-linked to pnpm's shared store don't count.
-- **Demo.** `npm run dev-demo` builds 8 projects plus every case the proof must refuse. The scripted request "I'm done with CS 3140 and the hackathon. Free up space." targets only the CS 3140 and hackathon projects. The validator rejects `hoohacks-2026` for uncommitted work, and try 2 passes with the two CS 3140 folders. The other courses, the `.env` secret, and the VM are never proposed. With an API key, Claude makes the same choice from the request. That path is tested with a simulated client (LLM-2, LLM-7); a live run hasn't been recorded yet.
+- **Demo.** `npm run dev-demo` builds 8 projects plus every case the proof must refuse. The scripted request "I'm done with CS 3140 and the hackathon. Free up space." targets only the CS 3140 and hackathon projects. On the offline planner, the validator rejects `hoohacks-2026` for uncommitted work, and try 2 passes with the two CS 3140 folders. The other courses, the `.env` secret, and the VM are never proposed. With an API key, Claude plans the two CS 3140 folders on try 1 and leaves `hoohacks-2026` out on its own, asking about it (LIVE-1, [`06-live-claude-run.txt`](06-live-claude-run.txt)). The simulated-client tests (LLM-2, LLM-7) cover the retry path.
 
 ## 5. Review log: what changed in the AI-generated tests
 

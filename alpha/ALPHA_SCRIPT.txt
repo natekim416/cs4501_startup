@@ -11,9 +11,10 @@ Time plan (from the rubric):
   Q&A                                   slide 8
 
 BEFORE PRESENTING
-- Slides 2 and 3 have a yellow PENDING banner. Do not present those
-  numbers until Nate Kim confirms them against the raw session evidence.
-  If they change, update the slides and this script.
+- Slides 2 and 3 present NO tester numbers on purpose: we can't verify
+  our session records. Don't add any numbers from memory or from the
+  old validation doc. If asked, use the validation answers in the Q&A
+  section at the bottom.
 - Demo setup (do this 10 minutes before class):
     cd app && npm run dev-demo
   Put the API key in the .env file at the repo root so MODE shows CLAUDE.
@@ -34,19 +35,21 @@ make that deletion safe.
 
 [SLIDE 2 - MVP VALIDATION - 0:35-1:20]
 Our MVP hypothesis was that students would let an AI clean their files
-if every plan was checked first. We planned fifteen testers and ran ten:
-five CS students and five non-CS. Trust held. Seventy percent ran a full
-plan in their first session, against a target of sixty, and zero unsafe
-actions reached anyone. But value failed. Testers got back about two
-percent of the space they wanted, and only thirty percent came back.
-We also found our own bug: the app said it freed twelve gigabytes, and
-zero bytes left the disk. So our decision was: pivot.
+if every plan was checked first. Our plan was fifteen testers on their
+own laptops for two weeks, judged by four pass/fail KPIs: run a full
+plan in the first session, come back within a week, rarely undo, and
+zero unsafe actions. We have to be straight with you: we can't verify
+our session records, so we are not presenting tester numbers. Our
+hypothesis is not validated. We made the pivot decision on evidence
+anyone can check, on the next slide, and our Beta test is where the
+real numbers will come from.
 
 [SLIDE 3 - PIVOT - 1:20-2:00]
-Every CS tester told us where their space actually was: build folders.
-The median CS tester had thirty-eight gigabytes of rebuildable clutter,
-against one point four of duplicates. So we kept the trust engine and
-aimed it there. To be honest about competition: CleanMyMac's new command
+Here's that evidence. Our MVP freed zero bytes on disk: "deleted"
+duplicates went to a bin on the same drive, and it could only remove
+exact copies. Meanwhile, the space is in build folders: two point four
+gigabytes on one of our own laptops, fifty-eight in that developer's
+case. So we kept the trust engine and aimed it there. To be honest about competition: CleanMyMac's new command
 line tool already deletes node_modules older than a week. What nobody
 does is prove a folder is safe to delete, with its lockfile, no
 uncommitted work, and no secrets inside, and save the command to rebuild
@@ -97,7 +100,8 @@ and one more is partly built. We have a
 hundred and twenty-nine automated tests, plus a fourteen-step test that
 clicks through the real app. Ninety-three of them were written before the
 code they test. Five more run against the real Claude, and all five
-pass. That's about four tests per issue, and every
+pass. That's about four tests per issue, three and a half counting only
+tests that run today, and every
 issue has at least two. All hundred and one tests that can run pass. That's
 seventy-eight percent of everything we wrote, because twenty-eight
 tests are for stories we haven't built yet. We keep those red, and CI
@@ -110,8 +114,8 @@ refined a test by hand yet. That review is scheduled before Beta.
 instead of the last two sentences.)
 
 [SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
-For the Alpha, we finished validation and the decision, all the stories
-and issues, and eighteen of them built: the rebuild proof, cleaning by
+For the Alpha, we made the pivot decision, wrote all the stories and
+issues, and built eighteen of them: the rebuild proof, cleaning by
 intent, one-click rebuild, undo for a single action, the Trash, a
 one-line summary, and honest space numbers. For Beta: four weekly
 sprints starting November ninth. First, protecting your projects and
@@ -151,5 +155,20 @@ A: The first red run failed because the module didn't exist yet. That's
    weaker evidence, and we say so in our TDD log. The Claude-path tests
    we added later failed on real assertions before we wrote the code.
 
-Q: (About the validation data, if asked.) Answer only with what Nate
-   Kim can back with evidence. Don't guess.
+Q: "Why no validation numbers?" / "Your Nov 3 commit calls the numbers
+   placeholders." / "Did you run the sessions?"
+A: We can't verify our session records, so we withdrew the numbers
+   instead of presenting them. Our pivot doesn't rest on them: it rests
+   on what the MVP could do by design and on measured build folders, and
+   the Beta test with twenty CS students we don't know is where we'll
+   get real numbers. Don't add details you can't back up.
+
+Q: "Why was a simulated study uploaded and deleted?"
+A: A teammate uploaded a draft simulation by mistake. We pulled it
+   because a simulation isn't evidence from real users.
+
+Q: "How can you pivot without validated data?"
+A: The MVP couldn't deliver its core value whatever users thought: it
+   freed zero bytes on disk and could only remove exact copies. That's
+   a product fact you can check in the code. The pivot is a bet we test
+   in Beta, with pass/fail targets on slide 7.
