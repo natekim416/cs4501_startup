@@ -1,155 +1,161 @@
 CLEANASAURUS ALPHA - 8-MINUTE PRESENTATION SCRIPT
 =====================================================================
 Hard limit 8:00, then 2 minutes of Q&A. One of us is picked at random,
-so all three of us rehearse the whole thing. About 950 spoken words.
+so all three of us rehearse the whole thing. About 900 spoken words.
 
 Time plan (from the rubric):
   0:00-2:00  Hook + MVP validation      slides 1-3
-  2:00-5:30  Live demo, end to end      slides 4-5 (the app)
-  5:30-7:00  Engineering metrics        slide 6
-  7:00-8:00  Stage and roadmap to Beta  slide 7
+  2:00-5:15  Demo video, narrated live  slides 4-5
+  5:15-6:45  Engineering metrics        slide 6
+  6:45-7:45  Stage and roadmap to Beta  slide 7
   Q&A                                   slide 8
 
 BEFORE PRESENTING
-- Slides 2 and 3 use the numbers in validation/MVP_VALIDATION.md, scored
-  against the thresholds from our MVP pitch. Say "full plan" and "at
-  least 80% of a plan" exactly as the slide does; they are different
-  numbers (30% vs 70%).
-- Demo setup (do this 10 minutes before class):
-    cd app && npm run dev-demo
-  Put the API key in the .env file at the repo root so MODE shows CLAUDE.
-  Test the exact request once before class, and run the live tests:
-    cd app && npm run test:live      (5/5 on Nov 4 and again Nov 5)
-  If Claude or the Wi-Fi fails, switch to the backup on slide 5 and say
-  so out loud (see step D6).
+- Numbers on the slides come from our Activities Document (metrics
+  measured Nov 5 on main at 787454f) and validation/MVP_VALIDATION.md.
+  Say "full plan" and "at least 80% of a plan" exactly as slide 2 does;
+  they are different numbers (30% vs 70%).
+- The demo is a silent video: DEMOVID.mov (about 2 minutes 20 seconds).
+  Have it open in QuickTime, full screen, sound off, paused at the start.
+  On slide 4, switch to it and press play. Narrate live using the cues
+  below; describe what is on screen, don't read the cue word for word.
+- If asked to run the app live in Q&A: cd app && npm run dev-demo
+  (MODE must say CLAUDE; the key lives only in the repo-root .env).
 
 
 ---------------------------------------------------------------------
 [SLIDE 1 - HOOK - 0:00-0:35]
 "Storage Almost Full." One developer ran a cleanup tool on their
 laptop and found fifty-eight gigabytes in a hundred and twenty-eight
-old node_modules folders. Most of them can be rebuilt with one command.
-Almost nobody deletes them, because deleting the wrong folder the night
-before a deadline costs you your project. We're Cleanasaurus, and we
-make that deletion safe.
+old node_modules folders. Most of it rebuilds with one command. Almost
+nobody deletes them, because deleting the wrong folder the night before
+a deadline costs you your project. We're Cleanasaurus, and we make that
+cleanup safe.
 
 [SLIDE 2 - MVP VALIDATION - 0:35-1:20]
-Our MVP hypothesis was that students would let an AI clean their files
-if every plan was checked first. We planned fifteen testers and ran ten,
-five CS and five non-CS, from October thirtieth to November second. We
-scored them against the thresholds from our pitch. Safety held: zero
-unsafe actions. But our primary KPI failed. Only thirty percent ran a
-full plan in their first session; seventy percent ran at least eighty
-percent of one. Repeat use and undo landed in between. And testers got
-back about two percent of the space they wanted. The app said it freed
-twelve gigabytes, and zero bytes left the disk. So our hypothesis isn't
-validated as built, and we pivoted.
+Our MVP bet was that students would let an AI clean their files if
+every plan was checked first. We ran ten testers from October thirtieth
+to November second: five CS students and five friends and family. We
+planned fifteen, so treat this as directional.
+Here's what went wrong. On the KPI we pitched, running a full plan in
+the first session, only thirty percent did. That's below our forty
+percent fail line. Seventy percent ran most of a plan. Only thirty
+percent came back on their own, and we only watched for three days, not
+seven. Undo was fifteen percent, and all of it was one tester who
+approved forty-one actions without reading them, then undid them all.
+Undo was all-or-nothing, so another tester dragged files back by hand,
+and one tester's own app got flagged as malware.
+The biggest failure was space. Testers wanted twenty-seven and a half
+gigabytes back and got about two percent. Our own counter said twelve
+gigabytes freed, and zero bytes actually left the disk, because removed
+files sat in a bin on the same drive. Safety held, with zero unsafe
+actions. Value didn't.
 
 [SLIDE 3 - PIVOT - 1:20-2:00]
-Every CS tester told us where their space actually was: build folders.
-The median CS tester had thirty-eight gigabytes of rebuildable clutter,
-against one point four of duplicates. So we kept the trust engine and
-aimed it there. To be honest about competition: CleanMyMac's new command
-line tool already deletes node_modules older than a week. What nobody
-does is prove a folder is safe to delete, with its lockfile, no
-uncommitted work, and no secrets inside, and save the command to rebuild
-it. And nobody lets you just say "I'm done with CS 3140."
+So where was their space? Seven of ten told us, unprompted, that it was
+somewhere our app wouldn't go, and that was all five of our CS testers.
+Their space was in build folders: Xcode data, machine-learning models,
+node_modules, Docker, Python environments, Unity projects. A hundred
+and ninety-two gigabytes across five people. The median CS tester had
+thirty-eight gigabytes of it, against one point four gigabytes of
+duplicates. That's twenty-seven times more.
+All of it is rebuildable: one command brings it back, like npm ci. And
+CS students are the ones who trusted us: they met all three trust
+targets, while non-CS testers undid more than a third of their actions.
+So we pivoted: same safety engine, aimed at CS students' build clutter,
+and it deletes only what it can prove comes back.
 
-[SLIDE 4 - DEMO SETUP - 2:00-2:20]
-Let me show you, end to end. Then switch to the app.
+[SLIDE 4 - DEMO VIDEO - 2:00-4:30]  (switch to the video, press play)
+V1. (Folder on screen.) This is a messy Downloads folder: lecture PDFs,
+    homework, copies of the same files, and three versions of a resume.
+V2. (Request being typed.) We ask, in plain English: organize by class,
+    remove exact duplicates, and don't touch our resumes. This goes to
+    Claude with file names and sizes only, never the files' contents.
+V3. (Plan appears.) Claude turned that one sentence into a plan. Every
+    line has a reason: this lecture goes to CS 4501, this file is an
+    exact copy of that one. And the resumes aren't in it, because we
+    said so. Before we saw it, plain code checked every line.
+V4. (Approve, completed actions.) Nothing ran until we approved. Now the
+    files are sorted into class folders, and the copies are in the
+    macOS Trash, so nothing is deleted for good.
+V5. (Undo.) And one click undoes it. Every file goes back where it was,
+    and the folders it made are gone.
+(Stop the video, switch back to the slides.)
 
-[LIVE DEMO - 2:20-5:30]
-D1. (Point at the folder panel.) This is a messy code folder: eight
-    projects from classes and a hackathon. One has uncommitted work, one
-    I edited four days ago, one has a secret .env file hidden in its
-    node_modules, and there's a virtual machine disk.
-D2. (Type:) "I'm done with CS 3140 and the hackathon. Free up space."
-    Point at MODE: CLAUDE. This goes to Claude with file names and
-    sizes only, never file contents.
-D3. (Point at the plan.) Claude matched "CS 3140" and "the hackathon"
-    to these projects, and ignored my other classes, the secret .env,
-    and the VM. Look at the question: it left hoohacks out on its own
-    and asked me about it, because hoohacks has uncommitted work.
-    (Point at the Safety Log.) And if Claude gets it wrong, the
-    validator catches it. In our live tests, Claude once proposed a
-    folder hiding a secret .env. The validator rejected it, sent the
-    reason back, and the second plan passed.
-    SAY WHAT YOU SEE: in our live run Claude skipped hoohacks itself.
-    If the Safety Log instead shows a rejected try 1, narrate that.
-D4. (Point at the plan card.) Every line is a folder we can prove is
-    rebuildable, with the exact command to rebuild it, like npm ci. The
-    LLM decides which projects I meant. Plain code decides whether
-    anything may be deleted, and only projects I named may skip the
-    30-day rule. Nothing runs until I approve.
-D5. (Click APPROVE.) Done. FREED is measured on the disk, not
-    estimated. That's the bug from our MVP, fixed. (Click UNDO.) Undo
-    can't un-delete a build folder, so it hands me the rebuild commands.
-D5b. (Only if under 4:45.) Reset (npm run dev-demo), then type: "I'm
-    done with my machine learning class." Claude picks cs4774-ml. Our
-    offline planner can't match that phrasing at all; it has to ask.
-    That's the part a regex can't do.
-D6. IF THE LIVE DEMO FAILS: "Here's the same request on our offline
-    planner," then go to slide 5. Its screenshot is the exact scripted
-    request: only the CS 3140 and hackathon projects, hoohacks rejected,
-    and try 2 passing. Say plainly that it's the offline planner.
+[SLIDE 5 - WHAT YOU JUST SAW - 4:30-5:15]
+Here's who decided what. Claude decided what we meant: which class each
+file belongs to, which files are copies, and that the resumes stay put.
+Plain code decided what's safe: a file only counts as a duplicate if its
+contents match a kept copy byte for byte, every move stays inside the
+folder, nothing runs until you approve, and undo reverses all of it. The
+copies go to the real Trash now, not a hidden bin. That's the zero-bytes
+bug from our validation, fixed.
 
-[SLIDE 6 - ENGINEERING METRICS - 5:30-7:00]
-How we built it. Thirty user stories; twenty-nine are GitHub issues, and
-eighteen are closed: six from the MVP and twelve built in the Alpha, one
-more partly built. The thirtieth, emptying the Trash, we built this week
-and still have to file. We have a hundred and forty-one automated tests,
-plus a twenty-two-step test that clicks through the real app. A hundred
-and five were written before the code they test. Five more run against
-the real Claude, and all five pass. That's almost five tests per story,
-and every story has at least two. All hundred and thirteen tests that
-can run pass; the other twenty-eight are for stories we haven't built
-yet. We keep those red, and CI fails if one ever passes by accident.
-Backend line coverage is ninety-six percent. Claude drafted the tests.
-Review changed twenty-five of them, and three bugs Wesley found by testing
-the app by hand each became a failing test before the fix. No one has
-hand-edited a test yet; that review is scheduled before Beta.
+[SLIDE 6 - ENGINEERING METRICS - 5:15-6:45]
+How we built it. Twenty-nine user stories, each a GitHub issue with
+acceptance criteria. Eighteen are closed: six from the MVP and twelve
+built in the Alpha. We have a hundred and twenty-nine automated tests,
+counted by npm test, plus a fifteen-step test that clicks through the
+real app and five tests against the real Claude, which all pass. A
+hundred and twenty-nine tests over twenty-nine stories is four point
+four per story, and every story has at least two. All hundred and one
+tests that can run today pass. The other twenty-eight are written for
+stories we haven't built, so we keep them red, and CI fails if one
+passes by accident. Counting those, it's seventy-eight percent. Backend
+line coverage is ninety-five point nine percent. Ninety-three of the
+tests were written before the code they test. Claude drafted the tests;
+review changed twenty-five of them and found seven real bugs. No
+teammate has hand-edited a test yet; that review is scheduled before
+Beta.
 (Presenter: if the team review has happened, give its real count
 instead of the last sentence.)
 
-[SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
+[SLIDE 7 - STAGE AND ROADMAP - 6:45-7:45]
 For the Alpha, we ran validation and made the pivot decision, wrote all
-the stories and issues, and built eighteen of them: the rebuild proof, cleaning by
-intent, one-click rebuild, undo for a single action, the Trash, a
-one-line summary, and honest space numbers. This week we added emptying
-the Trash, only after a separate confirmation. For Beta: four weekly
-sprints starting November ninth. First, protecting your projects and
-rerunning our live Claude tests, then Xcode and Docker, then ML caches and a
-storage watch, then twenty CS students we don't know.
-We'll call it a success if at least sixty
-percent approve a plan that frees ten gigabytes, rebuilds work
-ninety-five percent of the time, nothing is ever lost, and at least half
-prefer us over CleanMyMac's purge, head to head. Thank you. Questions?
+twenty-nine stories as issues, and built eighteen: the rebuild proof,
+cleaning by intent, one-click rebuild, single-action undo, the real
+Trash, and honest space numbers.
+For Beta, four goals, each with a pass line. One: the Dino Bin goes
+away, and seventy percent of testers see space actually freed. Two: one
+question instead of twenty. Claude asks one question that settles all
+the similar files, and sixty percent say deleting felt smoother. Three:
+find what people actually want gone, by narrowing scope, like deleting
+node_modules from inactive projects. Eighty percent say what they wanted
+cleaned was cleaned, and run eighty percent of the plan. Four: build it
+for CS students, with Claude knowing to look for Python environments and
+pip caches, hard rules against touching source code, git repos,
+uncommitted work, or .env files, and a read-only summary of your dev
+setup. Sixty percent of CS testers say it fits their needs better.
+Thank you. Questions?
 
 ---------------------------------------------------------------------
 Q&A: HARD QUESTIONS AND HONEST ANSWERS
 
+Q: "Why is the demo a video?"
+A: So the three minutes are reliable on classroom Wi-Fi. The app is on
+   this laptop, and we can run it live right now if you'd like.
+
+Q: "What decision did Claude make that a regex couldn't?"
+A: In the video, one sentence became a whole plan: which class each file
+   belongs to, which copies to remove, and to leave the resumes alone.
+   In our five live tests on the real model, "I'm done with my machine
+   learning class" maps to the right project, which our offline rules
+   can't match, and "the CS class" makes Claude ask which one instead of
+   guessing. Safety never depends on Claude: plain code rechecks every
+   action, and in one live test it rejected Claude's first plan.
+
 Q: "CleanMyMac adds a chat box next quarter. What's your moat?"
 A: Their purge deletes by age alone. We prove each folder is rebuildable
    and save the rebuild command, and Claude maps what you say to the
-   right projects. The head-to-head KPI in our Beta test measures
-   whether students actually prefer that.
-
-Q: "What decision did Claude make that a regex couldn't?"
-A: Plain requests like "done with CS 3140" we could handle with a regex,
-   and our offline planner does. "I'm done with my machine learning
-   class" it can't: it has to ask. Claude maps it to cs4774-ml. That's
-   one of five live tests against the real model, and all five pass,
-   including "I'm NOT done with CS 3140" and an ambiguous "the CS
-   class," where Claude asks instead of guessing. Safety never depends
-   on it: the validator rechecks every folder, and in one live test it
-   did reject Claude's first plan.
+   right projects. Our Beta measures whether CS students actually prefer
+   that, head to head.
 
 Q: "Your tests are all AI-generated. Did you review them?"
 A: Claude reviewed them, and an independent AI review found four weak
-   tests. And we tested the app by hand: three bugs we found that way,
-   like undo leaving folders behind, each became a failing test before
-   the fix. No one has hand-edited a test yet; that review is scheduled,
-   and we report it as zero until it happens.
+   tests. We also tested the app by hand this week; three bugs we found
+   that way each became a failing test before the fix. No one has
+   hand-edited a test yet; that review is scheduled, and we report it as
+   zero until it happens.
 
 Q: "Why does the red run show 'module not found' instead of failed assertions?"
 A: The first red run failed because the module didn't exist yet. That's
@@ -179,4 +185,4 @@ A: The part that failed was value, not safety. Zero unsafe actions, and
    space back, because the MVP could only remove exact copies and freed
    zero bytes. Every CS tester pointed at build folders, so we kept the
    safety engine and changed what it cleans. Beta tests that bet, with
-   pass/fail targets on slide 7.
+   pass lines on slide 7.
