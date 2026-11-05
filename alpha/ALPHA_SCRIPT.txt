@@ -74,8 +74,8 @@ give someone helping you sort it out."
 
 0:40-1:25 / 2:40-3:25 · Turn a request into a plan
 [Point to the CLAUDE badge. Type the request and submit it.]
-  Organize my school PDFs into folders by class, remove exact
-  duplicates, and quarantine anything the scanner flagged. Leave my
+  Organize my school PDFs into folders by class, and remove exact
+  duplicate. Leave my
   résumés alone.
 "Claude takes that request and uses the file inventory and scan results
 to propose specific actions. 'By class' is the part I'd normally have to
