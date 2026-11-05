@@ -171,8 +171,6 @@ button { font: inherit; cursor: pointer; }
 .log li.pass { color: var(--mint); }
 .log li.fail { color: var(--pink); }
 .log li.info { color: var(--muted); }
-.key-form { display: flex; gap: 8px; }
-.key-form input { flex: 1; min-width: 0; font: inherit; font-size: 18px; background: var(--ink-2); color: var(--paper); border: 3px solid var(--ink-3); padding: 6px; }
 .usage-actions { display: flex; gap: 8px; margin-top: 10px; }
 
 body.busy .composer input { border-color: var(--gold); }

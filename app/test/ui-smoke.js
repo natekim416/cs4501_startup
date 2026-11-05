@@ -40,6 +40,10 @@ const STEPS = [
   ['app starts and scans the demo folder', `
     await __t.waitFor(() => /Scanned \\d+ files/.test(__t.botText()), 'scan message');
     return document.querySelector('#folder-stats').textContent;`],
+  ['there is no API key box: the key stays in the backend (.env), and the page cannot set one', `
+    if (document.querySelector('#key, #key-form')) throw new Error('API key box is still on screen');
+    if (typeof api.setApiKey !== 'undefined') throw new Error('the page can still send an API key to the backend');
+    return 'ok';`],
   ['"Free up space" shows a plan that passed checks', `
     __t.button('Free up space').click();
     const card = await __t.waitFor(() => __t.liveCards()[0], 'plan card');

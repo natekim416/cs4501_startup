@@ -7,10 +7,11 @@ const { Engine } = require('./backend/engine');
 const { makeDemoFolder } = require('./scripts/make-demo-folder');
 
 // Load the API key from the repo's root .env, if there is one. A key already set in the shell wins.
+// The key stays in this (main) process; the window never sees it and has no way to set one.
 try {
   process.loadEnvFile(path.join(__dirname, '..', '.env'));
 } catch {
-  // No .env file: the app runs in demo mode, or with a key pasted in the side panel.
+  // No .env file: the app runs in demo mode with the offline planner.
 }
 
 const arg = (name) => {
@@ -88,10 +89,6 @@ function registerIpc() {
   ipcMain.handle('forget', (_e, pref) => {
     engine.profile.forget(pref);
     return profileView();
-  });
-  ipcMain.handle('set-api-key', (_e, key) => {
-    engine.apiKey = key || process.env.ANTHROPIC_API_KEY || '';
-    return engine.mode;
   });
   ipcMain.handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
   ipcMain.handle('export-usage', async () => {
