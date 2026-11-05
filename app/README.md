@@ -13,9 +13,9 @@ cd app
 npm install
 npm run demo        # creates a messy fake folder at ~/CleanasaurusDemo/Downloads and opens the app on it
 npm start           # opens the app; pick any folder with SELECT FOLDER, or press ▶ DEMO for a guided tour
-npm test            # 129 tests: 101 pass, 28 todo for stories not built yet; one file per user story, plus MIN-1 … MIN-9, LLM-1 … LLM-7, REG-1 … REG-5
+npm test            # 141 tests: 113 pass, 28 todo for stories not built yet; one file per user story, plus MIN-1 … MIN-9, LLM-1 … LLM-7, REG-1 … REG-8
 npm run test:todos  # fails if a todo test passes (it couldn't be testing its story)
-npm run test:coverage  # same, with line and branch coverage (backend: 96.0% lines)
+npm run test:coverage  # same, with line and branch coverage (backend: 96.1% lines)
 npm run test:live   # 5 tests against the real Claude API; needs ANTHROPIC_API_KEY in the repo root .env, skipped otherwise
 npm run dev-demo    # creates fake dev projects at ~/CleanasaurusDemo/code (old, active, dirty, no lockfile, .env, a VM) and opens the app
 npm run test:ui     # opens the real app and clicks through it: plan, approve, undo, NEVER zone, questions, usage log

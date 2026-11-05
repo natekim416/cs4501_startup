@@ -52,7 +52,7 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (!a.reason) return fail('Every action needs a "reason" the user can read.');
 
     const src = path.resolve(a.path);
-    // US-24: a permanent delete is allowed only for something already in the Trash, and always asks.
+    // US-30: a permanent delete is allowed only for something already in the Trash, and always asks.
     if (a.op === 'delete_from_trash') {
       if (!inTrash(src, trashDir)) return fail(`${src} isn't in the Trash. I can permanently delete only items already in the Trash.`);
       bytesFreed += itemBytes(src);

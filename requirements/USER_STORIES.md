@@ -334,6 +334,17 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 - **Given** I opt in for PDFs in Downloads, **then** only the first page's text is read, and the reason shows what was found ("course code on page 1: CS 2150").
 - **Given** no course code is found, **then** the file goes to Unsorted, or the dino asks.
 
+#### US-30 · Empty the Trash, only after I confirm
+`Should · 2 · New · NFR1 · Found while testing the Alpha (removed files sat in the Trash and freed nothing)`
+
+**As a** student whose Trash holds gigabytes, **I want** the dino to permanently delete what's already in the Trash after I confirm, **so that** removed files actually free space, without the app ever permanently deleting anything else.
+
+*Status: built in the Alpha (tests in `app/test/stories/us30-trash-delete.test.js`, UI test step "emptying the Trash…").*
+
+- **Given** I ask to empty the Trash, **then** each item in the Trash is listed as PERMANENT, unchecked, with a warning that it can't be undone.
+- **Given** a path outside the Trash (including `..` tricks, or the Trash folder itself), **then** the validator and the executor both refuse to delete it.
+- **Given** I approve, **then** a separate confirmation must say yes before anything is deleted; Cancel deletes nothing.
+
 ### Epic G · Already built in the MVP
 
 These work today, so they're size 0. They're part of Alpha, and any change we make has to keep them working.
@@ -418,15 +429,15 @@ These came up in the sessions. We're saying no for now on purpose.
 
 ## 6. Release plan
 
-**Where we are (Nov 4):** the Alpha delivered Sprints 1–3 except US-04 (19 of 29 stories done; see [tdd/README.md](../tdd/README.md#3-every-github-issue-and-its-tests)). **Beta goal:** finish Sprint 4 and US-04, then run the pivot test: 20 CS students from outside our friend group, using the app unsupervised, measured against the KPIs in [§7](#pivot-test-kpi--stories-it-depends-on).
+**Where we are (Nov 5):** the Alpha delivered Sprints 1–3 except US-04, plus US-30 (20 of 30 stories done, US-01 partial; see [tdd/README.md](../tdd/README.md#3-every-github-issue-and-its-tests)). **Beta goal:** finish Sprint 4 and US-04, then run the pivot test: 20 CS students from outside our friend group, using the app unsupervised, measured against the KPIs in [§7](#pivot-test-kpi--stories-it-depends-on).
 
 | Priority | Stories | Points |
 |---|---|---|
 | Already built (Alpha) | US-24–US-29 | 0 |
 | Must (Alpha) | US-01–12, US-14–16, US-18, US-19, US-21 | 78 |
-| Should | US-13, US-22 | 5 |
+| Should | US-13, US-22, US-30 | 7 |
 | Could | US-17, US-20, US-23 | 16 |
-| **Total** | **29 stories** | **99** |
+| **Total** | **30 stories** | **101** |
 
 **Sprint plan.** This assumes the three of us finish about 20 points a week. That's a guess; after Sprint 1, we'll replace it with our real pace.
 
@@ -472,7 +483,7 @@ These came up in the sessions. We're saying no for now on purpose.
 | FR15 Permission zones | US-08, US-26 |
 | FR16 Usage logs and fake door | US-21 |
 | FR17 Preview and approve | US-25 |
-| NFR1 Safety | US-02, US-05, US-09 |
+| NFR1 Safety | US-02, US-05, US-09, US-30 |
 | NFR2 Rebuild reliability | US-15 |
 | NFR3 Privacy | US-20, US-21, US-23 |
 | NFR4 Speed | US-01, US-22 |

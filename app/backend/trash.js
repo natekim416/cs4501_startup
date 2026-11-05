@@ -1,4 +1,4 @@
-// US-24: what's already in the Trash, and the one check every permanent delete must pass:
+// US-30: what's already in the Trash, and the one check every permanent delete must pass:
 // the item sits directly in the Trash folder. Nothing anywhere else can be permanently deleted.
 const fs = require('fs');
 const path = require('path');

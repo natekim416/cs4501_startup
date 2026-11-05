@@ -1,20 +1,20 @@
 # Activity 3 · AI-Assisted Test-Driven Development
 
-**Team:** Nate Kim, Nate Park, Wesley Chang · **Stories and issues:** [requirements/USER_STORIES.md](../requirements/USER_STORIES.md), GitHub issues #2–#30
+**Team:** Nate Kim, Nate Park, Wesley Chang · **Stories and issues:** [requirements/USER_STORIES.md](../requirements/USER_STORIES.md), GitHub issues #2–#30 (US-30's issue is still to be filed)
 
-> **Who wrote what.** Every test in this repo was drafted by Claude (Claude Code, Opus 5.5), working in our sessions. The reviews in §5 were also done by AI: Claude's own review pass, plus an independent AI review that played a critical grader. **No team member has hand-edited a test yet.** Our human review is scheduled in [TEAM_REVIEW.md](TEAM_REVIEW.md), and §5 will be updated with its results. We'd rather report 0% human-refined than claim review we haven't done.
+> **Who wrote what.** Every test in this repo was drafted by Claude (Claude Code, Opus 5.5), working in our sessions. The reviews in §5 were also done by AI: Claude's own review pass, plus an independent AI review that played a critical grader. **No team member has hand-edited a test yet**, but three bugs in §5 (rows 20–22) were found by Wesley testing the app by hand, and each became a failing test before its fix. Our human review is scheduled in [TEAM_REVIEW.md](TEAM_REVIEW.md), and §5 will be updated with its results. We'd rather report 0% human-refined than claim review we haven't done.
 
 ## 1. Engineering metrics
 
 | Metric | Value | How it's measured |
 |---|---|---|
-| User stories | **29** | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
-| GitHub issues logged vs. closed | **29 logged, 18 closed** (6 built in the MVP, 12 built in the Alpha). #2 is open as partial: its Xcode/Docker/ML totals wait for US-08–10 | `gh issue list`; §3 |
-| Automated tests | **129** unit and integration tests, plus a **14-step** end-to-end UI test, plus **5 live tests against the real Claude API** (`npm run test:live`, kept out of `npm test` because they need a key and cost API calls). **93 of the 129 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
-| Average tests per issue | **4.4** overall (129 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
-| Pass rate | **100% of runnable tests (101/101)**. Live Claude tests: **5/5** on the first run (Nov 4, [`06-live-claude-run.txt`](06-live-claude-run.txt)). Counting every test: **78% (101/129)**. The other 28 (22%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt), [`06-live-claude-run.txt`](06-live-claude-run.txt) |
-| Line coverage (`backend/` only) | **96.0%** lines, **90.4%** branches, 93.8% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Varies by about ±0.1% between runs (timing-dependent branches). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
-| AI-generated vs. refined | **100% AI-generated** (129 tests + 5 live tests + 14 UI steps). **25 tests added or changed because of review**, every one listed in §5 (rows 1–19). **0 refined by a team member so far** | Commit history; §5 |
+| User stories | **30** (US-30, emptying the Trash, was added Nov 5; its GitHub issue is still to be filed) | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
+| GitHub issues logged vs. closed | **29 logged, 18 closed** (6 built in the MVP, 12 built in the Alpha). #2 is open as partial: its Xcode/Docker/ML totals wait for US-08–10. US-30 is built but not yet filed as an issue | `gh issue list`; §3 |
+| Automated tests | **141** unit and integration tests, plus a **22-step** end-to-end UI test, plus **5 live tests against the real Claude API** (`npm run test:live`, kept out of `npm test` because they need a key and cost API calls). **105 of the 141 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
+| Average tests per issue | **4.7** per story overall (141 / 30), **3.8** counting only tests that run today (113 / 30). Every story has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
+| Pass rate | **100% of runnable tests (113/113)**. Live Claude tests: **5/5** (Nov 4, [`06-live-claude-run.txt`](06-live-claude-run.txt); rerun Nov 5 after the fixes below, still 5/5). Counting every test: **80% (113/141)**. The other 28 (20%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt), [`06-live-claude-run.txt`](06-live-claude-run.txt) |
+| Line coverage (`backend/` only) | **96.1%** lines, **91.1%** branches, 94.8% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Varies by about ±0.1% between runs (timing-dependent branches). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
+| AI-generated vs. refined | **All drafted by Claude** (141 tests + 5 live tests + 22 UI steps). **25 tests added or changed because of review**, every one listed in §5 (rows 1–19). **3 bugs found by a team member testing the app by hand** (§5 rows 20–22) added 7 tests and 7 UI steps. **0 tests hand-edited by a team member so far** | Commit history; §5 |
 
 ## 2. How we ran it, and what the history actually shows
 
@@ -56,6 +56,10 @@
 | `9f87272` → `53542fb` | "But keep …" and no-match questions | 🔴 2 fail → 🟢 |
 | round-3 tests → `e365edc` | Negation, keep-first, exact answers, scan root (REG-5) | 🔴 3 fail → 🟢 101/101 |
 | `5932552` | LIVE-1…5 against the real Claude, written before any live run | ⏭ skipped without a key → 🟢 5/5 with a key (no red phase) |
+| `56ca275` | US-30 empty the Trash, tests first (committed as US-24, renamed to US-30 because US-24 was taken) | 🔴 4 fail → 🟢 |
+| `9034213` | REG-6 ASK-zone moves | 🔴 1 fail → 🟢 (REG-6b passed at once: it checks behavior that already worked) |
+| `48fec8f` | REG-7 undo and created folders | 🔴 3 fail → 🟢 |
+| `e1fef6d` | REG-8 answers and refused runs, UI test 15 → 22 steps | 🔴 2 fail + UI step fail → 🟢 141 tests, UI 22/22 |
 
 ## 3. Every GitHub issue and its tests
 
@@ -90,7 +94,8 @@
 | #28 | US-27 Ask and remember | Built | MIN-8, `engine.test.js` (answers remembered), UI steps 8–9 | 🟢 pass |
 | #29 | US-28 Safety checks visible | Built | `engine.test.js` (rejects unsafe plans, retries), LLM-2, LLM-3 | 🟢 pass |
 | #30 | US-29 Malware from real scanners | Built | MIN-3, `engine.test.js` (flags test malware) | 🟢 pass |
-| — | Regressions | — | `regressions.test.js` REG-1…REG-5 | 🟢 pass |
+| — | US-30 Empty the Trash, after confirming (issue to be filed) | Should | `us30-trash-delete.test.js` (5), UI step "emptying the Trash…" | 🟢 pass |
+| — | Regressions | — | `regressions.test.js` REG-1…REG-8 (REG-6b, 7b, 7c, 8b included), UI steps 16–22 | 🟢 pass |
 
 ## 4. What the core does now
 
@@ -129,6 +134,9 @@
 | 17 | Answering "Which projects?" with one project also planned its sibling | Same review | **Bug** | Test red, then the answer names exactly that project |
 | 18 | The scanned folder itself was offered as a project | Same review | **Bug** (REG-5) | Test red, then excluded |
 | 19 | US-01's Xcode/Docker/ML keys were asserted to exist but couldn't fail | Same review | Test that couldn't fail | New todo test that needs real totals; US-01 marked partial |
+| 20 | In an ASK zone, APPROVE made the class folders but moved no files (the moves start unchecked) | Wesley, testing on ~/Documents | **Bug** (REG-6) | REG-6 red, then empty folders are skipped and the Done message says why; REG-6b confirms every checked move lands where planned |
+| 21 | UNDO left every created folder behind once Finder had opened it (.DS_Store) | Wesley, testing by hand | **Bug** (REG-7) | REG-7, 7b, 7c red, then undo ignores macOS's own files, keeps folders holding the user's files, and undo-one removes emptied folders |
+| 22 | After answering a "leave it" question, APPROVE couldn't be pressed | Wesley, testing by hand | **Bug** (REG-8) | REG-8, 8b and new UI steps red, then one-file answers act on the current plan, refused runs give APPROVE back, and empty answers say why |
 
 **Known limits:**
 - The secret check is cautious: a `node_modules` that ships test certificates (`.pem`) is refused.

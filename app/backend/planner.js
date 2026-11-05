@@ -167,7 +167,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
     add({ op: 'mkdir', path: dir, reason: `New folder for ${path.basename(dir)}` });
   };
 
-  // US-24: only when asked to empty the Trash; nothing else in the plan.
+  // US-30: only when asked to empty the Trash; nothing else in the plan.
   if (want(/(empty|clear|delete).*(trash|bin)|(trash|bin).*(empty|for good|permanent)/i)) {
     for (const t of trashItems) add({ op: 'delete_from_trash', path: t.path, reason: `${t.name} is already in the Trash` });
     return { summary: trashItems.length ? `Your Trash has ${trashItems.length} item(s). Check the ones to delete for good.` : 'Your Trash is empty.', actions, questions };

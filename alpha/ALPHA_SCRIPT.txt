@@ -19,7 +19,7 @@ BEFORE PRESENTING
     cd app && npm run dev-demo
   Put the API key in the .env file at the repo root so MODE shows CLAUDE.
   Test the exact request once before class, and run the live tests:
-    cd app && npm run test:live      (5/5 passed on Nov 4)
+    cd app && npm run test:live      (5/5 on Nov 4 and again Nov 5)
   If Claude or the Wi-Fi fails, switch to the backup on slide 5 and say
   so out loud (see step D6).
 
@@ -94,30 +94,29 @@ D6. IF THE LIVE DEMO FAILS: "Here's the same request on our offline
     and try 2 passing. Say plainly that it's the offline planner.
 
 [SLIDE 6 - ENGINEERING METRICS - 5:30-7:00]
-How we built it. Twenty-nine user stories, every one a GitHub issue.
-Eighteen are closed: six from the MVP and twelve built in the Alpha,
-and one more is partly built. We have a
-hundred and twenty-nine automated tests, plus a fourteen-step test that
-clicks through the real app. Ninety-three of them were written before the
-code they test. Five more run against the real Claude, and all five
-pass. That's about four tests per issue, three and a half counting only
-tests that run today, and every
-issue has at least two. All hundred and one tests that can run pass. That's
-seventy-eight percent of everything we wrote, because twenty-eight
-tests are for stories we haven't built yet. We keep those red, and CI
-fails if one ever passes by accident. Backend line coverage is
-ninety-six percent. And the honest number: one hundred
-percent of these tests were drafted by Claude. Review added or changed
-twenty-five of them and caught eight real bugs. No one on our team has
-refined a test by hand yet. That review is scheduled before Beta.
+How we built it. Thirty user stories; twenty-nine are GitHub issues, and
+eighteen are closed: six from the MVP and twelve built in the Alpha, one
+more partly built. The thirtieth, emptying the Trash, we built this week
+and still have to file. We have a hundred and forty-one automated tests,
+plus a twenty-two-step test that clicks through the real app. A hundred
+and five were written before the code they test. Five more run against
+the real Claude, and all five pass. That's almost five tests per story,
+and every story has at least two. All hundred and thirteen tests that
+can run pass; the other twenty-eight are for stories we haven't built
+yet. We keep those red, and CI fails if one ever passes by accident.
+Backend line coverage is ninety-six percent. Claude drafted the tests.
+Review changed twenty-five of them, and three bugs Wesley found by testing
+the app by hand each became a failing test before the fix. No one has
+hand-edited a test yet; that review is scheduled before Beta.
 (Presenter: if the team review has happened, give its real count
-instead of the last two sentences.)
+instead of the last sentence.)
 
 [SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
 For the Alpha, we ran validation and made the pivot decision, wrote all
 the stories and issues, and built eighteen of them: the rebuild proof, cleaning by
 intent, one-click rebuild, undo for a single action, the Trash, a
-one-line summary, and honest space numbers. For Beta: four weekly
+one-line summary, and honest space numbers. This week we added emptying
+the Trash, only after a separate confirmation. For Beta: four weekly
 sprints starting November ninth. First, protecting your projects and
 rerunning our live Claude tests, then Xcode and Docker, then ML caches and a
 storage watch, then twenty CS students we don't know.
@@ -147,8 +146,10 @@ A: Plain requests like "done with CS 3140" we could handle with a regex,
 
 Q: "Your tests are all AI-generated. Did you review them?"
 A: Claude reviewed them, and an independent AI review found four weak
-   tests. Human review is scheduled, and we report zero percent
-   human-refined until it happens.
+   tests. And we tested the app by hand: three bugs we found that way,
+   like undo leaving folders behind, each became a failing test before
+   the fix. No one has hand-edited a test yet; that review is scheduled,
+   and we report it as zero until it happens.
 
 Q: "Why does the red run show 'module not found' instead of failed assertions?"
 A: The first red run failed because the module didn't exist yet. That's
