@@ -11,6 +11,7 @@
     "test": "node --test test/*.test.js test/stories/*.test.js",
     "test:ui": "node scripts/ui-test.js",
     "test:todos": "node scripts/check-todos.js",
+    "test:live": "node --test --test-concurrency=1 test/live/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='scripts/**' test/*.test.js test/stories/*.test.js",
     "dev-demo": "node scripts/make-dev-demo.js && electron . --demo-folder=$HOME/CleanasaurusDemo/code"
   },
