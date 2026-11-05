@@ -23,7 +23,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -56,6 +56,7 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - trash_duplicate: remove "path" because it is byte-identical to "keep". Only use for files listed in the same duplicate group.
 - quarantine: isolate "path". Only for files listed in malware_findings.
 - clear_cache: empty the package-manager cache folder "path". Only for paths listed in package_caches, and only if the user asks about caches or wants as much space as possible.
+- delete_from_trash: permanently delete "path", an item already in the user's Trash. Only for paths listed in trash_items, and only when the user asks to empty the Trash or permanently delete trashed files. It can't be undone; the user must confirm it separately.
 - delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
 
 Rules:
@@ -76,7 +77,7 @@ function describeProject(project) {
   return { course: code ? `${code.replace(/\d+$/, '').toUpperCase()} ${code.match(/\d+$/)[0]}` : null, last_changed_days: info.lastChangedDays, uncommitted: info.uncommitted };
 }
 
-function summarizeScan(scan, findings, profile, dev = [], caches = []) {
+function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -95,6 +96,7 @@ function summarizeScan(scan, findings, profile, dev = [], caches = []) {
     rebuildable_items: dev.filter((d) => d.label === 'rebuildable').map((d) => ({ path: d.path, project: path.basename(d.project), bytes: d.bytes, how: d.reason, ...describeProject(d.project) })),
     projects: [...new Set(dev.map((d) => d.project))].map((p) => ({ name: path.basename(p), ...describeProject(p) })),
     package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
+    trash_items: trashItems.slice(0, MAX_FILES_IN_PROMPT).map((t) => ({ path: t.path, bytes: t.bytes })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -102,8 +104,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = []) {
   };
 }
 
-async function llmPlan({ request, scan, dev, caches, findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches))}`;
+async function llmPlan({ request, scan, dev, caches, trashItems = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -137,7 +139,7 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, dev = [], caches = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
+function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
@@ -165,6 +167,11 @@ function demoPlan({ request, scan, dev = [], caches = [], findings, profile, pre
     add({ op: 'mkdir', path: dir, reason: `New folder for ${path.basename(dir)}` });
   };
 
+  // US-24: only when asked to empty the Trash; nothing else in the plan.
+  if (want(/(empty|clear|delete).*(trash|bin)|(trash|bin).*(empty|for good|permanent)/i)) {
+    for (const t of trashItems) add({ op: 'delete_from_trash', path: t.path, reason: `${t.name} is already in the Trash` });
+    return { summary: trashItems.length ? `Your Trash has ${trashItems.length} item(s). Check the ones to delete for good.` : 'Your Trash is empty.', actions, questions };
+  }
   if (want(/cache/i)) {
     for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
   }

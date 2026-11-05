@@ -64,3 +64,81 @@ test('REG-5 the scanned folder itself is never offered as a project (found by gr
   const q = plan.questions.find((x) => /which projects/i.test(x.text));
   assert.ok(q && !q.options.includes('code'), JSON.stringify(q));
 });
+
+test('REG-6 in an ASK zone, approving with the moves unchecked creates no empty folders and says why (found by Papa on ~/Documents)', async () => {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const folder = path.join(tmp(), 'Downloads');
+  makeDemoFolder(folder);
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'ask');
+  engine.scanFolder(folder);
+  const plan = await engine.plan('Sort my school files by class');
+  const moves = plan.actions.filter((a) => a.op === 'move');
+  assert.ok(moves.length > 0 && moves.every((a) => plan.needsApproval.includes(a.id)), 'moves in an ASK zone wait for the user');
+  // What the card checks by default: everything not marked ASK FIRST.
+  const defaults = plan.actions.filter((a) => !plan.needsApproval.includes(a.id) && a.checked !== false).map((a) => a.id);
+  const before = new Set(fs.readdirSync(folder));
+  const res = engine.execute(plan.planId, defaults);
+  assert.strictEqual(res.ok, true, JSON.stringify(res.errors));
+  const created = fs.readdirSync(folder).filter((n) => !before.has(n));
+  assert.deepStrictEqual(created, [], 'no folder is created when none of its files were checked');
+  assert.match(res.freedNote, /14 moves? .*(check|ASK)/i);
+});
+
+test('REG-6b checking the moves too makes every file land exactly where the plan said', async () => {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const folder = path.join(tmp(), 'Downloads');
+  makeDemoFolder(folder);
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'ask');
+  engine.scanFolder(folder);
+  const plan = await engine.plan('Sort my school files by class');
+  const res = engine.execute(plan.planId, plan.actions.map((a) => a.id));
+  assert.strictEqual(res.ok, true, JSON.stringify(res.errors));
+  const moves = plan.actions.filter((a) => a.op === 'move');
+  for (const a of moves) {
+    assert.ok(fs.existsSync(path.join(a.dest, path.basename(a.path))), `${path.basename(a.path)} landed in ${a.dest}`);
+    assert.ok(!fs.existsSync(a.path), `${path.basename(a.path)} left its old place`);
+  }
+});
+
+function sortedAndRun() {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const folder = path.join(tmp(), 'Downloads');
+  makeDemoFolder(folder);
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'free');
+  engine.scanFolder(folder);
+  return engine.plan('Sort my school files by class').then((plan) => {
+    const res = engine.execute(plan.planId, plan.actions.map((a) => a.id));
+    return { folder, engine, plan, res, made: plan.actions.filter((a) => a.op === 'mkdir').map((a) => a.path) };
+  });
+}
+
+test('REG-7 undo removes the folders it created even after Finder left a hidden .DS_Store in them (found by Papa)', async () => {
+  const { engine, made } = await sortedAndRun();
+  for (const d of made) fs.writeFileSync(path.join(d, '.DS_Store'), 'x');
+  const u = engine.undo();
+  assert.deepStrictEqual(made.filter((d) => fs.existsSync(d)), [], 'every created folder is gone');
+  assert.deepStrictEqual(u.keptFolders, []);
+});
+
+test('REG-7b undo keeps a created folder that now holds the user\'s own file, and says so (edge case)', async () => {
+  const { engine, made } = await sortedAndRun();
+  const mine = path.join(made.find((d) => /Music$/.test(d)), 'my new song.mp3');
+  fs.writeFileSync(mine, 'mine');
+  const u = engine.undo();
+  assert.ok(fs.existsSync(mine), "the user's file is never touched");
+  assert.deepStrictEqual(u.keptFolders.map((d) => path.basename(d)), ['Music']);
+  assert.deepStrictEqual(made.filter((d) => fs.existsSync(d)).map((d) => path.basename(d)), ['Music']);
+});
+
+test('REG-7c undoing one move removes the folder it created once that folder is empty', async () => {
+  const { engine, res, plan } = await sortedAndRun();
+  const moves = plan.actions.filter((a) => a.op === 'move');
+  const dest = moves[0].dest;
+  const intoDest = moves.filter((a) => a.dest === dest);
+  fs.writeFileSync(path.join(dest, '.DS_Store'), 'x');
+  for (const a of intoDest) engine.undoAction(res.batchId, a.id);
+  assert.ok(!fs.existsSync(dest), `${path.basename(dest)} should be removed after its last file moved back`);
+});

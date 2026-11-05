@@ -7,10 +7,11 @@ const { Engine } = require('./backend/engine');
 const { makeDemoFolder } = require('./scripts/make-demo-folder');
 
 // Load the API key from the repo's root .env, if there is one. A key already set in the shell wins.
+// The key stays in this (main) process; the window never sees it and has no way to set one.
 try {
   process.loadEnvFile(path.join(__dirname, '..', '.env'));
 } catch {
-  // No .env file: the app runs in demo mode, or with a key pasted in the side panel.
+  // No .env file: the app runs in demo mode with the offline planner.
 }
 
 const arg = (name) => {
@@ -73,7 +74,7 @@ function registerIpc() {
   });
   ipcMain.handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
-  ipcMain.handle('execute', (_e, planId, ids) => ({ ...engine.execute(planId, ids), disk: diskInfo() }));
+  ipcMain.handle('execute', (_e, planId, ids, opts) => ({ ...engine.execute(planId, ids, opts), disk: diskInfo() }));
   ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
   ipcMain.handle('undo-one', (_e, batchId, actionId) => ({ ...engine.undoAction(batchId, actionId), disk: diskInfo() }));
   ipcMain.handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));
@@ -88,10 +89,6 @@ function registerIpc() {
   ipcMain.handle('forget', (_e, pref) => {
     engine.profile.forget(pref);
     return profileView();
-  });
-  ipcMain.handle('set-api-key', (_e, key) => {
-    engine.apiKey = key || process.env.ANTHROPIC_API_KEY || '';
-    return engine.mode;
   });
   ipcMain.handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
   ipcMain.handle('export-usage', async () => {

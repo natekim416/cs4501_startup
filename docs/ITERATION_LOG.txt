@@ -365,3 +365,19 @@ MERGE (Nov 4, after Papa asked to "recheck and merge if it's working")
 - Follow-up: updated the issue counts in tdd/README, slide 6, the
   script, and the PDF cover ("merged into main"), and regenerated the
   issue table from GitHub.
+
+---------------------------------------------------------------------
+LIVE CLAUDE TESTS (Nov 4, branch live-claude-tests)
+---------------------------------------------------------------------
+- Every Claude-path test used a fake client, so nothing showed the real
+  model understands requests. Added app/test/live/claude.live.test.js
+  (npm run test:live): five demo requests, written before any live run,
+  skipped without an API key so CI and npm test are unchanged.
+- First run with a key (tdd/06-live-claude-run.txt): 5/5 pass, 5-16 s
+  per plan. Claude skipped hoohacks on its own and asked about it;
+  mapped "my machine learning class" to cs4774-ml (the offline planner
+  can't); in LIVE-3 the validator rejected Claude's first plan (a
+  node_modules hiding a .env) and the retry passed. No red phase.
+- Updated tdd/README (metrics, step 6, commit table, limits), the
+  script (D3 narrates what Claude really did, optional D5b, metrics
+  line, Q&A), app/README, USER_STORIES, slides 6-7, and both PDFs.

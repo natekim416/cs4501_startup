@@ -106,6 +106,7 @@ button { font: inherit; cursor: pointer; }
 .op.trash_duplicate { background: var(--gold); }
 .op.quarantine { background: var(--pink); }
 .op.delete_rebuildable, .op.clear_cache { background: #CDB8FF; }
+.op.delete_from_trash { background: var(--pink); color: var(--ink); }
 .action .file { font-size: 21px; word-break: break-all; }
 .action .why { font-size: 18px; color: #5A5870; }
 .ask-tag { font-family: var(--pixel); font-size: 8px; background: var(--gold); padding: 3px 5px; margin-left: 6px; }
@@ -171,8 +172,6 @@ button { font: inherit; cursor: pointer; }
 .log li.pass { color: var(--mint); }
 .log li.fail { color: var(--pink); }
 .log li.info { color: var(--muted); }
-.key-form { display: flex; gap: 8px; }
-.key-form input { flex: 1; min-width: 0; font: inherit; font-size: 18px; background: var(--ink-2); color: var(--paper); border: 3px solid var(--ink-3); padding: 6px; }
 .usage-actions { display: flex; gap: 8px; margin-top: 10px; }
 
 body.busy .composer input { border-color: var(--gold); }

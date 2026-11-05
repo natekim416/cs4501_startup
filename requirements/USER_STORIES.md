@@ -437,7 +437,7 @@ These came up in the sessions. We're saying no for now on purpose.
 | 3 · Get it back | US-15 rebuild, US-14 per-action undo, US-04 protect projects, US-18 summary, US-19 unsigned | 15 | Every deletion can be rebuilt, and every plan is readable in one sentence | ✅ Alpha, except US-04 |
 | 4 · Coverage and test kit | US-08 Xcode, US-09 Docker, US-10 ML caches, US-16 storage watch, US-21 logs and fake door | 23 | All five ecosystems are covered, and the pivot test can run unsupervised | Beta |
 
-**Beta schedule** *(proposed; team to confirm)*: week of Nov 9: US-04, record live Claude runs, merge `alpha-review` · Nov 16: US-08 Xcode, US-09 Docker · Nov 23: US-10 ML caches, US-16 storage watch · Nov 30: US-21 Go Pro and rebuild logging, recruit 20 testers, start the pivot test.
+**Beta schedule** *(proposed; team to confirm)*: week of Nov 9: US-04, record the Claude demo video, rerun the live Claude tests · Nov 16: US-08 Xcode, US-09 Docker · Nov 23: US-10 ML caches, US-16 storage watch · Nov 30: US-21 Go Pro and rebuild logging, recruit 20 testers, start the pivot test.
 
 **Dependencies:** US-05 comes before US-06 to US-10 and US-15. US-01 comes before US-03. US-21 must be done before the test starts.
 

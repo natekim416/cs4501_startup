@@ -3,6 +3,7 @@
 // frees space), and their rebuild recipe is logged so undo can tell the user how to get them back.
 const fs = require('fs');
 const path = require('path');
+const { inTrash } = require('./trash');
 
 class Executor {
   // trashDir: where removed personal files go. The app passes the macOS Trash (US-13); without it they go
@@ -69,6 +70,12 @@ class Executor {
       if (a.op === 'quarantine') stripExecute(to);
       return { type: 'move', from: a.path, to };
     }
+    if (a.op === 'delete_from_trash') {
+      // Checked again here, so nothing outside the Trash is ever permanently deleted, whatever the caller.
+      if (!inTrash(a.path, this.trashDir)) throw new Error(`${a.path} isn't in the Trash; refusing to delete it.`);
+      fs.rmSync(a.path, { recursive: true });
+      return { type: 'deleted_permanently', path: a.path };
+    }
     if (a.op === 'delete_rebuildable') {
       if (!a.recipe) throw new Error(`No rebuild recipe for ${a.path}; refusing to delete it.`);
       fs.rmSync(a.path, { recursive: true });
@@ -89,6 +96,11 @@ class Executor {
     if (!step) return { undone: 0, needsRebuild: [] };
     const res = this.reverse(step);
     if (res.undone) step.undone = true;
+    // A folder this run created goes away with the last file moved back out of it, deepest first.
+    if (res.undone && step.type === 'move') {
+      const created = batch.steps.filter((st) => st.type === 'mkdir' && !st.undone && (path.dirname(step.to) === st.path || path.dirname(step.to).startsWith(st.path + path.sep)));
+      for (const st of created.sort((a, b) => b.path.length - a.path.length)) if (removeIfEmpty(st.path)) st.undone = true;
+    }
     this.saveLog();
     return res;
   }
@@ -96,12 +108,14 @@ class Executor {
   // Undoes one logged step. A deleted build folder can't be moved back, so it's returned for rebuilding.
   reverse(step) {
     if (step.type === 'deleted') return { undone: 0, needsRebuild: [{ path: step.path, ...step.recipe }] };
+    if (step.type === 'deleted_permanently') return { undone: 0, needsRebuild: [] };
     try {
       if (step.type === 'move') {
         fs.mkdirSync(path.dirname(step.from), { recursive: true });
         fs.renameSync(step.to, step.from);
-      } else if (step.type === 'mkdir' && fs.readdirSync(step.path).length === 0) {
-        fs.rmdirSync(step.path);
+      } else if (step.type === 'mkdir' && fs.existsSync(step.path) && !removeIfEmpty(step.path)) {
+        // The user put their own files in it since; leave it and say so.
+        return { undone: 0, needsRebuild: [], kept: step.path };
       }
       return { undone: 1, needsRebuild: [] };
     } catch {
@@ -112,18 +126,36 @@ class Executor {
   // Reverses the most recent batch, newest step first.
   undoLast() {
     const batch = this.history.pop();
-    if (!batch) return { undone: 0, needsRebuild: [] };
+    if (!batch) return { undone: 0, needsRebuild: [], keptFolders: [] };
     let undone = 0;
     const needsRebuild = [];
+    const keptFolders = [];
     // Keep undoing the rest even if one step can't be reversed; skip steps already undone one by one.
     for (const step of [...batch.steps].reverse()) {
       if (step.undone) continue;
       const res = this.reverse(step);
       undone += res.undone;
       needsRebuild.push(...res.needsRebuild);
+      if (res.kept) keptFolders.push(res.kept);
     }
     this.saveLog();
-    return { undone, needsRebuild };
+    return { undone, needsRebuild, keptFolders };
+  }
+}
+
+// Files macOS adds on its own (Finder's .DS_Store, AppleDouble "._" files). A folder holding only these
+// is still empty as far as the user is concerned.
+const isJunk = (name) => name === '.DS_Store' || name === '.localized' || name === 'Icon\r' || name.startsWith('._');
+
+function removeIfEmpty(dir) {
+  try {
+    const entries = fs.readdirSync(dir);
+    if (!entries.every(isJunk)) return false;
+    for (const e of entries) fs.rmSync(path.join(dir, e), { force: true });
+    fs.rmdirSync(dir);
+    return true;
+  } catch {
+    return false;
   }
 }
 
