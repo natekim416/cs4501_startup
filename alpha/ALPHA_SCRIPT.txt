@@ -35,11 +35,10 @@ nobody deletes them, because deleting the wrong folder the night before
 a deadline costs you your project. We're Cleanasaurus, and we make that
 cleanup safe.
 
-[SLIDE 2 - MVP VALIDATION - 0:25-1:20]
+[SLIDE 2 - MVP VALIDATION - 0:25-1:09]
 Our MVP bet was that students would let an AI clean their files if
 every plan was checked first. We tested ten people, five CS students and
-five friends and family, from October thirtieth to November second. Here's
-what went wrong. Only thirty percent ran a full plan in their first
+five friends and family. Here's what went wrong. Only thirty percent ran a full plan in their first
 session, below our forty percent fail line, though seventy percent ran
 most of one. Only thirty percent came back on their own. Undo was
 all-or-nothing, and one tester's own app got flagged as malware. The
@@ -47,15 +46,20 @@ biggest miss was space: testers got back about two percent of what they
 wanted. Our counter said twelve gigabytes freed, and zero bytes left the
 disk. Safety held. Value didn't.
 
-[SLIDE 3 - PIVOT - 1:20-2:00]
-So where was their space? Seven of ten said, unprompted, somewhere our
-app wouldn't go, including all five CS testers. It was build folders:
-Xcode data, machine-learning models, node_modules, Docker, Python
-environments. The median CS tester had thirty-eight gigabytes of it,
-against one point four of duplicates. That's twenty-seven times more.
-All of it rebuilds with one command, and CS testers were the ones who
-trusted us. So we kept the safety engine and aimed it at CS students'
-build clutter.
+[SLIDE 3 - PIVOT - 1:09-2:00]
+So why pivot to developers? We asked testers where their space
+actually goes. Seven of ten said: somewhere our app couldn't reach. That
+was all five of our CS students. (Point at "5 of 5".)
+Their space was in build folders. That's the stuff coding tools download
+for you: node_modules, Python environments, Xcode data, AI
+models. (Point at the table.) The typical CS tester had thirty-eight
+gigabytes of it, and only about one and a half of duplicate files. That's
+twenty-seven times more.
+And all of it is rebuildable: delete it, and one command brings it back.
+That's what makes it safe to clean. CS students also trusted us most;
+non-CS testers undid over a third of their actions.
+Other tools delete these just because they're old. We only delete
+what we can prove comes back.
 
 [SLIDE 4 - DEMO VIDEO - 2:00-5:30]  (switch to the video, press play)
 Times in brackets are demo time / presentation time.
