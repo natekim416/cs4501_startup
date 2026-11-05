@@ -101,3 +101,44 @@ test('REG-6b checking the moves too makes every file land exactly where the plan
     assert.ok(!fs.existsSync(a.path), `${path.basename(a.path)} left its old place`);
   }
 });
+
+function sortedAndRun() {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const folder = path.join(tmp(), 'Downloads');
+  makeDemoFolder(folder);
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'free');
+  engine.scanFolder(folder);
+  return engine.plan('Sort my school files by class').then((plan) => {
+    const res = engine.execute(plan.planId, plan.actions.map((a) => a.id));
+    return { folder, engine, plan, res, made: plan.actions.filter((a) => a.op === 'mkdir').map((a) => a.path) };
+  });
+}
+
+test('REG-7 undo removes the folders it created even after Finder left a hidden .DS_Store in them (found by Papa)', async () => {
+  const { engine, made } = await sortedAndRun();
+  for (const d of made) fs.writeFileSync(path.join(d, '.DS_Store'), 'x');
+  const u = engine.undo();
+  assert.deepStrictEqual(made.filter((d) => fs.existsSync(d)), [], 'every created folder is gone');
+  assert.deepStrictEqual(u.keptFolders, []);
+});
+
+test('REG-7b undo keeps a created folder that now holds the user\'s own file, and says so (edge case)', async () => {
+  const { engine, made } = await sortedAndRun();
+  const mine = path.join(made.find((d) => /Music$/.test(d)), 'my new song.mp3');
+  fs.writeFileSync(mine, 'mine');
+  const u = engine.undo();
+  assert.ok(fs.existsSync(mine), "the user's file is never touched");
+  assert.deepStrictEqual(u.keptFolders.map((d) => path.basename(d)), ['Music']);
+  assert.deepStrictEqual(made.filter((d) => fs.existsSync(d)).map((d) => path.basename(d)), ['Music']);
+});
+
+test('REG-7c undoing one move removes the folder it created once that folder is empty', async () => {
+  const { engine, res, plan } = await sortedAndRun();
+  const moves = plan.actions.filter((a) => a.op === 'move');
+  const dest = moves[0].dest;
+  const intoDest = moves.filter((a) => a.dest === dest);
+  fs.writeFileSync(path.join(dest, '.DS_Store'), 'x');
+  for (const a of intoDest) engine.undoAction(res.batchId, a.id);
+  assert.ok(!fs.existsSync(dest), `${path.basename(dest)} should be removed after its last file moved back`);
+});
