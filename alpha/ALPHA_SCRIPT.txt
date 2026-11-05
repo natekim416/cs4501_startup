@@ -3,28 +3,31 @@ CLEANASAURUS ALPHA - 8-MINUTE PRESENTATION SCRIPT
 Hard limit 8:00, then 2 minutes of Q&A. One of us is picked at random,
 so all three of us rehearse the whole thing. About 900 spoken words.
 
-Time plan (from the rubric):
-  0:00-2:00  Hook + MVP validation      slides 1-3
-  2:00-5:15  Demo video, narrated live  slides 4-5
-  5:15-6:45  Engineering metrics        slide 6
-  6:45-7:45  Stage and roadmap to Beta  slide 7
-  Q&A                                   slide 8
+Time plan (from the rubric). Word counts assume about 150 words a minute.
+  0:00-2:00  Hook + MVP validation + pivot  slides 1-3   (~300 words)
+  2:00-5:30  Demo video, narrated live      slides 4-5   (~330 words)
+  5:30-7:00  Engineering metrics            slide 6      (~180 words)
+  7:00-8:00  Stage and roadmap to Beta      slide 7      (~145 words)
+  Q&A                                       slide 8
+Checkpoints: switch to the video by 2:00; the undo should finish by 5:30;
+start the roadmap by 7:00. If you're behind at 5:30, skip the last two
+sentences of the metrics section.
 
 BEFORE PRESENTING
 - Numbers on the slides come from our Activities Document (metrics
   measured Nov 5 on main at 787454f) and validation/MVP_VALIDATION.md.
   Say "full plan" and "at least 80% of a plan" exactly as slide 2 does;
   they are different numbers (30% vs 70%).
-- The demo is a silent video: DEMOVID.mov (about 2 minutes 20 seconds).
-  Have it open in QuickTime, full screen, sound off, paused at the start.
-  On slide 4, switch to it and press play. Narrate live using the cues
-  below; describe what is on screen, don't read the cue word for word.
+- The demo is a silent video: DEMOVID.mov. Have it open in QuickTime,
+  full screen, sound off, paused at the start. On slide 4, switch to it
+  and press play. Narrate live with the demo script below; it is timed to
+  the video (demo time 0:00 = presentation time 2:00).
 - If asked to run the app live in Q&A: cd app && npm run dev-demo
   (MODE must say CLAUDE; the key lives only in the repo-root .env).
 
 
 ---------------------------------------------------------------------
-[SLIDE 1 - HOOK - 0:00-0:35]
+[SLIDE 1 - HOOK - 0:00-0:25]
 "Storage Almost Full." One developer ran a cleanup tool on their
 laptop and found fifty-eight gigabytes in a hundred and twenty-eight
 old node_modules folders. Most of it rebuilds with one command. Almost
@@ -32,66 +35,84 @@ nobody deletes them, because deleting the wrong folder the night before
 a deadline costs you your project. We're Cleanasaurus, and we make that
 cleanup safe.
 
-[SLIDE 2 - MVP VALIDATION - 0:35-1:20]
+[SLIDE 2 - MVP VALIDATION - 0:25-1:20]
 Our MVP bet was that students would let an AI clean their files if
-every plan was checked first. We ran ten testers from October thirtieth
-to November second: five CS students and five friends and family. We
-planned fifteen, so treat this as directional.
-Here's what went wrong. On the KPI we pitched, running a full plan in
-the first session, only thirty percent did. That's below our forty
-percent fail line. Seventy percent ran most of a plan. Only thirty
-percent came back on their own, and we only watched for three days, not
-seven. Undo was fifteen percent, and all of it was one tester who
-approved forty-one actions without reading them, then undid them all.
-Undo was all-or-nothing, so another tester dragged files back by hand,
-and one tester's own app got flagged as malware.
-The biggest failure was space. Testers wanted twenty-seven and a half
-gigabytes back and got about two percent. Our own counter said twelve
-gigabytes freed, and zero bytes actually left the disk, because removed
-files sat in a bin on the same drive. Safety held, with zero unsafe
-actions. Value didn't.
+every plan was checked first. We tested ten people, five CS students and
+five friends and family, from October thirtieth to November second. Here's
+what went wrong. Only thirty percent ran a full plan in their first
+session, below our forty percent fail line, though seventy percent ran
+most of one. Only thirty percent came back on their own. Undo was
+all-or-nothing, and one tester's own app got flagged as malware. The
+biggest miss was space: testers got back about two percent of what they
+wanted. Our counter said twelve gigabytes freed, and zero bytes left the
+disk. Safety held. Value didn't.
 
 [SLIDE 3 - PIVOT - 1:20-2:00]
-So where was their space? Seven of ten told us, unprompted, that it was
-somewhere our app wouldn't go, and that was all five of our CS testers.
-Their space was in build folders: Xcode data, machine-learning models,
-node_modules, Docker, Python environments, Unity projects. A hundred
-and ninety-two gigabytes across five people. The median CS tester had
-thirty-eight gigabytes of it, against one point four gigabytes of
-duplicates. That's twenty-seven times more.
-All of it is rebuildable: one command brings it back, like npm ci. And
-CS students are the ones who trusted us: they met all three trust
-targets, while non-CS testers undid more than a third of their actions.
-So we pivoted: same safety engine, aimed at CS students' build clutter,
-and it deletes only what it can prove comes back.
+So where was their space? Seven of ten said, unprompted, somewhere our
+app wouldn't go, including all five CS testers. It was build folders:
+Xcode data, machine-learning models, node_modules, Docker, Python
+environments. The median CS tester had thirty-eight gigabytes of it,
+against one point four of duplicates. That's twenty-seven times more.
+All of it rebuilds with one command, and CS testers were the ones who
+trusted us. So we kept the safety engine and aimed it at CS students'
+build clutter.
 
-[SLIDE 4 - DEMO VIDEO - 2:00-4:30]  (switch to the video, press play)
-V1. (Folder on screen.) This is a messy Downloads folder: lecture PDFs,
-    homework, copies of the same files, and three versions of a resume.
-V2. (Request being typed.) We ask, in plain English: organize by class,
-    remove exact duplicates, and don't touch our resumes. This goes to
-    Claude with file names and sizes only, never the files' contents.
-V3. (Plan appears.) Claude turned that one sentence into a plan. Every
-    line has a reason: this lecture goes to CS 4501, this file is an
-    exact copy of that one. And the resumes aren't in it, because we
-    said so. Before we saw it, plain code checked every line.
-V4. (Approve, completed actions.) Nothing ran until we approved. Now the
-    files are sorted into class folders, and the copies are in the
-    macOS Trash, so nothing is deleted for good.
-V5. (Undo.) And one click undoes it. Every file goes back where it was,
-    and the folders it made are gone.
-(Stop the video, switch back to the slides.)
+[SLIDE 4 - DEMO VIDEO - 2:00-5:30]  (switch to the video, press play)
+Times in brackets are demo time / presentation time.
 
-[SLIDE 5 - WHAT YOU JUST SAW - 4:30-5:15]
-Here's who decided what. Claude decided what we meant: which class each
-file belongs to, which files are copies, and that the resumes stay put.
-Plain code decided what's safe: a file only counts as a duplicate if its
-contents match a kept copy byte for byte, every move stays inside the
-folder, nothing runs until you approve, and undo reverses all of it. The
-copies go to the real Trash now, not a hidden bin. That's the zero-bytes
-bug from our validation, fixed.
+0:00-0:40 / 2:00-2:40 · Set up the problem
+[Show the sample Downloads folder, then switch to Cleanasaurus.]
+"Imagine it's the end of the semester and this is your Downloads folder.
+You've got lecture PDFs mixed in with duplicate downloads and files you
+don't remember saving. You want to clean it up, but you still need those
+notes for finals. Let's give Cleanasaurus the same instructions you'd
+give someone helping you sort it out."
 
-[SLIDE 6 - ENGINEERING METRICS - 5:15-6:45]
+0:40-1:25 / 2:40-3:25 · Turn a request into a plan
+[Point to the CLAUDE badge. Type the request and submit it.]
+  Organize my school PDFs into folders by class, remove exact
+  duplicates, and quarantine anything the scanner flagged. Leave my
+  résumés alone.
+"Claude takes that request and uses the file inventory and scan results
+to propose specific actions. 'By class' is the part I'd normally have to
+figure out myself. Claude can use clues in the filenames to decide which
+PDFs belong together. I can also make an exception, like leaving my
+résumés alone, in the same request."
+
+1:25-2:30 / 3:25-4:30 · Review the plan and approve it
+[Point to one proposed PDF move, then show the message about the index.js
+duplicates.]
+"Here's one PDF it wants to move. I can see where it'll go and why.
+Cleanasaurus also found duplicate index.js files and pointed out that
+removing one could break a project. Even if two copies have identical
+contents, a project might need its own copy at that exact path. So I'm
+leaving those files alone and going ahead with the PDF cleanup."
+"Before the plan reaches me, the validator checks the proposed actions.
+For duplicate removal, it checks that an identical copy will survive the
+cleanup. For quarantine, it checks that the scanner actually flagged the
+file. If a check fails, the app can send the error back to Claude so it
+can revise the plan."
+[If the plan includes any index.js actions, uncheck them. Then uncheck one
+optional PDF move and click APPROVE.]
+"I'm also going to keep this PDF where it is. I can uncheck that move and
+approve the rest."
+
+2:30-3:30 / 4:30-5:30 · Show the result and undo
+[Show the completion message. Open the sample folder and point to one PDF
+in its new class folder. Return to Cleanasaurus and click UNDO.]
+"Here's the PDF in its new folder. We went from one sentence to an actual
+cleanup. And if I decide I preferred the old layout, I can undo the batch
+right here."
+[Wait for the undo confirmation. Switch back to the slides: slide 5 is on
+screen while you say the last line.]
+"That's the full flow. I describe how I want my files organized, Claude
+proposes the steps, the app checks them, and I decide what actually
+runs."
+
+[SLIDE 5 - WHAT YOU JUST SAW - shown during the last demo line; no extra
+time. Advance to slide 6 right after.]
+
+[SLIDE 6 - ENGINEERING METRICS - 5:30-7:00]
 How we built it. Twenty-nine user stories, each a GitHub issue with
 acceptance criteria. Eighteen are closed: six from the MVP and twelve
 built in the Alpha. We have a hundred and twenty-nine automated tests,
@@ -110,22 +131,18 @@ Beta.
 (Presenter: if the team review has happened, give its real count
 instead of the last sentence.)
 
-[SLIDE 7 - STAGE AND ROADMAP - 6:45-7:45]
-For the Alpha, we ran validation and made the pivot decision, wrote all
-twenty-nine stories as issues, and built eighteen: the rebuild proof,
-cleaning by intent, one-click rebuild, single-action undo, the real
-Trash, and honest space numbers.
-For Beta, four goals, each with a pass line. One: the Dino Bin goes
-away, and seventy percent of testers see space actually freed. Two: one
-question instead of twenty. Claude asks one question that settles all
-the similar files, and sixty percent say deleting felt smoother. Three:
-find what people actually want gone, by narrowing scope, like deleting
-node_modules from inactive projects. Eighty percent say what they wanted
-cleaned was cleaned, and run eighty percent of the plan. Four: build it
-for CS students, with Claude knowing to look for Python environments and
-pip caches, hard rules against touching source code, git repos,
-uncommitted work, or .env files, and a read-only summary of your dev
-setup. Sixty percent of CS testers say it fits their needs better.
+[SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
+For the Alpha, we ran validation, made the pivot decision, wrote
+twenty-nine stories as issues, and built eighteen. For Beta, four goals,
+each with a pass line. One: the Dino Bin goes away, and seventy percent of
+testers see space actually freed. Two: one question instead of twenty,
+and sixty percent say deleting felt smoother. Three: find what people
+actually want gone, like node_modules from inactive projects; eighty
+percent say what they wanted cleaned was cleaned and run eighty percent
+of the plan. Four: built for CS students. Claude knows to look for Python
+environments and pip caches, never touches source code, git repos,
+uncommitted work, or .env files, and starts from a read-only summary of
+your dev setup. Sixty percent of CS testers say it fits them better.
 Thank you. Questions?
 
 ---------------------------------------------------------------------
