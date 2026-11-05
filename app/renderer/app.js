@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT' };
 
 // Decimal units, the way macOS Finder and the plan's one-line summary report sizes.
 function formatBytes(n) {
@@ -212,7 +212,7 @@ function showPlan(result) {
   if (result.actions.length) {
     const askFirst = new Set(result.needsApproval);
     const items = result.actions.map((a) => {
-      const box = el('input', { type: 'checkbox', 'data-id': a.id, 'aria-label': `Include ${OP_LABEL[a.op]} ${a.path}` });
+      const box = el('input', { type: 'checkbox', 'data-id': a.id, 'data-op': a.op, 'aria-label': `Include ${OP_LABEL[a.op]} ${a.path}` });
       box.checked = !askFirst.has(a.id) && a.checked !== false;
       const dest = a.dest === state.folder ? './' : short(a.dest) + '/';
       const target = a.op === 'move' ? `${short(a.path)}  →  ${dest}` : a.op === 'rename' ? `${short(a.path)}  →  ${short(a.dest)}` : short(a.path);
@@ -285,14 +285,20 @@ function askQuestion(q) {
 }
 
 async function runPlan(planId, list, approve) {
-  const ids = [...list.querySelectorAll('input:checked')].map((i) => i.dataset.id);
+  const checked = [...list.querySelectorAll('input:checked')];
+  const ids = checked.map((i) => i.dataset.id);
   if (!ids.length) return botSay('Nothing is checked, so there is nothing to do.');
   if (isBusy()) return;
+  // US-24: a permanent delete from the Trash needs its own yes, on top of APPROVE.
+  const permanent = checked.filter((i) => i.dataset.op === 'delete_from_trash').length;
+  if (permanent && !window.confirm(`Permanently delete ${permanent} item${permanent === 1 ? '' : 's'} from the Trash? This can't be undone.`)) {
+    return botSay('OK, nothing was deleted from the Trash.');
+  }
   approve.disabled = true;
   list.querySelectorAll('input').forEach((i) => (i.disabled = true));
   let res;
   try {
-    res = await api.execute(planId, ids);
+    res = await api.execute(planId, ids, { confirmPermanent: permanent > 0 });
   } catch (err) {
     approve.disabled = false;
     list.querySelectorAll('input').forEach((i) => (i.disabled = false));

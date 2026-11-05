@@ -3,6 +3,7 @@
 // frees space), and their rebuild recipe is logged so undo can tell the user how to get them back.
 const fs = require('fs');
 const path = require('path');
+const { inTrash } = require('./trash');
 
 class Executor {
   // trashDir: where removed personal files go. The app passes the macOS Trash (US-13); without it they go
@@ -69,6 +70,12 @@ class Executor {
       if (a.op === 'quarantine') stripExecute(to);
       return { type: 'move', from: a.path, to };
     }
+    if (a.op === 'delete_from_trash') {
+      // Checked again here, so nothing outside the Trash is ever permanently deleted, whatever the caller.
+      if (!inTrash(a.path, this.trashDir)) throw new Error(`${a.path} isn't in the Trash; refusing to delete it.`);
+      fs.rmSync(a.path, { recursive: true });
+      return { type: 'deleted_permanently', path: a.path };
+    }
     if (a.op === 'delete_rebuildable') {
       if (!a.recipe) throw new Error(`No rebuild recipe for ${a.path}; refusing to delete it.`);
       fs.rmSync(a.path, { recursive: true });
@@ -96,6 +103,7 @@ class Executor {
   // Undoes one logged step. A deleted build folder can't be moved back, so it's returned for rebuilding.
   reverse(step) {
     if (step.type === 'deleted') return { undone: 0, needsRebuild: [{ path: step.path, ...step.recipe }] };
+    if (step.type === 'deleted_permanently') return { undone: 0, needsRebuild: [] };
     try {
       if (step.type === 'move') {
         fs.mkdirSync(path.dirname(step.from), { recursive: true });

@@ -106,6 +106,7 @@ button { font: inherit; cursor: pointer; }
 .op.trash_duplicate { background: var(--gold); }
 .op.quarantine { background: var(--pink); }
 .op.delete_rebuildable, .op.clear_cache { background: #CDB8FF; }
+.op.delete_from_trash { background: var(--pink); color: var(--ink); }
 .action .file { font-size: 21px; word-break: break-all; }
 .action .why { font-size: 18px; color: #5A5870; }
 .ask-tag { font-family: var(--pixel); font-size: 8px; background: var(--gold); padding: 3px 5px; margin-left: 6px; }
