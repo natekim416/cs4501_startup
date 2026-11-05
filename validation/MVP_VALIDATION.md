@@ -13,7 +13,7 @@
 
 **Target population:** 5 CS-related friends and classmates (C1–C5), and 5 non-CS testers (N1–N5): four family members and one non-CS student.
 
-**Change from our plan:** we planned 15 testers (10 CS, 5 non-CS) and ran 10 (5 CS, 5 non-CS), so the CS results rest on fewer people.
+**Change from our plan:** we planned 10 testers (5 CS, 5 non-CS) and ran 10 (5 CS, 5 non-CS), so the CS results rest on fewer people.
 
 **Test 1:** A 20-minute think-aloud on the tester's own laptop, with three tasks: free up space, organize files, and scan for malware.
 
