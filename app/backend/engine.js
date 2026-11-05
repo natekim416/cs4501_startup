@@ -267,7 +267,15 @@ class Engine {
     if (!this.lastPlan || this.lastPlan.id !== planId) {
       return { ok: false, errors: ['This plan is out of date. Ask me again and approve the newest plan.'] };
     }
-    const chosen = this.lastPlan.plan.actions.filter((a) => actionIds.includes(a.id));
+    const all = this.lastPlan.plan.actions;
+    const picked = all.filter((a) => actionIds.includes(a.id));
+    // A new folder exists to hold files. If none of the files headed into it were checked (moves in an
+    // ASK zone start unchecked), skip it instead of leaving an empty folder behind.
+    const into = (a) => (a.op === 'move' ? path.resolve(a.dest) : a.op === 'rename' ? path.dirname(path.resolve(a.dest)) : null);
+    const filesInto = (dir, list) => list.some((a) => into(a) && (into(a) === dir || into(a).startsWith(dir + path.sep)));
+    const chosen = picked.filter((a) => a.op !== 'mkdir' || !filesInto(path.resolve(a.path), all) || filesInto(path.resolve(a.path), picked));
+    const skippedFolders = picked.length - chosen.length;
+    const uncheckedMoves = all.filter((a) => (a.op === 'move' || a.op === 'rename') && !actionIds.includes(a.id)).length;
     // US-24: nothing is permanently deleted unless the user confirmed it in a separate step.
     if (chosen.some((a) => a.op === 'delete_from_trash') && !confirmPermanent) {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
@@ -295,7 +303,13 @@ class Engine {
       ...countOps(chosen),
     });
     this.lastPlan = null;
-    return { ok: true, ...run, ...this.freedReport(chosen, check.bytesFreed, measuredFreed) };
+    const report = this.freedReport(chosen, check.bytesFreed, measuredFreed);
+    if (uncheckedMoves && skippedFolders) {
+      const zone = this.profile.zoneFor(this.folder) === 'ask' ? " They're marked ASK FIRST because this folder is an ASK zone." : '';
+      const moved = `${uncheckedMoves} move${uncheckedMoves === 1 ? '' : 's'} weren't checked, so those files stayed put and I didn't create their ${skippedFolders === 1 ? 'folder' : `${skippedFolders} folders`}.${zone} Check them and approve again to move them.`;
+      report.freedNote = [report.freedNote, moved].filter(Boolean).join(' ');
+    }
+    return { ok: true, ...run, ...report };
   }
 
   // US-12: FREED is the measured change on disk. Binned files free space only when the bin is emptied,

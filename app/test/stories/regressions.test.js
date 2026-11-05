@@ -64,3 +64,40 @@ test('REG-5 the scanned folder itself is never offered as a project (found by gr
   const q = plan.questions.find((x) => /which projects/i.test(x.text));
   assert.ok(q && !q.options.includes('code'), JSON.stringify(q));
 });
+
+test('REG-6 in an ASK zone, approving with the moves unchecked creates no empty folders and says why (found by Papa on ~/Documents)', async () => {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const folder = path.join(tmp(), 'Downloads');
+  makeDemoFolder(folder);
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'ask');
+  engine.scanFolder(folder);
+  const plan = await engine.plan('Sort my school files by class');
+  const moves = plan.actions.filter((a) => a.op === 'move');
+  assert.ok(moves.length > 0 && moves.every((a) => plan.needsApproval.includes(a.id)), 'moves in an ASK zone wait for the user');
+  // What the card checks by default: everything not marked ASK FIRST.
+  const defaults = plan.actions.filter((a) => !plan.needsApproval.includes(a.id) && a.checked !== false).map((a) => a.id);
+  const before = new Set(fs.readdirSync(folder));
+  const res = engine.execute(plan.planId, defaults);
+  assert.strictEqual(res.ok, true, JSON.stringify(res.errors));
+  const created = fs.readdirSync(folder).filter((n) => !before.has(n));
+  assert.deepStrictEqual(created, [], 'no folder is created when none of its files were checked');
+  assert.match(res.freedNote, /14 moves? .*(check|ASK)/i);
+});
+
+test('REG-6b checking the moves too makes every file land exactly where the plan said', async () => {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const folder = path.join(tmp(), 'Downloads');
+  makeDemoFolder(folder);
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'ask');
+  engine.scanFolder(folder);
+  const plan = await engine.plan('Sort my school files by class');
+  const res = engine.execute(plan.planId, plan.actions.map((a) => a.id));
+  assert.strictEqual(res.ok, true, JSON.stringify(res.errors));
+  const moves = plan.actions.filter((a) => a.op === 'move');
+  for (const a of moves) {
+    assert.ok(fs.existsSync(path.join(a.dest, path.basename(a.path))), `${path.basename(a.path)} landed in ${a.dest}`);
+    assert.ok(!fs.existsSync(a.path), `${path.basename(a.path)} left its old place`);
+  }
+});
