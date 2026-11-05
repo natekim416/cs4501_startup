@@ -74,7 +74,7 @@ function registerIpc() {
   });
   ipcMain.handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
   ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
-  ipcMain.handle('execute', (_e, planId, ids) => ({ ...engine.execute(planId, ids), disk: diskInfo() }));
+  ipcMain.handle('execute', (_e, planId, ids, opts) => ({ ...engine.execute(planId, ids, opts), disk: diskInfo() }));
   ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
   ipcMain.handle('undo-one', (_e, batchId, actionId) => ({ ...engine.undoAction(batchId, actionId), disk: diskInfo() }));
   ipcMain.handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));

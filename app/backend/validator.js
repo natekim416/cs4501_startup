@@ -5,8 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const { hashFile } = require('./scanner');
 const { rebuildProof, measureFreeable, toolCaches } = require('./devclutter');
+const { inTrash, itemBytes } = require('./trash');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -16,7 +17,7 @@ function inside(child, root) {
   return c === r || c.startsWith(r + path.sep);
 }
 
-function validate(plan, { scan, findings, profile, now, named, home, condaExports }) {
+function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -51,6 +52,13 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (!a.reason) return fail('Every action needs a "reason" the user can read.');
 
     const src = path.resolve(a.path);
+    // US-24: a permanent delete is allowed only for something already in the Trash, and always asks.
+    if (a.op === 'delete_from_trash') {
+      if (!inTrash(src, trashDir)) return fail(`${src} isn't in the Trash. I can permanently delete only items already in the Trash.`);
+      bytesFreed += itemBytes(src);
+      needsApproval.push(id);
+      return;
+    }
     // A code project is NEVER for moves, but its gitignored build folders are what the rebuild proof checks.
     const zone = a.op === 'delete_rebuildable' ? profile.zoneFor(src, { ignoreRepos: true }) : profile.zoneFor(src);
     if (zone === 'never') return fail(`${src} is in a NEVER-touch zone. Remove this action.`);

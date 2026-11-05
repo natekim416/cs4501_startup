@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   prepareTour: () => ipcRenderer.invoke('prepare-tour'),
   plan: (request) => ipcRenderer.invoke('plan', request),
   answer: (question, choice) => ipcRenderer.invoke('answer', question, choice),
-  execute: (planId, ids) => ipcRenderer.invoke('execute', planId, ids),
+  execute: (planId, ids, opts) => ipcRenderer.invoke('execute', planId, ids, opts),
   undo: () => ipcRenderer.invoke('undo'),
   setZone: (zonePath, zone) => ipcRenderer.invoke('set-zone', zonePath, zone),
   setTarget: (destRoot) => ipcRenderer.invoke('set-target', destRoot),

@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
 const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
+const { listTrash } = require('./trash');
 const { matchProjects } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
@@ -50,6 +51,8 @@ class Engine {
     this.condaExports = {};
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
+    this.trashDir = trashDir;
+    this.trashItems = [];
     this.executor = new Executor(dataDir, { trashDir });
     this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
@@ -91,6 +94,7 @@ class Engine {
     this.snapshot = scan(folder);
     this.dev = findArtifacts(folder);
     this.caches = toolCaches(this.home);
+    this.trashItems = listTrash(this.trashDir);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
     this.unknownApps = malware.findings.filter((f) => f.quarantine === false);
@@ -156,7 +160,7 @@ class Engine {
     const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev: this.dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports };
+    const ctx = { scan: this.snapshot, dev: this.dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems };
     const attempts = [];
     let previous = null;
     let plan;
@@ -197,6 +201,8 @@ class Engine {
 
     // A project the user named but touched recently is allowed, and shown unchecked so they decide.
     for (const a of plan.actions || []) {
+      // US-24: permanent deletes start unchecked; the user opts in and confirms.
+      if (a.op === 'delete_from_trash') Object.assign(a, { checked: false, note: 'Permanent: this deletes it from the Trash for good and cannot be undone.' });
       if (a.op !== 'delete_rebuildable') continue;
       const days = Math.floor((Date.now() - lastChanged(path.dirname(a.path))) / 864e5);
       if (days < INACTIVE_DAYS) Object.assign(a, { checked: false, note: `${path.basename(path.dirname(a.path))} is still active (changed ${days} day${days === 1 ? '' : 's'} ago). Check it only if you're sure.` });
@@ -216,7 +222,7 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
-    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes])]);
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
     const dayAgo = Date.now() - 864e5;
     const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
       try {
@@ -256,14 +262,18 @@ class Engine {
     return this.plan(`${request} (User answered "${question}" with "${choice}")`, onAttempt);
   }
 
-  execute(planId, actionIds) {
+  execute(planId, actionIds, { confirmPermanent = false } = {}) {
     // Only the newest plan can run: older cards may point at files that have since changed.
     if (!this.lastPlan || this.lastPlan.id !== planId) {
       return { ok: false, errors: ['This plan is out of date. Ask me again and approve the newest plan.'] };
     }
     const chosen = this.lastPlan.plan.actions.filter((a) => actionIds.includes(a.id));
+    // US-24: nothing is permanently deleted unless the user confirmed it in a separate step.
+    if (chosen.some((a) => a.op === 'delete_from_trash') && !confirmPermanent) {
+      return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
+    }
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };
