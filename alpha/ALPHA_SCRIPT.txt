@@ -17,8 +17,10 @@ BEFORE PRESENTING
 - Demo setup (do this 10 minutes before class):
     cd app && npm run dev-demo
   Put the API key in the .env file at the repo root so MODE shows CLAUDE.
-  Test the exact request once before class. If Claude or the Wi-Fi fails,
-  switch to the backup on slide 5 and say so out loud (see step D6).
+  Test the exact request once before class, and run the live tests:
+    cd app && npm run test:live      (5/5 passed on Nov 4)
+  If Claude or the Wi-Fi fails, switch to the backup on slide 5 and say
+  so out loud (see step D6).
 
 
 ---------------------------------------------------------------------
@@ -61,12 +63,16 @@ D1. (Point at the folder panel.) This is a messy code folder: eight
 D2. (Type:) "I'm done with CS 3140 and the hackathon. Free up space."
     Point at MODE: CLAUDE. This goes to Claude with file names and
     sizes only, never file contents.
-D3. (Point at the plan, then the Safety Log.) Claude matched "CS 3140"
-    and "the hackathon" to these projects. It ignored my other classes,
-    the secret .env, and the VM. Then the validator rejected one folder:
-    "hoohacks-2026 has uncommitted changes." That reason went back, and
-    the second plan passed. SAY WHAT YOU SEE: if Claude's run differs
-    (for example, it skips hoohacks on its own), narrate that instead.
+D3. (Point at the plan.) Claude matched "CS 3140" and "the hackathon"
+    to these projects, and ignored my other classes, the secret .env,
+    and the VM. Look at the question: it left hoohacks out on its own
+    and asked me about it, because hoohacks has uncommitted work.
+    (Point at the Safety Log.) And if Claude gets it wrong, the
+    validator catches it. In our live tests, Claude once proposed a
+    folder hiding a secret .env. The validator rejected it, sent the
+    reason back, and the second plan passed.
+    SAY WHAT YOU SEE: in our live run Claude skipped hoohacks itself.
+    If the Safety Log instead shows a rejected try 1, narrate that.
 D4. (Point at the plan card.) Every line is a folder we can prove is
     rebuildable, with the exact command to rebuild it, like npm ci. The
     LLM decides which projects I meant. Plain code decides whether
@@ -75,6 +81,10 @@ D4. (Point at the plan card.) Every line is a folder we can prove is
 D5. (Click APPROVE.) Done. FREED is measured on the disk, not
     estimated. That's the bug from our MVP, fixed. (Click UNDO.) Undo
     can't un-delete a build folder, so it hands me the rebuild commands.
+D5b. (Only if under 4:45.) Reset (npm run dev-demo), then type: "I'm
+    done with my machine learning class." Claude picks cs4774-ml. Our
+    offline planner can't match that phrasing at all; it has to ask.
+    That's the part a regex can't do.
 D6. IF THE LIVE DEMO FAILS: "Here's the same request on our offline
     planner," then go to slide 5. Its screenshot is the exact scripted
     request: only the CS 3140 and hackathon projects, hoohacks rejected,
@@ -86,8 +96,8 @@ Eighteen are closed: six from the MVP and twelve built in the Alpha,
 and one more is partly built. We have a
 hundred and twenty-nine automated tests, plus a fourteen-step test that
 clicks through the real app. Ninety-three of them were written before the
-code they test. The rest came with our MVP code or with a bug fix, and
-our TDD log says which. That's about four tests per issue, and every
+code they test. Five more run against the real Claude, and all five
+pass. That's about four tests per issue, and every
 issue has at least two. All hundred and one tests that can run pass. That's
 seventy-eight percent of everything we wrote, because twenty-eight
 tests are for stories we haven't built yet. We keep those red, and CI
@@ -105,7 +115,7 @@ and issues, and eighteen of them built: the rebuild proof, cleaning by
 intent, one-click rebuild, undo for a single action, the Trash, a
 one-line summary, and honest space numbers. For Beta: four weekly
 sprints starting November ninth. First, protecting your projects and
-recording live Claude runs, then Xcode and Docker, then ML caches and a
+rerunning our live Claude tests, then Xcode and Docker, then ML caches and a
 storage watch, then twenty CS students we don't know.
 We'll call it a success if at least sixty
 percent approve a plan that frees ten gigabytes, rebuilds work
@@ -123,11 +133,13 @@ A: Their purge deletes by age alone. We prove each folder is rebuildable
 
 Q: "What decision did Claude make that a regex couldn't?"
 A: Plain requests like "done with CS 3140" we could handle with a regex,
-   and our offline planner does. Claude is there for phrasings a regex
-   can't handle, like "the class with the robot project" or "everything
-   from last spring," and for deciding when to ask. Our tests use a
-   simulated Claude, so today's live run is the real evidence. Safety
-   never depends on it: the validator rechecks every folder.
+   and our offline planner does. "I'm done with my machine learning
+   class" it can't: it has to ask. Claude maps it to cs4774-ml. That's
+   one of five live tests against the real model, and all five pass,
+   including "I'm NOT done with CS 3140" and an ambiguous "the CS
+   class," where Claude asks instead of guessing. Safety never depends
+   on it: the validator rechecks every folder, and in one live test it
+   did reject Claude's first plan.
 
 Q: "Your tests are all AI-generated. Did you review them?"
 A: Claude reviewed them, and an independent AI review found four weak
