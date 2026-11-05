@@ -1,0 +1,81 @@
+
+> cleanasaurus@0.1.0 test:live
+> node --test --test-concurrency=1 test/live/*.test.js
+
+{
+ "request": "I'm done with CS 3140 and the hackathon. Free up space.",
+ "model": "claude-opus-5-5",
+ "seconds": 13,
+ "tries": [
+  "pass"
+ ],
+ "projects": [
+  "cs3140-final",
+  "cs3140-hw1"
+ ],
+ "questions": [
+  "hoohacks-2026 has uncommitted changes, so its node_modules (about 80 MB) can't be safely deleted yet. What would you like to do?"
+ ]
+}
+✔ LIVE-1 "done with CS 3140 and the hackathon" deletes only CS 3140 build folders, never hoohacks (13243.199833ms)
+{
+ "request": "I'm done with my machine learning class. Free up space.",
+ "model": "claude-opus-5-5",
+ "seconds": 5,
+ "tries": [
+  "pass"
+ ],
+ "projects": [
+  "cs4774-ml"
+ ],
+ "questions": []
+}
+✔ LIVE-2 "my machine learning class" maps to cs4774-ml, which the offline planner cannot match (5422.066375ms)
+{
+ "request": "I'm not done with CS 3140 yet. Free up space.",
+ "model": "claude-opus-5-5",
+ "seconds": 16,
+ "tries": [
+  "fail: Rebuild proof failed: cs2150-lab/node_modules contains .env, which may hold secrets I can't get back.",
+  "pass"
+ ],
+ "projects": [
+  "cs4774-ml"
+ ],
+ "questions": []
+}
+✔ LIVE-3 "I'm NOT done with CS 3140" deletes nothing from CS 3140 (15745.198167ms)
+{
+ "request": "I'm done with CS 3140, but keep the final project.",
+ "model": "claude-opus-5-5",
+ "seconds": 6,
+ "tries": [
+  "pass"
+ ],
+ "projects": [
+  "cs3140-hw1"
+ ],
+ "questions": []
+}
+✔ LIVE-4 "done with CS 3140 but keep the final project" deletes hw1 only (5827.538083ms)
+{
+ "request": "I'm done with the CS class. Free up space.",
+ "model": "claude-opus-5-5",
+ "seconds": 6,
+ "tries": [
+  "pass"
+ ],
+ "projects": [],
+ "questions": [
+  "Which CS class are you done with? I'll delete only that class's rebuildable dependency folders. You can reinstall them later with one command."
+ ]
+}
+✔ LIVE-5 "the CS class" is ambiguous, so Claude asks which one instead of deleting (6256.112875ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46668.77975

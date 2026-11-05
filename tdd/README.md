@@ -10,11 +10,11 @@
 |---|---|---|
 | User stories | **29** | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
 | GitHub issues logged vs. closed | **29 logged, 18 closed** (6 built in the MVP, 12 built in the Alpha). #2 is open as partial: its Xcode/Docker/ML totals wait for US-08–10 | `gh issue list`; §3 |
-| Automated tests | **129** unit and integration tests, plus a **14-step** end-to-end UI test. **93 of the 129 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
+| Automated tests | **129** unit and integration tests, plus a **14-step** end-to-end UI test, plus **5 live tests against the real Claude API** (`npm run test:live`, kept out of `npm test` because they need a key and cost API calls). **93 of the 129 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
 | Average tests per issue | **4.4** overall (129 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
-| Pass rate | **100% of runnable tests (101/101)**. Counting every test: **78% (101/129)**. The other 28 (22%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt) |
+| Pass rate | **100% of runnable tests (101/101)**. Live Claude tests: **5/5** on the first run (Nov 4, [`06-live-claude-run.txt`](06-live-claude-run.txt)). Counting every test: **78% (101/129)**. The other 28 (22%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt), [`06-live-claude-run.txt`](06-live-claude-run.txt) |
 | Line coverage (`backend/` only) | **96.0%** lines, **90.4%** branches, 93.8% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Varies by about ±0.1% between runs (timing-dependent branches). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
-| AI-generated vs. refined | **100% AI-generated** (129 tests + 14 UI steps). **25 tests added or changed because of review**, every one listed in §5 (rows 1–19). **0 refined by a team member so far** | Commit history; §5 |
+| AI-generated vs. refined | **100% AI-generated** (129 tests + 5 live tests + 14 UI steps). **25 tests added or changed because of review**, every one listed in §5 (rows 1–19). **0 refined by a team member so far** | Commit history; §5 |
 
 ## 2. How we ran it, and what the history actually shows
 
@@ -26,7 +26,15 @@
 3. **Built the core until green.** We built the rebuild proof, labels, and JS and Python detection (`d2f885d`), then wired them into the validator, executor, engine, and planner (`454d384`). The first implementation took minutes, not days, because Claude wrote it.
 4. **Tests for unbuilt stories stay red on purpose.** They run on every `npm test` and are marked `todo` with their issue number. An independent review found four of them that passed even though their story wasn't built. They tested the wrong thing, so we tightened them (§5).
 5. **The Claude path got its own tests later.** The independent review found the LLM planner had 0% coverage. Tests LLM-1…6 use a fake Anthropic client and were committed before the code change (`3464586` red, then `c4c4aee` green). The red output in [`03-red-run-llm.txt`](03-red-run-llm.txt) was captured right after `3464586` but committed together with `c4c4aee`.
-6. **CI.** [`.github/workflows/test.yml`](../.github/workflows/test.yml) runs `npm test` on every push. It was added after the first red commit, and our first push was the finished branch. So **GitHub only shows green runs**: the red steps live in the commit history and the saved run files, not on CI.
+6. **Live tests against the real Claude.** Every Claude-path test above uses a fake client, which proves how we handle Claude's output but not Claude's judgment. So we wrote five live tests (`app/test/live/`, commit `5932552`) from the demo's tricky requests *before* running any of them with a key. They skip without one. The first run, saved in [`06-live-claude-run.txt`](06-live-claude-run.txt), passed **5/5** with `claude-opus-5-5`, 5–16 s per plan:
+   - **LIVE-1** "done with CS 3140 and the hackathon": only the two CS 3140 folders. Claude left `hoohacks-2026` out **on its own** and asked about it, because the snapshot says it has uncommitted changes.
+   - **LIVE-2** "done with my machine learning class": `cs4774-ml`. The offline planner can't match this phrasing and asks which project. This is the clearest case of the LLM doing what a regex can't.
+   - **LIVE-3** "I'm not done with CS 3140": nothing from CS 3140. On try 1 Claude proposed `cs2150-lab`, whose `node_modules` hides a `.env`; the **validator rejected it** ("Rebuild proof failed… contains .env"), the reason went back, and try 2 passed. That's the safety loop working on the real model.
+   - **LIVE-4** "done with CS 3140, but keep the final project": `cs3140-hw1` only.
+   - **LIVE-5** "done with the CS class": no deletions; Claude asked which class.
+
+   Honest limits: there was no red phase (the tests passed on their first run), it's one run of a model whose output varies, and the tests aren't in CI because CI has no key.
+7. **CI.** [`.github/workflows/test.yml`](../.github/workflows/test.yml) runs `npm test` on every push. It was added after the first red commit, and our first push was the finished branch. So **GitHub only shows green runs**: the red steps live in the commit history and the saved run files, not on CI.
 
 | Commit | What it contains | Result |
 |---|---|---|
@@ -47,6 +55,7 @@
 | US-01 | Todo tests switched on (red was "Cannot find module", a weak red) plus an engine-level test (real assertion), then the breakdown | 🔴 4 fail → 🟢 |
 | `9f87272` → `53542fb` | "But keep …" and no-match questions | 🔴 2 fail → 🟢 |
 | round-3 tests → `e365edc` | Negation, keep-first, exact answers, scan root (REG-5) | 🔴 3 fail → 🟢 101/101 |
+| `5932552` | LIVE-1…5 against the real Claude, written before any live run | ⏭ skipped without a key → 🟢 5/5 with a key (no red phase) |
 
 ## 3. Every GitHub issue and its tests
 
@@ -125,10 +134,10 @@
 - The secret check is cautious: a `node_modules` that ships test certificates (`.pem`) is refused.
 - Measured FREED can be off if another app writes to the disk during a run. Tests use a fake disk.
 - The tests need `git`. CI runs on macOS because the malware checks call `codesign` and `xattr`.
-- No test calls the real Claude API. LLM tests use a fake client, so they prove our handling of Claude's output, not Claude's judgment.
+- Only 5 tests call the real Claude API, and they've run once (5/5). The model's output varies between runs, so a pass is evidence, not a guarantee. They aren't in CI, because CI has no API key.
 
 ## 6. Next stories, in sprint order
 
-1. Record a real Claude run of the demo request. (`alpha-review` was merged in #32; #2 was reopened because US-01 is partial.)
+1. Record the demo on Claude as the backup video, and rerun `npm run test:live` before class (5/5 on Nov 4). (`alpha-review` was merged in #32; #2 was reopened because US-01 is partial.)
 2. US-04 protect projects.
 3. US-08 Xcode, US-09 Docker, US-10 ML caches (which also completes US-01), US-16 storage watch, US-21 Go Pro.
