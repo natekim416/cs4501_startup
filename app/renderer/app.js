@@ -414,12 +414,6 @@ document.querySelectorAll('.zone-btn').forEach((b) =>
   }),
 );
 
-$('#key-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setMode(await api.setApiKey($('#key').value.trim()));
-  $('#key').value = '';
-});
-
 (async function start() {
   $('#logo-dino').append(makeDino(44));
   const init = await api.init();

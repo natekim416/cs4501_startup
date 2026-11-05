@@ -13,7 +13,6 @@ contextBridge.exposeInMainWorld('api', {
   setZone: (zonePath, zone) => ipcRenderer.invoke('set-zone', zonePath, zone),
   setTarget: (destRoot) => ipcRenderer.invoke('set-target', destRoot),
   forget: (pref) => ipcRenderer.invoke('forget', pref),
-  setApiKey: (key) => ipcRenderer.invoke('set-api-key', key),
   setUsage: (on) => ipcRenderer.invoke('set-usage', on),
   rebuild: (recipe) => ipcRenderer.invoke('rebuild', recipe),
   undoOne: (batchId, actionId) => ipcRenderer.invoke('undo-one', batchId, actionId),
