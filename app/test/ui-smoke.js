@@ -118,7 +118,111 @@ const STEPS = [
     if (fs.existsSync(path.join(base, 'data', 'usage-log.jsonl'))) throw new Error('log file still there');
     return 'ok';
   }],
+  // Answers, refused runs, undo, and the Trash, on fresh folders (after the usage-log steps, so they aren't counted).
+  ['set up fresh folders, one with a 1.1 GB lecture recording (sparse: takes no disk space)', async ({ win, base }) => {
+    const { makeDemoFolder } = require('../scripts/make-demo-folder');
+    for (const name of ['Fresh', 'Fresh2']) makeDemoFolder(path.join(base, name));
+    const big = path.join(base, 'Fresh', 'lecture-recording.mp4');
+    fs.closeSync(fs.openSync(big, 'w'));
+    fs.truncateSync(big, 1.1e9);
+    fresh2Before = new Set(fs.readdirSync(path.join(base, 'Fresh2')));
+    await page(win, `await useFolder(${JSON.stringify(path.join(base, 'Fresh'))}); return 'ok';`);
+    return 'ok';
+  }],
+  ['"No, leave it" on a one-file question unchecks just that file; the plan stays approvable and runs', `
+    const before = __t.liveCards().at(-1);
+    __t.button('Organize everything').click();
+    const card = await __t.waitFor(() => __t.liveCards().at(-1) !== before && __t.liveCards().at(-1), 'plan card');
+    const q = await __t.waitFor(() => [...document.querySelectorAll('.question')].find((b) => /lecture-recording/.test(b.textContent)), 'big-file question');
+    [...q.querySelectorAll('button')].find((b) => b.textContent === 'No, leave it').click();
+    await __t.sleep(300);
+    if (card.classList.contains('stale') || __t.liveCards().at(-1) !== card) throw new Error('answering re-planned instead of keeping the plan');
+    const box = [...card.querySelectorAll('input')].find((i) => /lecture-recording/.test(i.getAttribute('aria-label')));
+    if (!box || box.checked) throw new Error('the big file is still checked');
+    const approve = card.querySelector('.btn-primary');
+    if (approve.disabled) throw new Error('APPROVE is disabled after answering');
+    const done = (__t.botText().match(/Done! /g) || []).length;
+    approve.click();
+    await __t.waitFor(() => (__t.botText().match(/Done! /g) || []).length > done, 'Done message');
+    return 'ok';`],
+  ['the file the user said to leave alone did not move', async ({ base }) => {
+    if (!fs.existsSync(path.join(base, 'Fresh', 'lecture-recording.mp4'))) throw new Error('lecture-recording.mp4 was moved');
+    return 'ok';
+  }],
+  ['a refused run gives APPROVE and the checkboxes back so the selection can be fixed', async ({ win, base }) => page(win, `
+    await useFolder(${JSON.stringify(path.join(base, 'Fresh2'))});
+    const before = __t.liveCards().at(-1);
+    __t.button('Sort my school files by class').click();
+    const card = await __t.waitFor(() => __t.liveCards().at(-1) !== before && __t.liveCards().at(-1), 'plan card');
+    const mkdirs = [...card.querySelectorAll('input[data-op="mkdir"]')];
+    if (!mkdirs.length) throw new Error('no new folders in the plan');
+    mkdirs.forEach((i) => (i.checked = false));
+    // Moves in this folder start unchecked (it isn't a FREE zone); check them, so they lack their folders.
+    card.querySelectorAll('input[data-op="move"]').forEach((i) => (i.checked = true));
+    const approve = card.querySelector('.btn-primary');
+    approve.click();
+    await __t.waitFor(() => /stopped before touching anything/.test(__t.botText()), 'refusal message');
+    if (approve.disabled) throw new Error('APPROVE stayed disabled after a refused run');
+    if (mkdirs.some((i) => i.disabled)) throw new Error('checkboxes stayed disabled');
+    mkdirs.forEach((i) => (i.checked = true));
+    const done = (__t.botText().match(/Done! /g) || []).length;
+    approve.click();
+    await __t.waitFor(() => (__t.botText().match(/Done! /g) || []).length > done, 'Done message after fixing the selection');
+    return mkdirs.length + ' folders';`)],
+  ['UNDO removes the folders the run created, even after Finder opened them', async ({ win, base }) => {
+    const dir = path.join(base, 'Fresh2');
+    const created = fs.readdirSync(dir).filter((n) => !fresh2Before.has(n));
+    if (!created.length) throw new Error('the run created no folders');
+    for (const n of created) fs.writeFileSync(path.join(dir, n, '.DS_Store'), 'x');
+    await page(win, `
+      const undos = (__t.botText().match(/Undone\\./g) || []).length;
+      [...document.querySelectorAll('.undo-row button')].filter((b) => !b.disabled).at(-1).click();
+      await __t.waitFor(() => (__t.botText().match(/Undone\\./g) || []).length > undos, 'Undone message');`);
+    const left = created.filter((n) => fs.existsSync(path.join(dir, n)));
+    if (left.length) throw new Error('still there: ' + left.join(', '));
+    return created.length + ' folders removed';
+  }],
+  ['emptying the Trash needs the confirm dialog: Cancel deletes nothing, OK deletes for real (US-24)', async ({ win, base }) => {
+    const trash = path.join(base, 'Trash');
+    fs.mkdirSync(trash, { recursive: true });
+    fs.writeFileSync(path.join(trash, 'old draft.docx'), 'x');
+    await page(win, `
+      await sendRequest('Empty my trash');
+      const card = await __t.waitFor(() => __t.liveCards().at(-1), 'trash plan card');
+      const boxes = [...card.querySelectorAll('input[data-op="delete_from_trash"]')];
+      if (!boxes.length) throw new Error('no PERMANENT actions');
+      if (boxes.some((b) => b.checked)) throw new Error('permanent deletes should start unchecked');
+      boxes.forEach((b) => (b.checked = true));
+      window.confirm = () => false;
+      card.querySelector('.btn-primary').click();
+      await __t.waitFor(() => /nothing was deleted from the Trash/.test(__t.botText()), 'cancel message');
+      if (card.querySelector('.btn-primary').disabled) throw new Error('APPROVE disabled after Cancel');`);
+    if (!fs.existsSync(path.join(trash, 'old draft.docx'))) throw new Error('Cancel deleted a file');
+    await page(win, `
+      window.confirm = () => true;
+      const done = (__t.botText().match(/Done! /g) || []).length;
+      __t.liveCards().at(-1).querySelector('.btn-primary').click();
+      await __t.waitFor(() => (__t.botText().match(/Done! /g) || []).length > done, 'Done message');`);
+    const left = fs.readdirSync(trash);
+    if (left.length) throw new Error('still in the Trash: ' + left.join(', '));
+    return 'ok';
+  }],
+  ['an answer that leaves nothing safe to do says why, instead of an empty reply', async ({ win, base }) => {
+    const { makeDevDemo } = require('../scripts/make-dev-demo');
+    const code = makeDevDemo(path.join(base, 'code'));
+    return page(win, `
+      await useFolder(${JSON.stringify(code)});
+      await sendRequest("I'm done with something. Free up space.");
+      const q = await __t.waitFor(() => [...document.querySelectorAll('.question')].find((b) => /Which projects/.test(b.textContent)), 'which-projects question');
+      [...q.querySelectorAll('button')].find((b) => b.textContent === 'hoohacks-2026').click();
+      await __t.waitFor(() => /nothing to approve/i.test(__t.botText()), 'explanation');
+      await __t.waitFor(() => /uncommitted/i.test(__t.botText()), 'the reason (uncommitted changes)');
+      return 'ok';`);
+  }],
 ];
+
+let fresh2Before = new Set();
+const page = (win, code) => win.webContents.executeJavaScript(`(async () => { ${code} })()`);
 
 module.exports = function runUiTest(win, resultFile) {
   win.webContents.once('did-finish-load', async () => {
