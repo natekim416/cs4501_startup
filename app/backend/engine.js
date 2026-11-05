@@ -199,6 +199,17 @@ class Engine {
     }
     for (const s of check.strange) questions.push({ text: s.text, options: ['Yes, go ahead', 'No, leave it'], action: s.action });
 
+    // Nothing safe to do: say why (the checker's reasons, or why a named project has nothing rebuildable),
+    // so the user isn't left with an empty reply and nothing to approve.
+    if (!(plan.actions || []).length && !questions.length) {
+      const why = [...new Set(attempts.flatMap((a) => a.errors))];
+      for (const name of intent.matched) {
+        const items = this.dev.filter((d) => path.basename(d.project) === name);
+        if (!items.some((d) => d.label === 'rebuildable')) why.push(...items.map((d) => `${name}: ${d.reason}`));
+      }
+      if (why.length) plan = { ...plan, summary: `I couldn't find anything safe to change, so there's nothing to approve:\n- ${why.join('\n- ')}` };
+    }
+
     // A project the user named but touched recently is allowed, and shown unchecked so they decide.
     for (const a of plan.actions || []) {
       // US-24: permanent deletes start unchecked; the user opts in and confirms.
