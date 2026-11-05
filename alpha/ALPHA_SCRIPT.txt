@@ -93,9 +93,7 @@ contents, a project might need its own copy at that exact path. So I'm
 leaving those files alone and going ahead with the PDF cleanup."
 "Before the plan reaches me, the validator checks the proposed actions.
 For duplicate removal, it checks that an identical copy will survive the
-cleanup. For quarantine, it checks that the scanner actually flagged the
-file. If a check fails, the app can send the error back to Claude so it
-can revise the plan."
+cleanup. 
 [If the plan includes any index.js actions, uncheck them. Then uncheck one
 optional PDF move and click APPROVE.]
 "I'm also going to keep this PDF where it is. I can uncheck that move and
@@ -138,15 +136,13 @@ instead of the last sentence.)
 [SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
 For the Alpha, we ran validation, made the pivot decision, wrote
 twenty-nine stories as issues, and built eighteen. For Beta, four goals,
-each with a pass line. One: the Dino Bin goes away, and seventy percent of
-testers see space actually freed. Two: one question instead of twenty,
-and sixty percent say deleting felt smoother. Three: find what people
-actually want gone, like node_modules from inactive projects; eighty
+each with a pass line. One: the Dino Bin goes away. Originally, we wanted all deleted files to go into the dino bin for safety reasons. However, users found this confusing and wanted their deleted files just gone. We want seventy percent of
+testers see space actually freed. Two: We want one question instead of twenty. Users stated that when handling duplicate files, they were overwhelmed by the prompts from cleanasauras. Users felt fatigued by the amount of questions being asked. We
+want sixty percent say deleting felt smoother. Three: find what people
+actually want gone and pivot targetting. Right now cleanasauras finds it hard to personalize cleaning plans automatically. If we target cs students, we can find things like node_modules from inactive projects. We want eighty
 percent say what they wanted cleaned was cleaned and run eighty percent
-of the plan. Four: built for CS students. Claude knows to look for Python
-environments and pip caches, never touches source code, git repos,
-uncommitted work, or .env files, and starts from a read-only summary of
-your dev setup. Sixty percent of CS testers say it fits them better.
+of the plan. 
+
 Thank you. Questions?
 
 ---------------------------------------------------------------------
