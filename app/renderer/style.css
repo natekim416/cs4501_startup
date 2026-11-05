@@ -246,3 +246,4 @@ body.tour-talking #tour-guide .dino { animation: talk 0.25s steps(2) infinite; }
 .one-line { padding: 10px 14px; font-weight: 700; border-top: 2px dashed var(--ink); }
 .undo-one summary { cursor: pointer; margin-top: 6px; }
 .undo-one .btn { white-space: normal; text-align: left; }
+.action.skipped .file { text-decoration: line-through; opacity: 0.6; }

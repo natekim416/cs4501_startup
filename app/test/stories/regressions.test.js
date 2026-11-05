@@ -181,3 +181,57 @@ test('REG-8 the Yarn and pnpm caches in ~/Library can be cleared, though ~/Libra
     assert.match(res.errors[0].message, /NEVER/);
   }
 });
+
+async function devEngine() {
+  const { makeDevDemo } = require('../../scripts/make-dev-demo');
+  const folder = makeDevDemo(path.join(tmp(), 'code'));
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(folder, 'free');
+  engine.scanFolder(folder);
+  return engine;
+}
+
+test('REG-9 an answer that leaves nothing safe to do says why, instead of an empty reply (found by Papa)', async () => {
+  for (const [pick, why] of [['hoohacks-2026', /uncommitted/i], ['cs2150-lab', /\.env|secret/i], ['old-experiment', /lockfile|manifest/i]]) {
+    const engine = await devEngine();
+    const first = await engine.plan("I'm done with something. Free up space.");
+    const q = first.questions.find((x) => /which projects/i.test(x.text));
+    const after = await engine.answer(q.text, pick);
+    assert.strictEqual(after.actions.length, 0, pick);
+    assert.match(after.summary, /nothing to approve/i, pick);
+    assert.match(after.summary, why, `${pick}: ${after.summary}`);
+  }
+});
+
+test('REG-9b every option of every question gives an approvable plan or says why there is nothing to approve', async () => {
+  const { makeDemoFolder } = require('../../scripts/make-demo-folder');
+  const setups = [
+    ['Organize everything', async () => {
+      const folder = path.join(tmp(), 'Downloads');
+      makeDemoFolder(folder);
+      const e = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+      e.profile.setZone(folder, 'free');
+      e.scanFolder(folder);
+      return e;
+    }],
+    ["I'm done with the CS class. Free up space.", devEngine],
+    ["I'm done with something. Free up space.", devEngine],
+  ];
+  for (const [request, make] of setups) {
+    const probe = await (await make()).plan(request);
+    assert.ok(probe.questions.length, `${request} asks something`);
+    for (const q of probe.questions) {
+      for (const choice of q.options) {
+        const engine = await make();
+        await engine.plan(request);
+        const after = await engine.answer(q.text, choice);
+        if (after.actions.length) {
+          const run = engine.execute(after.planId, after.actions.map((a) => a.id), { confirmPermanent: true });
+          assert.strictEqual(run.ok, true, `${request} / ${choice}: ${JSON.stringify(run.errors)}`);
+        } else {
+          assert.match(after.summary, /nothing to approve|which/i, `${request} / ${choice}: "${after.summary}"`);
+        }
+      }
+    }
+  }
+});

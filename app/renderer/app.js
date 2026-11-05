@@ -395,13 +395,29 @@ function askQuestion(q) {
             state.currentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return botSay('Here it is. Press APPROVE on the plan to run it.');
           }
+          // A question about one action ("over 1 GB, are you sure?") is answered on the plan you already
+          // have: check or uncheck that action. Re-planning would throw the rest of the plan away.
+          const box = q.action && state.currentCard && state.currentCard.querySelector(`input[data-id="${q.action}"]`);
+          if (box) {
+            const keep = choice === 'Yes, go ahead';
+            box.checked = keep;
+            box.closest('li').classList.toggle('skipped', !keep);
+            return botSay(keep ? 'OK, it stays in the plan. Press APPROVE when ready.' : "OK, I'll leave that one alone. The rest of the plan is ready: press APPROVE.");
+          }
+          // Any other answer makes a new plan, so the old card can't be approved meanwhile.
+          retirePlans();
           document.body.classList.add('busy');
+          const thinking = botSay('Re-planning with your answer...');
           try {
             const result = await api.answer(q.text, choice);
             renderProfile((await api.init()).profile);
             botSay("Got it, I'll remember that.");
             showPlan(result);
+          } catch (err) {
+            options.querySelectorAll('button').forEach((b) => (b.disabled = false));
+            botSay(`I couldn't use that answer: ${err.message}. Try again or ask me something new.`);
           } finally {
+            thinking.closest('.msg').remove();
             document.body.classList.remove('busy');
           }
         },
@@ -431,11 +447,18 @@ async function runPlan(planId, list, approve) {
     list.querySelectorAll('input').forEach((i) => (i.disabled = false));
     return botSay(`I couldn't run that: ${err.message}`);
   }
-  state.currentCard = null;
   if (!res.ok) {
     log('Approved subset failed re-check', 'fail');
-    return botSay(`I stopped before touching anything, because your selection isn't safe on its own:\n- ${res.errors.join('\n- ')}`);
+    if (res.errors.some((e) => /out of date/i.test(e))) {
+      retirePlans();
+      return botSay(`${res.errors.join(' ')}`);
+    }
+    // Nothing ran, so give the controls back: the user can fix the selection and approve again.
+    approve.disabled = false;
+    list.querySelectorAll('input').forEach((i) => (i.disabled = false));
+    return botSay(`I stopped before touching anything, because your selection isn't safe on its own:\n- ${res.errors.join('\n- ')}\nFix the checkboxes and press APPROVE again.`);
   }
+  state.currentCard = null;
   const failed = res.results.filter((r) => !r.ok);
   state.freed += res.bytesFreed;
   $('#freed').textContent = formatBytes(state.freed);
