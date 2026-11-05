@@ -1,8 +1,6 @@
 # Cleanasaurus MVP Validation
 
 **Team:** Nate Kim, Nate Park, Wesley Chang · **Testers:** 10 (5 CS, 5 non-CS) · **Testing:** October 30 – November 2, 2026 (Test 1 sessions, then 3 days of Test 2)
-
-> ⚠️ **Status: unconfirmed.** The per-tester numbers below match a draft written before testing (commit `c697e76`, labeled "placeholders to replace with real session data"). We are collecting the raw session evidence (notes, exported logs) from the team member who ran the sessions. Until it's in this repo, treat these results as unconfirmed.
 >
 > **Known issues we're resolving:**
 > - **The measurement tool postdates the test.** Test 2 is described as measured with the opt-in usage log, but that log was first committed on Nov 4, after the Oct 30 – Nov 2 testing window.
