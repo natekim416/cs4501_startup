@@ -348,3 +348,20 @@ ROUND 4 FIXES (from the round 3 report). The loop stops here.
 WHY THE LOOP STOPS: three grading rounds scored 5.25. The grader says
 the remaining points depend on things only the team can do (below), so
 more machine-only rounds can't raise the score.
+
+---------------------------------------------------------------------
+MERGE (Nov 4, after Papa asked to "recheck and merge if it's working")
+---------------------------------------------------------------------
+- Rechecked locally: npm test 129 (101 pass, 0 fail, 28 todo), the
+  todo check passed, and the UI test passed 14/14.
+- Pushed alpha-review and opened PR #32. Both CI runs passed (npm test
+  plus the todo check).
+- Merged #32 into main with a merge commit, so the history is kept.
+  CI on main passed. PR #31 now shows as merged too, because its
+  commits are included.
+- Issues: 18 closed (6 MVP + 12 Alpha). #2 was reopened as partial and
+  relabeled "status: change". The built issues were relabeled
+  "status: built".
+- Follow-up: updated the issue counts in tdd/README, slide 6, the
+  script, and the PDF cover ("merged into main"), and regenerated the
+  issue table from GitHub.
