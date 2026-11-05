@@ -9,7 +9,7 @@
 | Metric | Value | How it's measured |
 |---|---|---|
 | User stories | **29** | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
-| GitHub issues logged vs. closed | **29 logged, 10 closed on GitHub.** On the unmerged `alpha-review` branch, 8 more are built (#4, #7, #8, #14, #15, #16, #19, #20) and 1 is partial (#2: its Xcode/Docker/ML totals wait for US-08–10), so **18 done + 1 partial** | Closed: 6 already built in the MVP (#25–#30), 4 by Alpha work (#3, #6, #12, #13) |
+| GitHub issues logged vs. closed | **29 logged, 18 closed** (6 built in the MVP, 12 built in the Alpha). #2 is open as partial: its Xcode/Docker/ML totals wait for US-08–10 | `gh issue list`; §3 |
 | Automated tests | **129** unit and integration tests, plus a **14-step** end-to-end UI test. **93 of the 129 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
 | Average tests per issue | **4.4** overall (129 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
 | Pass rate | **100% of runnable tests (101/101)**. Counting every test: **78% (101/129)**. The other 28 (22%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt) |
@@ -54,23 +54,23 @@
 |---|---|---|---|---|
 | #2 | US-01 Storage breakdown | Must | `us01-storage-breakdown.test.js` (5: 4 pass, 1 todo) | 🟡 partial: JS/Python totals, top projects, blocked folders work; Xcode/Docker/ML totals wait for US-08–10 |
 | #3 | US-02 Label rebuildable vs. not | Must | `us02-labels.test.js` (5) | 🟢 pass |
-| #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (10), LLM-7, REG-3, REG-4, REG-5 | 🟢 pass (on `alpha-review`) |
+| #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (10), LLM-7, REG-3, REG-4, REG-5 | 🟢 pass  |
 | #5 | US-04 Protect projects | Must | `us04-protect-projects.test.js` (3) | 🔴 todo |
 | #6 | US-05 Rebuild proof | Must | `us05-rebuild-proof.test.js` (12) | 🟢 pass |
-| #7 | US-06 JavaScript packages | Must | `us06-javascript.test.js` (7) | 🟢 pass; caches now offered in plans (on `alpha-review`) |
-| #8 | US-07 Python environments | Must | `us07-python.test.js` (6) | 🟢 pass; conda export wired into plans (on `alpha-review`) |
+| #7 | US-06 JavaScript packages | Must | `us06-javascript.test.js` (7) | 🟢 pass; caches now offered in plans  |
+| #8 | US-07 Python environments | Must | `us07-python.test.js` (6) | 🟢 pass; conda export wired into plans  |
 | #9 | US-08 Xcode | Must | `us08-xcode.test.js` (3) | 🔴 todo |
 | #10 | US-09 Docker | Must | `us09-docker.test.js` (4) | 🔴 todo |
 | #11 | US-10 ML caches | Must | `us10-ml-caches.test.js` (3) | 🔴 todo |
 | #12 | US-11 Validator reasons | Must | `us11-validator-reasons.test.js` (3), `llm-planner.test.js` LLM-2, LLM-3 | 🟢 pass |
 | #13 | US-12 Real space freed | Must | `us12-real-freed.test.js` (4), UI step 5 | 🟢 pass |
-| #14 | US-13 macOS Trash | Should | `us13-macos-trash.test.js` (2) | 🟢 pass (on `alpha-review`) |
-| #15 | US-14 Undo one action | Must | `us14-undo-one.test.js` (3) | 🟢 pass (on `alpha-review`) |
-| #16 | US-15 One-click rebuild | Must | `us15-rebuild.test.js` (3) | 🟢 pass (on `alpha-review`) |
+| #14 | US-13 macOS Trash | Should | `us13-macos-trash.test.js` (2) | 🟢 pass  |
+| #15 | US-14 Undo one action | Must | `us14-undo-one.test.js` (3) | 🟢 pass  |
+| #16 | US-15 One-click rebuild | Must | `us15-rebuild.test.js` (3) | 🟢 pass  |
 | #17 | US-16 Storage watch | Must | `us16-storage-watch.test.js` (3) | 🔴 todo |
 | #18 | US-17 Semester sweep | Could | `us17-semester-sweep.test.js` (2) | 🔴 todo |
-| #19 | US-18 One-sentence summary | Must | `us18-summary.test.js` (3) | 🟢 pass (on `alpha-review`) |
-| #20 | US-19 Unsigned isn't malware | Must | `us19-unsigned.test.js` (2) | 🟢 pass (on `alpha-review`) |
+| #19 | US-18 One-sentence summary | Must | `us18-summary.test.js` (3) | 🟢 pass  |
+| #20 | US-19 Unsigned isn't malware | Must | `us19-unsigned.test.js` (2) | 🟢 pass  |
 | #21 | US-20 Local model | Could | `us20-local-model.test.js` (2) | 🔴 todo |
 | #22 | US-21 Logs and Go Pro | Must | `usage-log.test.js` (8, built part), `us21-logs-go-pro.test.js` (2) | 🟡 log built, rest todo |
 | #23 | US-22 Huge folders | Should | `us22-huge-folder.test.js` (2) | 🔴 todo |
@@ -129,6 +129,6 @@
 
 ## 6. Next stories, in sprint order
 
-1. Push and merge `alpha-review` (closes #4, #7, #8, #14, #15, #16, #19, #20). Its commit message also says "Closes #2", so **reopen #2 after the merge**: US-01 is partial. Record a real Claude run of the demo request.
+1. Record a real Claude run of the demo request. (`alpha-review` was merged in #32; #2 was reopened because US-01 is partial.)
 2. US-04 protect projects.
 3. US-08 Xcode, US-09 Docker, US-10 ML caches (which also completes US-01), US-16 storage watch, US-21 Go Pro.

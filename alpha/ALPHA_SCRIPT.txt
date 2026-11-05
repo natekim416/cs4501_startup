@@ -82,8 +82,8 @@ D6. IF THE LIVE DEMO FAILS: "Here's the same request on our offline
 
 [SLIDE 6 - ENGINEERING METRICS - 5:30-7:00]
 How we built it. Twenty-nine user stories, every one a GitHub issue.
-Ten are closed on GitHub. Eight more are built on our branch, and one
-is partly built, so eighteen of twenty-nine are done. We have a
+Eighteen are closed: six from the MVP and twelve built in the Alpha,
+and one more is partly built. We have a
 hundred and twenty-nine automated tests, plus a fourteen-step test that
 clicks through the real app. Ninety-three of them were written before the
 code they test. The rest came with our MVP code or with a bug fix, and
