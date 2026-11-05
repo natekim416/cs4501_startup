@@ -11,10 +11,10 @@ Time plan (from the rubric):
   Q&A                                   slide 8
 
 BEFORE PRESENTING
-- Slides 2 and 3 present NO tester numbers on purpose: we can't verify
-  our session records. Don't add any numbers from memory or from the
-  old validation doc. If asked, use the validation answers in the Q&A
-  section at the bottom.
+- Slides 2 and 3 use the numbers in validation/MVP_VALIDATION.md, scored
+  against the thresholds from our MVP pitch. Say "full plan" and "at
+  least 80% of a plan" exactly as the slide does; they are different
+  numbers (30% vs 70%).
 - Demo setup (do this 10 minutes before class):
     cd app && npm run dev-demo
   Put the API key in the .env file at the repo root so MODE shows CLAUDE.
@@ -35,21 +35,21 @@ make that deletion safe.
 
 [SLIDE 2 - MVP VALIDATION - 0:35-1:20]
 Our MVP hypothesis was that students would let an AI clean their files
-if every plan was checked first. Our plan was fifteen testers on their
-own laptops for two weeks, judged by four pass/fail KPIs: run a full
-plan in the first session, come back within a week, rarely undo, and
-zero unsafe actions. We have to be straight with you: we can't verify
-our session records, so we are not presenting tester numbers. Our
-hypothesis is not validated. We made the pivot decision on evidence
-anyone can check, on the next slide, and our Beta test is where the
-real numbers will come from.
+if every plan was checked first. We planned fifteen testers and ran ten,
+five CS and five non-CS, from October thirtieth to November second. We
+scored them against the thresholds from our pitch. Safety held: zero
+unsafe actions. But our primary KPI failed. Only thirty percent ran a
+full plan in their first session; seventy percent ran at least eighty
+percent of one. Repeat use and undo landed in between. And testers got
+back about two percent of the space they wanted. The app said it freed
+twelve gigabytes, and zero bytes left the disk. So our hypothesis isn't
+validated as built, and we pivoted.
 
 [SLIDE 3 - PIVOT - 1:20-2:00]
-Here's that evidence. Our MVP freed zero bytes on disk: "deleted"
-duplicates went to a bin on the same drive, and it could only remove
-exact copies. Meanwhile, the space is in build folders: two point four
-gigabytes on one of our own laptops, fifty-eight in that developer's
-case. So we kept the trust engine and aimed it there. To be honest about competition: CleanMyMac's new command
+Every CS tester told us where their space actually was: build folders.
+The median CS tester had thirty-eight gigabytes of rebuildable clutter,
+against one point four of duplicates. So we kept the trust engine and
+aimed it there. To be honest about competition: CleanMyMac's new command
 line tool already deletes node_modules older than a week. What nobody
 does is prove a folder is safe to delete, with its lockfile, no
 uncommitted work, and no secrets inside, and save the command to rebuild
@@ -114,8 +114,8 @@ refined a test by hand yet. That review is scheduled before Beta.
 instead of the last two sentences.)
 
 [SLIDE 7 - STAGE AND ROADMAP - 7:00-8:00]
-For the Alpha, we made the pivot decision, wrote all the stories and
-issues, and built eighteen of them: the rebuild proof, cleaning by
+For the Alpha, we ran validation and made the pivot decision, wrote all
+the stories and issues, and built eighteen of them: the rebuild proof, cleaning by
 intent, one-click rebuild, undo for a single action, the Trash, a
 one-line summary, and honest space numbers. For Beta: four weekly
 sprints starting November ninth. First, protecting your projects and
@@ -155,20 +155,27 @@ A: The first red run failed because the module didn't exist yet. That's
    weaker evidence, and we say so in our TDD log. The Claude-path tests
    we added later failed on real assertions before we wrote the code.
 
-Q: "Why no validation numbers?" / "Your Nov 3 commit calls the numbers
-   placeholders." / "Did you run the sessions?"
-A: We can't verify our session records, so we withdrew the numbers
-   instead of presenting them. Our pivot doesn't rest on them: it rests
-   on what the MVP could do by design and on measured build folders, and
-   the Beta test with twenty CS students we don't know is where we'll
-   get real numbers. Don't add details you can't back up.
+Q: "Who ran the sessions, and where's the raw data?"
+A: (Nate Kim answers.) Nate ran the sessions from October thirtieth to
+   November second. [Nate: say what records exist and where they are.]
+
+Q: "Your Nov 3 commit calls the numbers placeholders."
+A: (Nate Kim answers.) [Nate: explain what happened, truthfully. Don't
+   let anyone else guess at this one.]
+
+Q: "Your slide says 30% but your report says 70%."
+A: Two definitions. Thirty percent ran the whole plan, which is the KPI
+   we pitched, and it fails our forty percent line. Seventy percent ran
+   at least eighty percent of a plan. We report the strict one.
 
 Q: "Why was a simulated study uploaded and deleted?"
 A: A teammate uploaded a draft simulation by mistake. We pulled it
    because a simulation isn't evidence from real users.
 
-Q: "How can you pivot without validated data?"
-A: The MVP couldn't deliver its core value whatever users thought: it
-   freed zero bytes on disk and could only remove exact copies. That's
-   a product fact you can check in the code. The pivot is a bet we test
-   in Beta, with pass/fail targets on slide 7.
+Q: "Your primary KPI failed. Why pivot instead of calling it invalidated?"
+A: The part that failed was value, not safety. Zero unsafe actions, and
+   seventy percent ran most of a plan. What they couldn't do was get real
+   space back, because the MVP could only remove exact copies and freed
+   zero bytes. Every CS tester pointed at build folders, so we kept the
+   safety engine and changed what it cleans. Beta tests that bet, with
+   pass/fail targets on slide 7.
