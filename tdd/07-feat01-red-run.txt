@@ -1,0 +1,146 @@
+FEAT-01 (#41) red run, 2026-11-11 13:11: tests written, no production code yet.
+
+$ node --test test/feat01-change-zone.test.js
+✖ FEAT-01 changing a listed zone updates only that zone, in place, and saves it (1.774833ms)
+✖ FEAT-01 only folders already in the zones list can be changed (1.230875ms)
+✖ FEAT-01 a zone must be free, ask, or never (0.896042ms)
+✖ FEAT-01 macOS folders are locked to NEVER, and so is everything inside them (0.526208ms)
+✖ FEAT-01 a link that points into a locked folder is locked too (0.938ms)
+✖ FEAT-01 a plan made before its folder became NEVER cannot run (328.815208ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 0
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 473.834833
+
+✖ failing tests:
+
+test at test/feat01-change-zone.test.js:31:1
+✖ FEAT-01 changing a listed zone updates only that zone, in place, and saves it (1.774833ms)
+  TypeError: profile.changeZone is not a function
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:34:34)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+
+test at test/feat01-change-zone.test.js:40:1
+✖ FEAT-01 only folders already in the zones list can be changed (1.230875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /isn't in your zones list/. Input:
+  
+  'TypeError: profile.changeZone is not a function'
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:43:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: TypeError: profile.changeZone is not a function
+        at /Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:43:31
+        at getActual (node:assert:580:5)
+        at assert.throws (node:assert:728:24)
+        at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:43:10)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1382:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+        at Test.postRun (node:internal/test_runner/test:1522:19)
+        at Test.run (node:internal/test_runner/test:1447:12)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3),
+    expected: /isn't in your zones list/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at test/feat01-change-zone.test.js:48:1
+✖ FEAT-01 a zone must be free, ask, or never (0.896042ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:52:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /isn't a zone/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at test/feat01-change-zone.test.js:59:1
+✖ FEAT-01 macOS folders are locked to NEVER, and so is everything inside them (0.526208ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:64:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /macOS folder/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at test/feat01-change-zone.test.js:75:1
+✖ FEAT-01 a link that points into a locked folder is locked too (0.938ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:80:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /macOS folder/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at test/feat01-change-zone.test.js:89:1
+✖ FEAT-01 a plan made before its folder became NEVER cannot run (328.815208ms)
+  TypeError: engine.profile.changeZone is not a function
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/feat01-change-zone.test.js:101:41)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+exit 1
+
+$ npm run test:ui
+
+> cleanasaurus@0.1.0 test:ui
+> node scripts/ui-test.js
+
+✔ first launch asks about the usage log, and it stays off until answered  (ok)
+✔ saying yes turns the log on and the prompt goes away  (ok)
+✔ app starts and scans the demo folder  (19 files · 83.5 MB · zone: FREE)
+✔ there is no API key box: the key stays in the backend (.env), and the page cannot set one  (ok)
+✔ "Free up space" shows a plan that passed checks  (7 actions)
+✔ APPROVE runs the plan, and FREED is honest about the Dino Bin (US-12)  (freed 0 B, bin noted)
+✔ UNDO reverses it  (ok)
+✔ NEVER zone: dino refuses clearly, no plan card  (ok)
+✔ back to FREE: plan appears and asks about resume versions  (ok)
+✔ answering replaces the plan; the old card can no longer be approved  (ok)
+✔ approving the new plan runs it  (ok)
+✔ the practice folder stayed out of the usage log  (ok)
+✔ a run and undo on a real folder are logged  (5 events)
+✔ EXPORT saves a copy with counts and no file names  (logging_on, scan, plan, run, undo)
+✔ TURN OFF deletes the log  (ok)
+✖ FEAT-01 clicking a zone opens a picker with FREE, ASK and NEVER, and the current one marked  (Cannot read properties of undefined (reading 'click'))
+
+UI smoke test FAILED
+exit 1
