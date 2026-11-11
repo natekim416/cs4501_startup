@@ -56,6 +56,7 @@
 | `9f87272` → `53542fb` | "But keep …" and no-match questions | 🔴 2 fail → 🟢 |
 | round-3 tests → `e365edc` | Negation, keep-first, exact answers, scan root (REG-5) | 🔴 3 fail → 🟢 101/101 |
 | `5932552` | LIVE-1…5 against the real Claude, written before any live run | ⏭ skipped without a key → 🟢 5/5 with a key (no red phase) |
+| FEAT-01 (#41) | Changing a zone from the zones panel: 6 tests in `test/feat01-change-zone.test.js` and 5 UI steps, written before any code ([`07-feat01-red-run.txt`](07-feat01-red-run.txt)), then `profile.changeZone`, the macOS-folder lock, and the picker ([`08-feat01-green-run.txt`](08-feat01-green-run.txt)) | 🔴 6 fail (3 on real checks; 3 on "changeZone is not a function", a weak red) and UI step 16 fails → 🟢 117/117 runnable, UI 20/20 |
 
 ## 3. Every GitHub issue and its tests
 
@@ -90,6 +91,7 @@
 | #28 | US-27 Ask and remember | Built | MIN-8, `engine.test.js` (answers remembered), UI steps 8–9 | 🟢 pass |
 | #29 | US-28 Safety checks visible | Built | `engine.test.js` (rejects unsafe plans, retries), LLM-2, LLM-3 | 🟢 pass |
 | #30 | US-29 Malware from real scanners | Built | MIN-3, `engine.test.js` (flags test malware) | 🟢 pass |
+| #41 | FEAT-01 Change a zone from the zones panel (a team feature, not a user story; extends US-26) | Feature | `feat01-change-zone.test.js` (6), UI steps 16–20 | 🟢 pass |
 | — | Regressions | — | `regressions.test.js` REG-1…REG-5 | 🟢 pass |
 
 ## 4. What the core does now

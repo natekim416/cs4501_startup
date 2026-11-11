@@ -160,7 +160,22 @@ button { font: inherit; cursor: pointer; }
 .path { font-size: 19px; word-break: break-all; margin: 0 0 10px; }
 .muted { color: var(--muted); font-size: 19px; margin: 6px 0; }
 .zones, .memory, .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 18px; }
-.zones li { display: flex; gap: 8px; align-items: center; word-break: break-all; }
+.zones li { display: flex; flex-direction: column; align-items: stretch; word-break: break-all; }
+/* FEAT-01: each zone is a button that opens a picker under it. */
+.zone-row { display: flex; gap: 8px; align-items: center; width: 100%; padding: 2px; text-align: left; color: var(--paper); background: none; border: 2px solid transparent; }
+.zone-row:hover, .zone-row:focus-visible, .zone-row[aria-expanded="true"] { border-color: var(--ink-3); outline: none; }
+.zone-row[aria-expanded="true"] { background: var(--ink-2); }
+.zone-path { flex: 1; }
+.zone-lock { font-family: var(--pixel); font-size: 7px; color: var(--muted); flex: none; }
+.zone-edit { margin: 0 0 6px; padding: 8px 10px; background: var(--ink-2); border: 2px solid var(--ink-3); border-top: none; word-break: normal; }
+.zone-edit p { margin: 0 0 8px; }
+.zone-choice { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: start; margin-bottom: 8px; }
+.zone-pick:disabled { opacity: 0.45; cursor: default; }
+.zone-help { color: var(--muted); font-size: 17px; }
+.zone-warn { color: var(--gold); }
+.zone-actions { display: flex; gap: 10px; margin-top: 4px; }
+.zone-actions .btn { font-size: 9px; padding: 8px 10px; }
+.zone-actions .btn:focus-visible, .zone-pick:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
 .zone-tag { font-family: var(--pixel); font-size: 8px; padding: 4px 5px; color: var(--ink); flex: none; width: 58px; text-align: center; }
 .zone-tag.free, .zone-btn.free { background: var(--mint); }
 .zone-tag.ask, .zone-btn.ask { background: var(--gold); }
