@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR', remove_docker_image: 'DOCKER IMAGE', clear_docker_build_cache: 'DOCKER BUILD CACHE', remove_ml_model: 'MODEL CACHE' };
 // US-08: "simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0" -> "iOS 16.0 simulator"
 const simulatorName = (p) => `${p.replace(/^simulator:.*SimRuntime\./, '').replace(/^([A-Za-z]+)-([\d-]+)$/, (_, os, v) => `${os} ${v.replace(/-/g, '.')}`)} simulator`;
 
@@ -255,6 +255,12 @@ async function useFolder(folder) {
   document.body.classList.add('busy');
   const info = await api.scan(folder);
   renderSemesterOffer(info.semesterOffer);
+  $('#model-cache-details').hidden = !(info.modelCaches || []).length;
+  $('#model-cache-list').replaceChildren(...(info.modelCaches || []).map((model) => el('li', {},
+    el('strong', {}, model.model),
+    el('p', { class: 'muted' }, `${formatBytes(model.bytes)} · Last used: ${model.lastUsed ? new Date(model.lastUsed).toLocaleDateString() : 'unknown'}`),
+    el('p', { class: 'muted' }, model.reason),
+  )));
   document.body.classList.remove('busy');
   $('#folder-stats').textContent = `${info.fileCount} files · ${formatBytes(info.totalBytes)} · zone: ${info.zone.toUpperCase()}`;
   log(`Scanned with ${info.malwareEngine}`, 'info');
@@ -280,6 +286,8 @@ async function sendRequest(text) {
   userSay(text);
   document.body.classList.add('busy');
   const thinking = botSay('Planning... every plan goes through my safety checks first.');
+  state.planningProgress = el('span', { class: 'breakdown-progress' });
+  thinking.append(state.planningProgress);
   try {
     const result = await api.plan(text);
     showPlan(result);
@@ -289,6 +297,7 @@ async function sendRequest(text) {
     botSay(`Something went wrong: ${err.message}`);
   } finally {
     thinking.closest('.msg').remove();
+    state.planningProgress = null;
     document.body.classList.remove('busy');
   }
 }
@@ -533,6 +542,49 @@ api.onAttempt((a) => {
 
 api.onUsage(renderUsage);
 
+api.onBreakdownProgress((progress) => {
+  if (state.planningProgress && Number.isFinite(progress?.done) && Number.isFinite(progress?.total)) {
+    state.planningProgress.textContent = ` Checking storage: ${progress.done} of ${progress.total}${progress.current ? ` (${progress.current})` : ''}.`;
+  }
+});
+
+function renderStorageNotice(notice) {
+  $('#storage-alert').hidden = !notice || !state.storageWatchOn;
+  $('#storage-alert-text').textContent = notice?.text || '';
+}
+
+function renderStorageWatch(status) {
+  state.storageWatchOn = status.enabled;
+  $('#storage-watch-status').textContent = status.enabled ? 'On. I’ll remind you at 85% full.' : 'Off. Turn it on if you want storage reminders.';
+  $('#storage-watch-toggle').textContent = status.enabled ? 'TURN WATCH OFF' : 'TURN WATCH ON';
+  renderStorageNotice(status.notice);
+}
+
+async function previewStorageCleanup() {
+  if (!state.storageWatchOn || isBusy()) return;
+  if (!state.folder) {
+    botSay('Pick a folder first with SELECT FOLDER, then preview the cleanup. Nothing has changed.');
+    return;
+  }
+  renderStorageWatch(await api.dismissStorageWatch());
+  await sendRequest('Free up as much space as possible, including Docker, model caches, Xcode and package caches');
+}
+
+let storageWatchInitialized = false;
+let pendingStorageNotice = null;
+api.onStorageAlert((notice) => {
+  if (!storageWatchInitialized) pendingStorageNotice = notice;
+  else renderStorageNotice(notice);
+});
+api.onStoragePreview(previewStorageCleanup);
+
+$('#storage-watch-toggle').addEventListener('click', async () => {
+  try { renderStorageWatch(await api.setStorageWatch(!state.storageWatchOn)); }
+  catch (err) { botSay(`I couldn't change the storage watch: ${err.message}`); }
+});
+$('#storage-preview').addEventListener('click', previewStorageCleanup);
+$('#storage-dismiss').addEventListener('click', async () => renderStorageWatch(await api.dismissStorageWatch()));
+
 let semesterProjects = [];
 function renderSemesterOffer(offer) {
   semesterProjects = offer?.projects || [];
@@ -620,6 +672,9 @@ document.querySelectorAll('.zone-btn').forEach((b) =>
   setDisk(init.disk);
   renderProfile(init.profile);
   renderUsage(init.usage);
+  renderStorageWatch(init.storageWatch);
+  storageWatchInitialized = true;
+  if (pendingStorageNotice) renderStorageNotice(pendingStorageNotice);
   $('#semester-end').value = init.profile.semesterEnd || '';
   botSay(
     `RAWR! I'm Cleanasaurus, your file maid.\nPick a folder, then tell me what you want in plain English.\nI check every plan for safety before you see it, and I never touch your NEVER zones.${init.mode === 'demo' ? '\n(No Claude API key found, so I\'m in DEMO MODE with offline rules.)' : ''}`,

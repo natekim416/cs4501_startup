@@ -41,6 +41,57 @@ const HELPERS = `
 
 // A step is either page code (a string) or a function that runs in the main process.
 const STEPS = [
+  ['US-01 storage breakdown reports progress and all five categories without changing files', async ({ win, base }) => {
+    const root = path.join(base, 'breakdown');
+    fs.mkdirSync(path.join(root, 'cs3140-old'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'cs4501-current'), { recursive: true });
+    const file = path.join(root, 'cs3140-old', 'source.js');
+    fs.writeFileSync(file, 'const unchanged = true;');
+    await page(win, `
+      await api.setZone(${JSON.stringify(root)}, 'free');
+      await useFolder(${JSON.stringify(root)});
+      window.__us01progress = [];
+      api.onBreakdownProgress((p) => window.__us01progress.push(p));
+      await sendRequest('Where did my space go?');
+      await __t.waitFor(() => /ML model caches/.test(__t.botText()), 'all storage categories');
+      if (!['JavaScript packages', 'Python environments', 'Xcode build data', 'Docker', 'ML model caches'].every((s) => __t.botText().includes(s))) throw new Error('missing storage category');
+      if (!window.__us01progress.some((p) => p.done === p.total)) throw new Error('no completed progress event');
+      if (__t.liveCards().length) throw new Error('read-only breakdown produced an approvable plan');
+      await useFolder((await api.init()).demoFolder);
+      return 'ok';`);
+    if (fs.readFileSync(file, 'utf8') !== 'const unchanged = true;') throw new Error('breakdown modified source');
+    return 'progress shown; five categories; no actions';
+  }],
+  ['US-16 storage watch is opt-in, its notification opens only a preview, and turning it off stops reminders', async ({ win }) => {
+    const controls = require('../main').storageWatchTest;
+    const folder = await page(win, 'return (await api.init()).demoFolder;');
+    const contents = () => fs.readdirSync(folder, { recursive: true }).filter((p) => fs.statSync(path.join(folder, p)).isFile()).sort().map((p) => [p, fs.readFileSync(path.join(folder, p), 'hex')]);
+    const before = contents();
+    await page(win, `
+      if ((await api.init()).storageWatch.enabled) throw new Error('watch enabled without opt-in');
+      document.querySelector('#storage-watch-toggle').click();
+      await __t.waitFor(() => document.querySelector('#storage-watch-toggle').textContent === 'TURN WATCH OFF', 'watch enabled');
+      if (!(await api.init()).profile.storageWatch.enabled) throw new Error('watch preference not saved');
+      return 'ok';`);
+    controls.check({ usedFraction: 0.99, now: Date.now() + 8 * 864e5 });
+    await page(win, `
+      await __t.waitFor(() => !document.querySelector('#storage-alert').hidden, 'storage alert');
+      if (!/99% full/.test(document.querySelector('#storage-alert-text').textContent)) throw new Error('missing disk reading');
+      return 'ok';`);
+    // The same callback used by a native notification click; no real OS notification is shown in tests.
+    controls.preview();
+    await page(win, `
+      await __t.waitFor(() => __t.liveCards().length && !document.body.classList.contains('busy'), 'ordinary cleanup preview');
+      if (!__t.liveCards().at(-1).querySelector('.btn-primary')) throw new Error('preview has no approval button');
+      document.querySelector('#storage-watch-toggle').click();
+      await __t.waitFor(() => document.querySelector('#storage-watch-toggle').textContent === 'TURN WATCH ON', 'watch off');
+      if ((await api.init()).storageWatch.enabled) throw new Error('watch still enabled');
+      retirePlans();
+      return 'ok';`);
+    if (controls.check({ usedFraction: 1, now: Date.now() + 20 * 864e5 })) throw new Error('disabled watch delivered a reminder');
+    if (JSON.stringify(contents()) !== JSON.stringify(before)) throw new Error('notification or preview modified a file');
+    return 'opt-in; preview only; off stays quiet';
+  }],
   ['US-17 semester sweep offers a preview and leaves files in place', async ({ win, base }) => {
     const { makeJsProject } = require('./stories/helpers');
     const root = path.join(base, 'semester');
@@ -68,6 +119,27 @@ const STEPS = [
     if (!/Pro isn't available yet/.test(document.querySelector('#go-pro-message').textContent)) throw new Error('missing Pro message');
     if ((await api.init()).usage.enabled) throw new Error('Go Pro enabled logging');
     return 'ok';`],
+  ['US-10 model cache panel shows name, measured size, last use, and download estimate', async ({ win, base }) => {
+    const homeArg = process.argv.find((a) => a.startsWith('--home='));
+    const home = homeArg && path.resolve(homeArg.slice('--home='.length));
+    if (!home || !home.startsWith(path.resolve(base) + path.sep)) throw new Error('model UI test requires an isolated home');
+    const dir = path.join(home, '.cache', 'huggingface', 'hub', 'models--ui-test--model');
+    const weights = path.join(dir, 'snapshots', 'a'.repeat(40), 'model.safetensors');
+    fs.mkdirSync(path.dirname(weights), { recursive: true });
+    fs.writeFileSync(weights, 'm'.repeat(64 * 1024));
+    require('./stories/helpers').age(dir, 60);
+    await page(win, `
+      await useFolder((await api.init()).demoFolder);
+      const panel = document.querySelector('#model-cache-details');
+      if (panel.hidden) throw new Error('model panel is hidden');
+      panel.open = true;
+      const text = document.querySelector('#model-cache-list').textContent;
+      if (!text.includes('ui-test/model') || !/65[,.]?5? ?KB|66 KB/.test(text)) throw new Error('missing name or size: ' + text);
+      if (!/Last used:/.test(text) || !/minutes? to re-download/.test(text)) throw new Error('missing use date or download estimate');
+      return 'ok';`);
+    // The generated cache is inside the checked isolated home and remains there for the test process.
+    return 'name, size, last use, download estimate';
+  }],
   ['first launch asks about the usage log, and it stays off until answered', `
     await __t.waitFor(() => document.querySelector('.consent'), 'usage log prompt');
     if ((await api.init()).usage.enabled) throw new Error('log is on before the user answered');

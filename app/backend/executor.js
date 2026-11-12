@@ -4,14 +4,18 @@
 const fs = require('fs');
 const path = require('path');
 const { inTrash } = require('./trash');
+const { executeDockerItem } = require('./ecosystems/docker');
+const { removeMlItem } = require('./ecosystems/ml');
 
 class Executor {
   // trashDir: where removed personal files go. The app passes the macOS Trash (US-13); without it they go
   // to the app's own Dino Bin, which keeps tests away from the real Trash.
   // xcrun: runs `xcrun simctl …` to remove simulators (US-08). Tests pass a fake.
-  constructor(dataDir, { trashDir = null, xcrun = null } = {}) {
+  constructor(dataDir, { trashDir = null, xcrun = null, dockerRun = null, home } = {}) {
     this.trashDir = trashDir;
     this.xcrun = xcrun;
+    this.dockerRun = dockerRun;
+    this.home = home;
     this.binDir = path.join(dataDir, 'dino-bin');
     this.quarantineDir = path.join(dataDir, 'quarantine');
     this.logFile = path.join(dataDir, 'undo-log.json');
@@ -58,7 +62,7 @@ class Executor {
         const step = this.apply(a, batch.id);
         if (step) batch.steps.push({ ...step, actionId: a.id });
         if (step && step.type === 'deleted') this.recordRecipe(step);
-        results.push({ id: a.id, ok: true });
+        results.push({ id: a.id, ok: true, ...(step && step.docker ? { docker: true, insideDocker: step.insideDocker } : {}) });
       } catch (err) {
         results.push({ id: a.id, ok: false, error: err.message });
       }
@@ -72,6 +76,17 @@ class Executor {
     // Defense in depth for red-team F3: never act on a path the validator could have read differently.
     if (['path', 'dest', 'keep'].some((k) => typeof a[k] === 'string' && a[k].split(/[\\/]/).includes('..'))) {
       throw new Error('Refusing a path with "..".');
+    }
+    if (a.op === 'remove_docker_image' || a.op === 'clear_docker_build_cache') {
+      const item = a.recipe && a.recipe.dockerItem;
+      if (!item || item.path !== a.path || !this.dockerRun) throw new Error('No verified Docker item; refusing to remove anything.');
+      const result = executeDockerItem(item, { run: this.dockerRun });
+      return { type: 'deleted', path: a.path, recipe: item.rebuild, docker: true, insideDocker: result.insideDocker };
+    }
+    if (a.op === 'remove_ml_model') {
+      if (!a.recipe || !a.recipe.model) throw new Error('No verified model cache; refusing to delete it.');
+      removeMlItem(a.path, { home: this.home, named: a.recipe.named || [] });
+      return { type: 'deleted', path: a.path, recipe: { command: null, note: a.recipe.note || 'The model re-downloads the next time you load it.' } };
     }
     if (a.op === 'mkdir') {
       if (fs.existsSync(a.path)) return null;

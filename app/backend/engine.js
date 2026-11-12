@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
-const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
+const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS, rebuildProof } = require('./devclutter');
 const { listTrash } = require('./trash');
 const { xcodeItems, xcrunFor } = require('./ecosystems/xcode');
 const { matchProjects, matchProtect } = require('./intent');
@@ -17,9 +17,12 @@ const { Executor } = require('./executor');
 const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
 const { sweepOffer, semesterDate } = require('./semester');
+const { dockerItems, dockerFor, reportDockerFreed } = require('./ecosystems/docker');
+const { mlItems, mlProof } = require('./ecosystems/ml');
+const { cleanupIntent } = require('./cleanup-intent');
 
 const MAX_ATTEMPTS = 3;
-const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator'];
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator', 'remove_docker_image', 'clear_docker_build_cache', 'remove_ml_model'];
 const ESTIMATE_GAP = 0.1;
 
 // "a", "a and b", "a, b and c"
@@ -56,7 +59,7 @@ function withTimeout(promise, ms) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000 } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null, dockerRun = null, planTimeoutMs = 90000 } = {}) {
     this.planTimeoutMs = planTimeoutMs;
     this.llmClient = llmClient;
     this.dataDir = dataDir;
@@ -65,13 +68,17 @@ class Engine {
     // US-08: runs `xcrun simctl` to list and remove simulators. Tests pass a fake.
     this.xcodeRun = xcodeRun || xcrunFor(home);
     this.xcode = [];
+    this.dockerRun = dockerRun || dockerFor(home);
+    this.docker = { available: false, items: [], totalBytes: 0 };
+    this.ml = [];
+    this.cachedStorageEstimate = null;
     this.caches = [];
     this.condaExports = {};
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.trashDir = trashDir;
     this.trashItems = [];
-    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun });
+    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun, dockerRun: this.dockerRun, home });
     this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
     this.practiceFolders = new Set();
@@ -116,6 +123,9 @@ class Engine {
     this.dev = findArtifacts(folder);
     this.caches = toolCaches(this.home);
     this.xcode = this.findXcode();
+    this.docker = dockerItems({ run: this.dockerRun });
+    this.ml = mlItems({ home: this.home });
+    this.cachedStorageEstimate = null;
     this.trashItems = listTrash(this.trashDir);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
@@ -134,6 +144,8 @@ class Engine {
       findings: this.findings,
       unknownApps: this.unknownApps.map((f) => ({ name: f.name, label: f.label })),
       semesterOffer: this.semesterOffer(),
+      modelCaches: this.ml.map(({ model, bytes, lastUsed, reason, offered }) => ({ model, bytes, lastUsed, reason, offered })),
+      dockerMessage: this.docker.message,
       zone: this.profile.zoneFor(folder),
       zoneReason: this.profile.zoneInfo(folder).reason,
     };
@@ -171,8 +183,29 @@ class Engine {
     })) });
   }
 
+  // At most once per explicit scan. The watch reuses this number instead of scanning the disk on a timer.
+  storageEstimate() {
+    if (!this.folder || this.profile.zoneFor(this.folder) === 'never') return 0;
+    const stamp = JSON.stringify({ zones: this.profile.data.zones, protected: this.profile.data.protected });
+    if (this.estimateProfileStamp !== stamp) this.cachedStorageEstimate = null;
+    this.estimateProfileStamp = stamp;
+    if (this.cachedStorageEstimate !== null) return this.cachedStorageEstimate;
+    let bytes = 0;
+    for (const d of this.dev) {
+      if (this.profile.protectedBy(d.path, this.folder) || this.profile.zoneFor(d.path, { ignoreRepos: true }) === 'never') continue;
+      if (rebuildProof(d.path, { home: this.home, condaExports: this.condaExports }).ok) bytes += d.bytes;
+    }
+    for (const c of this.caches) if (this.profile.zoneFor(c.path) !== 'never') bytes += c.bytes;
+    bytes += this.xcode.reduce((n, x) => n + x.bytes, 0);
+    bytes += this.docker.items.reduce((n, x) => n + x.bytes, 0);
+    bytes += this.ml.filter((x) => x.offered && this.profile.zoneFor(x.path) !== 'never' && !this.profile.protectedBy(x.path, this.folder)
+      && (x.source !== 'pytorch' || mlProof(x.path, { home: this.home }).ok)).reduce((n, x) => n + x.bytes, 0);
+    this.cachedStorageEstimate = Number.isFinite(bytes) && bytes > 0 ? bytes : 0;
+    return this.cachedStorageEstimate;
+  }
+
   // Plans, validates, and feeds errors back to the planner until the plan passes or attempts run out.
-  async plan(request, onAttempt = () => {}) {
+  async plan(request, onAttempt = () => {}, onProgress = () => {}) {
     if (!this.folder) throw new Error('Pick a folder first.');
     const started = Date.now();
     this.lastPlan = null;
@@ -182,7 +215,10 @@ class Engine {
     }
     this.scanFolder(this.folder);
     // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
-    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown();
+    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown(onProgress);
+    // Only exact model names in the user's request can override the inactivity rule, never the LLM.
+    const { namedModels } = cleanupIntent(request, this.ml, this.docker.items);
+    this.ml = mlItems({ home: this.home, named: namedModels });
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
     // The scanned folder itself isn't a project (a VM bundle at the top level would otherwise make it one).
     const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
@@ -201,7 +237,7 @@ class Engine {
     const protectedNames = this.protectedHere();
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode };
+    const ctx = { request, scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode, docker: this.docker, ml: this.ml, namedModels };
     const attempts = [];
     let previous = null;
     let plan;
@@ -265,7 +301,7 @@ class Engine {
     }
 
     const planId = ++this.planCount;
-    this.lastPlan = { id: planId, request, plan, check, named: ctx.named };
+    this.lastPlan = { id: planId, request, plan, check, named: ctx.named, namedModels };
     this.track('plan', {
       zone: this.profile.zoneFor(this.folder),
       tries: attempts.length,
@@ -278,7 +314,7 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
-    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes]), ...this.docker.items.map((x) => [x.path, x.bytes]), ...this.ml.map((x) => [x.path, x.bytes])]);
     const dayAgo = Date.now() - 864e5;
     const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
       try {
@@ -309,7 +345,8 @@ class Engine {
   // US-08: Xcode build data and simulators unused long enough to offer. Run again at approval, so a
   // project rebuilt or a simulator booted since the plan was made is refused.
   findXcode() {
-    return xcodeItems({ home: this.home, run: this.xcodeRun });
+    return xcodeItems({ home: this.home, run: this.xcodeRun }).filter((x) =>
+      !this.profile.protectedBy(x.path, this.folder || this.home) && !(x.project && this.profile.protectedPattern(x.project)));
   }
 
   // A reply with nothing to approve.
@@ -382,7 +419,15 @@ class Engine {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode() });
+    const freshDocker = chosen.some((a) => a.op.includes('docker')) ? dockerItems({ run: this.dockerRun }) : this.docker;
+    for (const action of chosen.filter((a) => a.op.includes('docker'))) {
+      const before = this.lastPlan.check.recipes[action.id]?.dockerItem;
+      const after = freshDocker.items.find((d) => d.path === action.path);
+      if (!before || !after || ['context', 'daemonId', 'digest', 'builder', 'id'].some((key) => before[key] !== after[key])) {
+        return { ok: false, errors: ['Docker changed since this preview. Ask for a new plan before removing anything.'] };
+      }
+    }
+    const check = validate({ actions: chosen }, { request: this.lastPlan.request, scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, namedModels: this.lastPlan.namedModels, trashDir: this.trashDir, xcode: this.findXcode(), docker: freshDocker, ml: this.ml });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };
@@ -405,6 +450,14 @@ class Engine {
     });
     this.lastPlan = null;
     const report = this.freedReport(chosen, check.bytesFreed, measuredFreed);
+    this.cachedStorageEstimate = 0;
+    this.estimateProfileStamp = JSON.stringify({ zones: this.profile.data.zones, protected: this.profile.data.protected });
+    const dockerResults = run.results.filter((r) => r.ok && r.docker);
+    if (dockerResults.length) {
+      const insideDocker = dockerResults.every((r) => Number.isFinite(r.insideDocker)) ? dockerResults.reduce((n, r) => n + r.insideDocker, 0) : null;
+      report.docker = insideDocker === null ? { insideDocker: null, diskChange: measuredFreed, text: `Docker cleanup completed; its reclaimed space could not be measured. Host disk change: ${formatBytes(measuredFreed)}.` } : { ...reportDockerFreed({ insideDocker, diskChange: measuredFreed }), insideDocker, diskChange: measuredFreed };
+      report.freedNote = [report.freedNote, report.docker.text].filter(Boolean).join(' ');
+    }
     if (uncheckedMoves && skippedFolders) {
       const zone = this.profile.zoneFor(this.folder) === 'ask' ? " They're marked ASK FIRST because this folder is an ASK zone." : '';
       const moved = `${uncheckedMoves} move${uncheckedMoves === 1 ? '' : 's'} weren't checked, so those files stayed put and I didn't create their ${skippedFolders === 1 ? 'folder' : `${skippedFolders} folders`}.${zone} Check them and approve again to move them.`;
@@ -426,13 +479,13 @@ class Engine {
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
   }
 
-  answerBreakdown() {
-    const b = breakdown(this.folder);
+  answerBreakdown(onProgress = () => {}) {
+    const b = breakdown(this.folder, { home: this.home, artifacts: this.dev, caches: this.caches, docker: this.docker, ml: this.ml, onProgress });
     const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker', ml: 'ML model caches' };
     const types = Object.entries(b.byType).map(([k, v]) => `${names[k]}: ${formatBytes(v)}`).join('\n');
     const top = b.topProjects.map((p, i) => `${i + 1}. ${path.basename(p.path)}: ${formatBytes(p.bytes)}`).join('\n');
     const blocked = b.unreadable.map((u) => `${u.path}: ${u.howToFix}`).join('\n');
-    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest projects:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}`;
+    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest projects:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}\n${b.notes.join('\n')}`;
     this.track('breakdown', { projects: b.topProjects.length, unreadable: b.unreadable.length });
     return { mode: this.mode, planId: null, summary, breakdown: b, actions: [], questions: [], attempts: [], bytesFreed: 0, needsApproval: [], warnings: [] };
   }

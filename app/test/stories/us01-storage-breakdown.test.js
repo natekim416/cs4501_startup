@@ -60,10 +60,46 @@ test('US-01 asking "where did my space go?" answers with the breakdown and propo
   assert.ok(res.breakdown && res.breakdown.byType.javascript > 0);
 });
 
-test('US-01 Xcode, Docker, and ML totals are measured, not just present as keys (partial until US-08–10)', { todo: 'US-01 (#2): needs US-08, US-09, US-10' }, () => {
+test('US-01 Xcode, Docker, and ML totals use their storage inventories, including active entries', () => {
   const { breakdown } = require('../../backend/breakdown');
   const root = tmp();
   write(path.join(root, 'Library', 'Developer', 'Xcode', 'DerivedData', 'App-abc', 'Build', 'x.o'), 'x'.repeat(4096));
-  const b = breakdown(root);
+  write(path.join(root, 'Library', 'Developer', 'CoreSimulator', 'Devices', 'device', 'data.bin'), 'x'.repeat(8192));
+  const model = path.join(root, '.cache', 'huggingface', 'hub', 'models--old--model', 'snapshots', 'a'.repeat(40), 'model.safetensors');
+  write(model, 'm'.repeat(65536));
+  const before = fs.readFileSync(model);
+  const b = breakdown(root, { home: root, docker: { available: true, totalBytes: 1.5e9, items: [] } });
   assert.ok(b.byType.xcode > 0, 'DerivedData should count toward Xcode');
+  assert.ok(b.byType.xcode >= 12288, 'active simulator data also counts');
+  assert.strictEqual(b.byType.docker, 1.5e9);
+  assert.ok(b.byType.ml > 0, 'an active model still occupies storage');
+  assert.deepStrictEqual(fs.readFileSync(model), before);
+  assert.strictEqual(b.dockerAvailable, true);
+});
+
+test('US-01 unavailable Docker is explained; installed ecosystem totals still appear', () => {
+  const { breakdown } = require('../../backend/breakdown');
+  const root = tmp();
+  makeJsProject(root, 'app', { repo: false });
+  const b = breakdown(root, { home: root, docker: { available: false, totalBytes: null, message: "Docker isn't running." } });
+  assert.ok(b.byType.javascript > 0);
+  assert.strictEqual(b.byType.docker, 0);
+  assert.ok(b.notes.some((n) => n.includes("Docker isn't running")));
+});
+
+test('US-01 exact package cache paths count once alongside project artifacts', () => {
+  const { breakdown } = require('../../backend/breakdown');
+  const root = tmp();
+  const cache = { path: path.join(root, '.npm'), type: 'npm-cache', bytes: 4096 };
+  const b = breakdown(root, { home: root, artifacts: [cache], caches: [cache], ml: [], docker: { available: true, totalBytes: 0 } });
+  assert.strictEqual(b.byType.javascript, 4096);
+});
+
+test('US-01 no project folders still emits completed progress and valid zero totals', () => {
+  const { breakdown } = require('../../backend/breakdown');
+  const root = tmp();
+  const progress = [];
+  const b = breakdown(root, { home: root, onProgress: (p) => progress.push(p), docker: { available: false, totalBytes: null } });
+  assert.deepStrictEqual(b.byType, { javascript: 0, python: 0, xcode: 0, docker: 0, ml: 0 });
+  assert.deepStrictEqual(progress.at(-1), { done: 0, total: 0, current: null });
 });

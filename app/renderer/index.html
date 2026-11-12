@@ -44,6 +44,11 @@
         <p id="folder-path" class="path">No folder selected</p>
         <button id="pick" class="btn">SELECT FOLDER</button>
         <p id="folder-stats" class="muted"></p>
+        <details id="model-cache-details" hidden>
+          <summary>MODEL CACHES</summary>
+          <p class="muted">Last use comes from file access times. Download times are estimates.</p>
+          <ul id="model-cache-list" class="model-cache-list"></ul>
+        </details>
       </div>
 
       <div class="panel">
@@ -80,6 +85,17 @@
         <div class="usage-actions">
           <button id="usage-toggle" class="btn">TURN ON</button>
           <button id="usage-export" class="btn" hidden>EXPORT</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>STORAGE WATCH</h2>
+        <p id="storage-watch-status" class="muted"></p>
+        <button id="storage-watch-toggle" class="btn">TURN WATCH ON</button>
+        <p class="muted">While the app is open, check disk space once a minute. Cleanup estimates use your latest scan. Nothing runs automatically.</p>
+        <div id="storage-alert" class="watch-alert" role="status" hidden>
+          <p id="storage-alert-text"></p>
+          <button id="storage-preview" class="btn">PREVIEW CLEANUP</button>
+          <button id="storage-dismiss" class="btn">DISMISS</button>
         </div>
       </div>
       <div class="panel">

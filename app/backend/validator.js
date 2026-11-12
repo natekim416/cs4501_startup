@@ -8,12 +8,14 @@ const { rebuildProof, measureFreeable, toolCaches, isXcodeArchive } = require('.
 const { isDerivedData } = require('./ecosystems/xcode');
 const { inTrash, itemBytes } = require('./trash');
 const { realPath } = require('./profile');
+const { mlProof } = require('./ecosystems/ml');
+const { cleanupIntent } = require('./cleanup-intent');
 
 // "a/link/../b" means one place to path.resolve and another to the OS once "link" is a symlink, so a
 // plan path with ".." is never allowed (red-team F3).
 const hasDotDot = (p) => typeof p === 'string' && p.split(/[\\/]/).includes('..');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator', 'remove_docker_image', 'clear_docker_build_cache', 'remove_ml_model']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -24,7 +26,7 @@ function inside(child, root) {
 }
 
 // xcode: what the Xcode check found unused (US-08). Only those exact items in ~/Library can be cleaned.
-function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [] }) {
+function validate(plan, { request = '', scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [], docker = { items: [] }, ml = [], namedModels = [] }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -49,6 +51,8 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
   const removed = new Map(); // path -> the copy that must survive
   const recipes = {}; // action id -> how to rebuild what it deletes
   let bytesFreed = 0;
+  const actionIds = new Set();
+  const externalTargets = new Set();
 
   plan.actions.forEach((a, i) => {
     const id = a && a.id ? a.id : `#${i + 1}`;
@@ -58,8 +62,24 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     // Red-team F11: every field the model fills is text; anything else is an error to fix, not a crash.
     const wrong = ['id', 'op', 'path', 'dest', 'keep', 'reason'].find((k) => a[k] != null && typeof a[k] !== 'string');
     if (wrong) return fail(`"${wrong}" must be text.`);
+    if (actionIds.has(id)) return fail('Each action must have a unique id.');
+    actionIds.add(id);
     if (!OPS.has(a.op)) return fail(`Unknown op "${a.op}". Allowed: ${[...OPS].join(', ')}.`);
     if (['path', 'dest', 'keep'].some((k) => hasDotDot(a[k]))) return fail('Paths may not contain "..". Use the full, direct path.');
+    if (a.op === 'remove_docker_image' || a.op === 'clear_docker_build_cache') {
+      if (!cleanupIntent(request, [], docker.items).docker) return fail('Docker cleanup was not requested.');
+      if (!a.reason) return fail('Every action needs a "reason" the user can read.');
+      const type = a.op === 'remove_docker_image' ? 'docker-image' : 'docker-build-cache';
+      const item = docker.items.find((x) => x.path === a.path && x.type === type && x.label === 'rebuildable');
+      if (!item) return fail(`${a.path} isn't an unused, rebuildable Docker item from the current scan.`);
+      if (externalTargets.has(a.path)) return fail('A Docker item may only be removed once per plan.');
+      externalTargets.add(a.path);
+      recipes[id] = { ...item.rebuild, dockerItem: item };
+      bytesFreed += item.bytes;
+      // Docker is outside the picked folder; show it unchecked, even in a FREE zone.
+      needsApproval.push(id);
+      return;
+    }
     // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
     // and the steps that remove it come from that check, never from the plan.
     if (a.op === 'remove_simulator') {
@@ -79,6 +99,25 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (guard) return fail(`${guard.project} is protected in DINO MEMORY (always keep "${guard.pattern}"). Leave it out of the plan.`);
     // US-08: Archives stay, whatever zone they're in.
     if (isXcodeArchive(src)) return fail(`${src} is an Xcode Archive. Xcode Archives are what crash reports need to be readable, so they always stay NEVER.`);
+    if (a.op === 'remove_ml_model') {
+      if (!cleanupIntent(request, ml.length ? ml : namedModels.map((model) => ({ model }))).ml) return fail('Model-cache cleanup was not requested.');
+      if (profile.zoneFor(src) === 'never') return fail(`${src} is in a NEVER-touch zone.`);
+      if (externalTargets.has(src)) return fail('A model may only be removed once per plan.');
+      const proof = mlProof(src, { home, now, named: namedModels });
+      if (!proof.ok) {
+        for (const failure of proof.failures) fail(`Model cache check failed: ${failure.message}`);
+        return;
+      }
+      if (cleanupIntent(request, [proof.item]).keptModels.includes(proof.item.model)) return fail('The user asked to keep this model.');
+      const scope = cleanupIntent(request, ml.length ? ml : namedModels.map((model) => ({ model })));
+      if (scope.onlyNamedModels && !scope.namedModels.includes(proof.item.model)) return fail('Only the exact models the user named may be removed for this request.');
+      externalTargets.add(src);
+      recipes[id] = { ...proof.item.rebuild, model: proof.item.model, home, named: namedModels };
+      bytesFreed += proof.item.bytes;
+      for (const f of [...files]) if (inside(f, src)) files.delete(f);
+      needsApproval.push(id);
+      return;
+    }
     // US-08: DerivedData lives in ~/Library, which is NEVER. Only the exact folders the Xcode check found
     // unused are opened up (Xcode rebuilds them); any other folder there still meets the zone check below.
     const built = a.op === 'delete_rebuildable' && xcode.find((x) => x.type === 'xcode-deriveddata' && path.resolve(x.path) === src);

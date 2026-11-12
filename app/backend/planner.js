@@ -5,6 +5,7 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { projectInfo } = require('./devclutter');
 const { courseCodes } = require('./intent');
+const { cleanupIntent } = require('./cleanup-intent');
 
 const MODEL = 'claude-opus-5-5';
 const MAX_FILES_IN_PROMPT = 400;
@@ -23,7 +24,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator', 'remove_docker_image', 'clear_docker_build_cache', 'remove_ml_model'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -59,9 +60,13 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - delete_from_trash: permanently delete "path", an item already in the user's Trash. Only for paths listed in trash_items, and only when the user asks to empty the Trash or permanently delete trashed files. It can't be undone; the user must confirm it separately.
 - delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items, or Xcode DerivedData folders listed in xcode_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
 - remove_simulator: remove the simulator runtime "path" (an id like simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0) and its devices. Only for simulator runtimes listed in xcode_items, and only if the user asks about Xcode or simulators, or wants as much space as possible.
+- remove_docker_image: remove an unused, downloadable image listed in docker_items using its exact opaque path. Never remove container data, volumes, or locally built images.
+- clear_docker_build_cache: remove only the specific old cache record listed in docker_items using its exact opaque path. Never invent a Docker command or widen its scope.
+- remove_ml_model: remove a downloaded model listed as offered in model_caches using its exact path. Models used in the last 30 days are eligible only if the user explicitly named that exact model. Unknown checkpoints and trained models are never eligible.
 
 Rules:
 - Every action needs a short, plain-English "reason".
+- Only propose Docker or model-cache cleanup if the user explicitly asks about that category or asks for as much space as possible. A general request to sort files does not authorize these cleanups.
 - Only put new folders and moved files inside the allowed destination roots.
 - Never act on files in "never" zones. Files in "ask" zones are allowed but the user will be asked.
 - ~/Library is a never zone. The only exceptions are the exact paths in xcode_items; never anything else there, and never Xcode Archives.
@@ -80,7 +85,7 @@ function describeProject(project) {
   return { course: code ? `${code.replace(/\d+$/, '').toUpperCase()} ${code.match(/\d+$/)[0]}` : null, last_changed_days: info.lastChangedDays, uncommitted: info.uncommitted };
 }
 
-function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = [], xcode = []) {
+function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = [], xcode = [], docker = { items: [] }, ml = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -101,6 +106,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
     package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
     trash_items: trashItems.slice(0, MAX_FILES_IN_PROMPT).map((t) => ({ path: t.path, bytes: t.bytes })),
     xcode_items: xcode.map((x) => ({ path: x.path, kind: x.type === 'simulator' ? 'simulator runtime' : 'Xcode DerivedData', bytes: x.bytes, how: x.reason })),
+    docker_items: docker.items.map((x) => ({ path: x.path, kind: x.type, bytes: x.bytes, how: x.reason })),
+    model_caches: ml.map((x) => ({ path: x.path, model: x.model, bytes: x.bytes, last_used: x.lastUsed, offered: x.offered, how: x.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -109,8 +116,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
   };
 }
 
-async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey, timeout: 60000, maxRetries: 1 }) }) {
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems, xcode))}`;
+async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], docker = { items: [] }, ml = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey, timeout: 60000, maxRetries: 1 }) }) {
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems, xcode, docker, ml))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -163,8 +170,10 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
+function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], docker = { items: [] }, ml = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
+  const cleanup = cleanupIntent(request, ml, docker.items);
+  const allClutter = cleanup.allClutter;
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
   const doneWith = want(/done with|finished with|over with/i);
@@ -199,11 +208,19 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     return { summary: trashItems.length ? `Your Trash has ${trashItems.length} item(s). Check the ones to delete for good.` : 'Your Trash is empty.', actions, questions };
   }
   // US-08: an Xcode request plans only Xcode's own clutter, nothing in the folder.
-  if (want(/xcode|simulators?|derived ?data/i)) {
-    for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
-    return { summary: xcode.length ? `I found ${xcode.length} Xcode item(s) you haven't used in a while.` : "I didn't find any Xcode build data or simulators you haven't used in a while.", actions, questions };
+  if (cleanup.docker) {
+    for (const d of docker.items) add({ op: d.type === 'docker-image' ? 'remove_docker_image' : 'clear_docker_build_cache', path: d.path, reason: d.reason });
+    if (!allClutter && !want(/models?|hugging\s?face|pytorch|torch|xcode/i)) return { summary: docker.available ? `I found ${docker.items.length} unused Docker item(s) with a rebuild or download recipe. Volumes and container data stay untouched.` : docker.message || "Docker isn't running, so I skipped it.", actions, questions };
   }
-  if (want(/cache/i)) {
+  if (cleanup.ml) {
+    for (const m of ml) if (m.offered && (!cleanup.onlyNamedModels || cleanup.namedModels.includes(m.model)) && !cleanup.keptModels.includes(m.model) && !guarded(m.path) && profile.zoneFor(m.path) !== 'never') add({ op: 'remove_ml_model', path: m.path, reason: m.reason });
+    if (!allClutter && !want(/xcode/i)) return { summary: ml.length ? ml.map((m) => `${m.model}: ${(m.bytes / 1e6).toFixed(1)} MB, last used ${m.lastUsed || 'unknown'}. ${m.reason}`).join('\n') : 'I found no recognized downloaded model caches. Trained or unfamiliar checkpoints stay untouched.', actions, questions };
+  }
+  if (want(/xcode|simulators?|derived ?data/i) || allClutter) {
+    for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
+    if (!allClutter) return { summary: xcode.length ? `I found ${xcode.length} Xcode item(s) you haven't used in a while.` : "I didn't find any Xcode build data or simulators you haven't used in a while.", actions, questions };
+  }
+  if (want(/cache/i) || allClutter) {
     for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
   }
   for (const f of findings) {

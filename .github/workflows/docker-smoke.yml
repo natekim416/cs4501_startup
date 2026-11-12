@@ -1,0 +1,30 @@
+name: disposable Docker smoke
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-cli:
+    # GitHub-hosted disposable VM, never a self-hosted runner or a developer's daemon.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Exercise the real Docker CLI with one disposable image and stopped container
+        run: node --test --test-concurrency=1 test/live/docker.test.js
+        env:
+          CLEANASAURUS_DOCKER_LIVE: '1'
+          ANTHROPIC_API_KEY: ''

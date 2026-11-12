@@ -247,3 +247,8 @@ body.tour-talking #tour-guide .dino { animation: talk 0.25s steps(2) infinite; }
 .undo-one summary { cursor: pointer; margin-top: 6px; }
 .undo-one .btn { white-space: normal; text-align: left; }
 .action.skipped .file { text-decoration: line-through; opacity: 0.6; }
+.watch-alert { border-top: 2px dashed var(--ink); margin-top: 12px; padding-top: 8px; }
+.watch-alert .btn { margin: 4px 4px 4px 0; }
+.breakdown-progress { display: block; margin-top: 6px; }
+.model-cache-list { padding-left: 16px; overflow-wrap: anywhere; }
+.model-cache-list li { margin-top: 10px; }

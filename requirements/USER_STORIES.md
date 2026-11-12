@@ -121,6 +121,8 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 
 **As a** dev student whose laptop is almost full, **I want** to see where my space went, by type and by project, before anything changes, **so that** I know whether cleaning is worth it.
 
+*Implemented on `feature/simple-user-stories`: measured project and package-cache totals, Xcode storage, Docker-reported usage, and recognized model-cache storage. Active entries count toward storage even when cleanup is not offered. Progress, the ten largest project folders, and access errors are shown without proposing actions. See [Beta cleanup validation](../validation/BETA_CLEANUP_TESTING.md) for tests and supported sources.*
+
 - **Given** I haven't approved anything, **when** I ask "where did my space go?", **then** I see measured totals for JavaScript packages, Python environments, Xcode build data, Docker, and ML model caches, plus my 10 largest projects, and no file is modified.
 - **Given** about 50 projects under my home folder, **when** the scan runs, **then** it finishes within 60 seconds and shows progress.
 - **Given** macOS blocks the app from reading a folder (Documents, Desktop), **when** the scan reaches it, **then** the app names the folder and says how to grant access, instead of silently skipping it.
@@ -195,6 +197,8 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 
 **As a** dev student who uses Docker, **I want** images that no container uses and old build cache removed, **so that** Docker Desktop stops eating 20 GB.
 
+*Implemented on `feature/simple-user-stories`: digest-backed unused images and individual eligible build-cache records. Stopped containers, volumes, local-only images, shared/mutable cache, unsupported builders, and changed daemons are protected. Explicit approval is required. Docker-reported savings and host disk change are shown separately.*
+
 - **Given** images that no container (running or stopped) uses, **then** they're offered with their size and the note "re-downloads on the next pull."
 - **Given** Docker volumes, **then** they're never offered.
 - **Given** Docker isn't running, **then** the dino says so and skips Docker, instead of failing the whole plan.
@@ -204,6 +208,8 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 `Must · 5 · New · FR6 · C2`
 
 **As a** dev student who does ML, **I want** to see which downloaded models I haven't used lately and how long each would take to re-download, **so that** I can drop the big ones without worrying.
+
+*Implemented on `feature/simple-user-stories`: default Hugging Face model snapshots and a conservative set of hash-verified official PyTorch downloads. Names, measured sizes, filesystem last-use times, and download-time estimates are visible. Unknown checkpoints, custom/symlinked cache roots, training data, and unsupported shared blobs are retained. See [validation limits](../validation/BETA_CLEANUP_TESTING.md).*
 
 - **Given** Hugging Face or PyTorch cache entries, **then** each one shows the model name, size, last-used date, and estimated re-download time.
 - **Given** a model unused for 30 days, **then** it's offered. A model used more recently is offered only if I name it.
@@ -262,6 +268,8 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 `Must · 5 · New · FR10 · C1; repeat-use KPI; validation §3.2`
 
 **As a** dev student who forgets about cleanup until it's an emergency, **I want** a heads-up when my disk passes 85% full, with how much I could get back, **so that** I clean up before "Storage Almost Full."
+
+*Implemented on `feature/simple-user-stories`: opt-in reminders while the app is open; 85% threshold, five percentage points or seven days between dismissed reminders, persisted settings, and a fallback reminder when OS notifications are unavailable. Clicking opens the ordinary validated approval preview. Estimates reuse the latest scan and never trigger recurring full scans.*
 
 - **Given** my disk passes 85% full, **then** I get one notification, such as "You're 87% full. I can get you about 18 GB back." It opens the plan preview and never runs anything on its own.
 - **Given** I dismiss it, **then** it stays quiet until the disk fills another 5% or 7 days pass.

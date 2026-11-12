@@ -1,10 +1,11 @@
 // Electron entry point: opens the window and connects the UI to the backend engine over IPC.
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { Engine } = require('./backend/engine');
 const { makeDemoFolder } = require('./scripts/make-demo-folder');
+const { StorageWatch } = require('./backend/storage-watch');
 
 // Load the API key from the repo's root .env, if there is one. A key already set in the shell wins.
 // The key stays in this (main) process; the window never sees it and has no way to set one.
@@ -21,6 +22,10 @@ const arg = (name) => {
 
 let win;
 let engine;
+let storageWatch;
+let storageTimer;
+let storageNotice = null;
+let storageNotification = null;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -64,6 +69,58 @@ function diskInfo() {
   }
 }
 
+function sendStorage(channel, value) {
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, value);
+}
+
+function openStoragePreview() {
+  if (!storageWatch.status().enabled || !win || win.isDestroyed()) return;
+  win.show();
+  win.focus();
+  sendStorage('storage-preview');
+}
+
+function notifyStorage(notice) {
+  storageNotice = notice;
+  sendStorage('storage-alert', notice);
+  // The in-app reminder is available even when the OS blocks notifications.
+  if (arg('ui-test') || !Notification.isSupported()) return;
+  try {
+    const previous = storageNotification;
+    storageNotification = null;
+    previous?.close();
+    const notification = new Notification({ title: 'Storage is getting full', body: notice.text });
+    storageNotification = notification;
+    notification.on('click', openStoragePreview);
+    notification.on('close', () => {
+      // A notification being replaced or disabled is not a fresh dismissal.
+      if (storageNotification === notification && storageWatch.status().enabled) storageWatch.dismiss();
+    });
+    notification.on('failed', () => {});
+    notification.show();
+  } catch { /* The in-app reminder already delivered the same offer. */ }
+}
+
+function checkStorage() {
+  if (!storageWatch?.status().enabled) return;
+  const disk = diskInfo();
+  if (!disk || !Number.isFinite(disk.total) || disk.total <= 0 || !Number.isFinite(disk.free) || disk.free < 0 || disk.free > disk.total) return;
+  storageWatch.check({ usedFraction: 1 - disk.free / disk.total });
+}
+
+function storageStatus() {
+  return { enabled: storageWatch.status().enabled, notice: storageNotice };
+}
+
+function invalidateStorageEstimate() {
+  engine.cachedStorageEstimate = null;
+  storageNotice = null;
+  const notification = storageNotification;
+  storageNotification = null;
+  notification?.close();
+  sendStorage('storage-alert', null);
+}
+
 function profileView() {
   // FEAT-01: locked zones are marked so the page can say why they can't change. The backend enforces it either way.
   const zones = engine.profile.data.zones.map((z) => ({ ...z, locked: engine.profile.isLocked(z.path) }));
@@ -74,6 +131,7 @@ function profileView() {
 function zoneChange(change) {
   try {
     change();
+    invalidateStorageEstimate();
     return profileView();
   } catch (err) {
     return { error: err.message };
@@ -86,6 +144,7 @@ function registerIpc() {
     disk: diskInfo(),
     profile: profileView(),
     usage: engine.usage.status(),
+    storageWatch: storageStatus(),
     demoFolder: arg('demo-folder'),
     screenshot: Boolean(arg('screenshot')),
     screenshotRequest: arg('screenshot-request'),
@@ -94,7 +153,11 @@ function registerIpc() {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'], defaultPath: path.join(os.homedir(), 'Downloads') });
     return res.canceled ? null : res.filePaths[0];
   });
-  handle('scan', (_e, folder) => engine.openFolder(folder));
+  handle('scan', (_e, folder) => {
+    const info = engine.openFolder(folder);
+    checkStorage();
+    return info;
+  });
   // The guided demo always runs on a fresh practice folder outside the user's real files.
   handle('prepare-tour', () => {
     const folder = makeDemoFolder(path.join(os.tmpdir(), 'cleanasaurus-tour', 'Downloads'));
@@ -104,7 +167,7 @@ function registerIpc() {
     engine.profile.save();
     return { folder, profile: profileView() };
   });
-  handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
+  handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt), (progress) => e.sender.send('breakdown-progress', progress)));
   handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
   handle('execute', (_e, planId, ids, opts) => ({ ...engine.execute(planId, ids, opts), disk: diskInfo() }));
   handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
@@ -123,18 +186,40 @@ function registerIpc() {
   // US-04: names are checked in the backend; a refused one comes back as { error } and nothing is saved.
   handle('protect', (_e, names) => {
     try {
-      return { ...engine.protect(names), profile: profileView() };
+      const result = engine.protect(names);
+      invalidateStorageEstimate();
+      return { ...result, profile: profileView() };
     } catch (err) {
       return { error: err.message };
     }
   });
   handle('unprotect', (_e, name) => {
     engine.profile.unprotect(name);
+    invalidateStorageEstimate();
     return profileView();
   });
   handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
   handle('go-pro', () => engine.usage.goPro());
   handle('set-semester-end', (_e, date) => engine.setSemesterEnd(date));
+  handle('set-storage-watch', (_e, on) => {
+    storageWatch.setEnabled(on);
+    if (on) checkStorage();
+    else {
+      storageNotice = null;
+      const notification = storageNotification;
+      storageNotification = null;
+      notification?.close();
+    }
+    return storageStatus();
+  });
+  handle('dismiss-storage-watch', () => {
+    storageWatch.dismiss();
+    storageNotice = null;
+    const notification = storageNotification;
+    storageNotification = null;
+    notification?.close();
+    return storageStatus();
+  });
   handle('export-usage', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });
     if (res.canceled || !res.filePath) return null;
@@ -154,6 +239,13 @@ app.whenReady().then(() => {
   // Removed duplicates go to the macOS Trash (US-13); tests pass --trash-dir to keep the real Trash clean.
   // --home points the Xcode check (US-08) and the package caches at a fake home folder; the UI test uses it.
   engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData'), trashDir: arg('trash-dir') || path.join(os.homedir(), '.Trash'), home: arg('home') || os.homedir() });
+  storageWatch = new StorageWatch({
+    enabled: engine.profile.data.storageWatch?.enabled === true,
+    state: engine.profile.data.storageWatch,
+    estimate: () => engine.folder ? engine.storageEstimate?.() || 0 : 0,
+    notify: notifyStorage,
+    save: (state) => { engine.profile.data.storageWatch = state; engine.profile.save(); },
+  });
   // The generated demo folder is safe to change freely.
   if (arg('demo-folder')) {
     engine.profile.setZone(arg('demo-folder'), 'free');
@@ -161,9 +253,20 @@ app.whenReady().then(() => {
   }
   registerIpc();
   createWindow();
+  win.webContents.once('did-finish-load', () => {
+    checkStorage();
+    if (storageNotice) sendStorage('storage-alert', storageNotice);
+  });
+  storageTimer = setInterval(checkStorage, 60_000);
+  storageTimer.unref();
   engine.usage.onChange = () => win.webContents.send('usage', engine.usage.status());
-  if (arg('ui-test')) require('./test/ui-smoke')(win, arg('ui-test'));
+  if (arg('ui-test')) {
+    // Main-process-only fake readings for UI tests; never exposed through the page's API.
+    module.exports.storageWatchTest = { check: (reading) => storageWatch.check(reading), status: () => storageWatch.status(), preview: openStoragePreview };
+    require('./test/ui-smoke')(win, arg('ui-test'));
+  }
   if (arg('tour-test')) require('./test/tour-check')(win, arg('tour-test'));
 });
 
 app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => clearInterval(storageTimer));

@@ -22,6 +22,10 @@ function summarize(plan, { recentlyOpened = [] } = {}) {
   if (caches.length) parts.push(`clear ${plural(caches.length, 'package cache')}`);
   const sims = by('remove_simulator');
   if (sims.length) parts.push(`remove ${plural(sims.length, 'unused simulator runtime')} (${size(sims.reduce((n, a) => n + (a.bytes || 0), 0))})`);
+  const docker = [...by('remove_docker_image'), ...by('clear_docker_build_cache')];
+  if (docker.length) parts.push(`remove ${plural(docker.length, 'unused Docker item')} (Docker estimate ${size(docker.reduce((n, a) => n + (a.bytes || 0), 0))})`);
+  const models = by('remove_ml_model');
+  if (models.length) parts.push(`remove ${plural(models.length, 'downloaded model')} (${size(models.reduce((n, a) => n + (a.bytes || 0), 0))}); they re-download when needed`);
   const moves = [...by('move'), ...by('rename')];
   if (moves.length) parts.push(`move ${plural(moves.length, 'file')} into ${plural(new Set(moves.map((a) => a.dest)).size, 'folder')}`);
   const dups = by('trash_duplicate');
