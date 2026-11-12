@@ -227,6 +227,38 @@ const STEPS = [
     if (!/capstone-team7/.test(actions)) throw new Error('capstone-team7 is still left out');
     if (/portfolio-site/.test(actions)) throw new Error('portfolio-site lost its protection');
     return 'ok';`],
+  // US-08 (#9): old Xcode build data in ~/Library (a fake home, see scripts/ui-test.js) is offered and deleted,
+  // and undo says how it comes back instead of offering a command to run.
+  ['US-08 asking to clean Xcode offers old build data, APPROVE deletes it, and UNDO says Xcode rebuilds it', async ({ win, base }) => {
+    const dd = path.join(base, 'home', 'Library', 'Developer', 'Xcode', 'DerivedData', 'OldApp-abc123');
+    fs.mkdirSync(path.join(dd, 'Build'), { recursive: true });
+    fs.writeFileSync(path.join(dd, 'info.plist'), '<plist><dict><key>WorkspacePath</key><string>/nope/OldApp.xcodeproj</string></dict></plist>');
+    fs.writeFileSync(path.join(dd, 'Build', 'App'), 'b'.repeat(256 * 1024));
+    const old = new Date(Date.now() - 45 * 864e5);
+    for (const p of [path.join(dd, 'Build', 'App'), path.join(dd, 'Build'), path.join(dd, 'info.plist'), dd]) fs.utimesSync(p, old, old);
+    const row = await win.webContents.executeJavaScript(`(async () => {
+      const cards = () => document.querySelectorAll('.card');
+      const n = cards().length;
+      await sendRequest('Clean up my Xcode build data');
+      if (cards().length === n) throw new Error('no plan card');
+      const card = [...cards()].pop();
+      const rows = [...card.querySelectorAll('.action')].map((a) => a.textContent);
+      if (rows.length !== 1 || !/OldApp-abc123/.test(rows[0])) throw new Error('plan shows: ' + rows.join(' | '));
+      if (!/rebuilds it on the next build/.test(rows[0])) throw new Error('no rebuild note: ' + rows[0]);
+      card.querySelector('.btn-primary').click();
+      await __t.waitFor(() => /Done! 1 actions complete/.test(__t.botText()), 'Done message');
+      return rows[0];
+    })()`);
+    if (fs.existsSync(dd)) throw new Error('DerivedData is still there after APPROVE');
+    await win.webContents.executeJavaScript(`(async () => {
+      __t.button('↶ UNDO').click();
+      const last = () => [...document.querySelectorAll('.msg.bot')].pop();
+      await __t.waitFor(() => /Undone\\./.test(last().textContent) && /Xcode rebuilds it on the next build/.test(last().textContent), 'undo note');
+      if (last().querySelector('button')) throw new Error('undo offers a button: ' + last().querySelector('button').textContent);
+      return true;
+    })()`);
+    return row.includes('REBUILDABLE') ? 'offered, deleted, undo explained' : row;
+  }],
 ];
 
 module.exports = function runUiTest(win, resultFile) {

@@ -20,6 +20,8 @@ function summarize(plan, { recentlyOpened = [] } = {}) {
   if (permanent.length) parts.push(`permanently delete ${plural(permanent.length, 'item')} from the Trash (${size(permanent.reduce((n, a) => n + (a.bytes || 0), 0))})`);
   const caches = by('clear_cache');
   if (caches.length) parts.push(`clear ${plural(caches.length, 'package cache')}`);
+  const sims = by('remove_simulator');
+  if (sims.length) parts.push(`remove ${plural(sims.length, 'unused simulator runtime')} (${size(sims.reduce((n, a) => n + (a.bytes || 0), 0))})`);
   const moves = [...by('move'), ...by('rename')];
   if (moves.length) parts.push(`move ${plural(moves.length, 'file')} into ${plural(new Set(moves.map((a) => a.dest)).size, 'folder')}`);
   const dups = by('trash_duplicate');
@@ -31,7 +33,9 @@ function summarize(plan, { recentlyOpened = [] } = {}) {
   const recent = plan.actions.map((a) => a.path).filter((p) => recentlyOpened.includes(p)).map((p) => path.basename(p));
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
   const warn = recent.length ? ` (includes ${recent.join(', ')}, opened today)` : '';
-  const where = plan.folder ? ` Nothing outside ${path.basename(plan.folder)} changes.` : '';
+  // Only promised when it's true: caches and Xcode items (US-08) live outside the folder.
+  const inside = (p) => path.isAbsolute(p) && (path.resolve(p) + path.sep).startsWith(path.resolve(plan.folder) + path.sep);
+  const where = plan.folder && plan.actions.every((a) => inside(a.path)) ? ` Nothing outside ${path.basename(plan.folder)} changes.` : '';
   return `${list[0].toUpperCase()}${list.slice(1)}${warn}.${where}`;
 }
 

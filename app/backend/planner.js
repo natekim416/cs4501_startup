@@ -23,7 +23,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -57,12 +57,14 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - quarantine: isolate "path". Only for files listed in malware_findings.
 - clear_cache: empty the package-manager cache folder "path". Only for paths listed in package_caches, and only if the user asks about caches or wants as much space as possible.
 - delete_from_trash: permanently delete "path", an item already in the user's Trash. Only for paths listed in trash_items, and only when the user asks to empty the Trash or permanently delete trashed files. It can't be undone; the user must confirm it separately.
-- delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
+- delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items, or Xcode DerivedData folders listed in xcode_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
+- remove_simulator: remove the simulator runtime "path" (an id like simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0) and its devices. Only for simulator runtimes listed in xcode_items, and only if the user asks about Xcode or simulators, or wants as much space as possible.
 
 Rules:
 - Every action needs a short, plain-English "reason".
 - Only put new folders and moved files inside the allowed destination roots.
 - Never act on files in "never" zones. Files in "ask" zones are allowed but the user will be asked.
+- ~/Library is a never zone. The only exceptions are the exact paths in xcode_items; never anything else there, and never Xcode Archives.
 - Follow the user's saved preferences.
 - Never propose any action inside a folder listed in protected_projects (names, or patterns like capstone-*). The user asked to always keep them, and the validator will reject it.
 - Don't propose deleting anything in a project with uncommitted: true or last_changed_days under 30 unless the user named that project; the validator will reject it anyway.
@@ -78,7 +80,7 @@ function describeProject(project) {
   return { course: code ? `${code.replace(/\d+$/, '').toUpperCase()} ${code.match(/\d+$/)[0]}` : null, last_changed_days: info.lastChangedDays, uncommitted: info.uncommitted };
 }
 
-function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = []) {
+function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = [], xcode = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -98,6 +100,7 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
     projects: [...new Set(dev.map((d) => d.project))].map((p) => ({ name: path.basename(p), ...describeProject(p) })),
     package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
     trash_items: trashItems.slice(0, MAX_FILES_IN_PROMPT).map((t) => ({ path: t.path, bytes: t.bytes })),
+    xcode_items: xcode.map((x) => ({ path: x.path, kind: x.type === 'simulator' ? 'simulator runtime' : 'Xcode DerivedData', bytes: x.bytes, how: x.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
@@ -106,8 +109,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
   };
 }
 
-async function llmPlan({ request, scan, dev, caches, trashItems = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems))}`;
+async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems, xcode))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -141,7 +144,7 @@ const CATEGORIES = [
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
 
-function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
+function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
@@ -175,6 +178,11 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
   if (want(/(empty|clear|delete).*(trash|bin)|(trash|bin).*(empty|for good|permanent)/i)) {
     for (const t of trashItems) add({ op: 'delete_from_trash', path: t.path, reason: `${t.name} is already in the Trash` });
     return { summary: trashItems.length ? `Your Trash has ${trashItems.length} item(s). Check the ones to delete for good.` : 'Your Trash is empty.', actions, questions };
+  }
+  // US-08: an Xcode request plans only Xcode's own clutter, nothing in the folder.
+  if (want(/xcode|simulators?|derived ?data/i)) {
+    for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
+    return { summary: xcode.length ? `I found ${xcode.length} Xcode item(s) you haven't used in a while.` : "I didn't find any Xcode build data or simulators you haven't used in a while.", actions, questions };
   }
   if (want(/cache/i)) {
     for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });

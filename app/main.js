@@ -130,7 +130,8 @@ function registerIpc() {
 
 app.whenReady().then(() => {
   // Removed duplicates go to the macOS Trash (US-13); tests pass --trash-dir to keep the real Trash clean.
-  engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData'), trashDir: arg('trash-dir') || path.join(os.homedir(), '.Trash') });
+  // --home points the Xcode check (US-08) and the package caches at a fake home folder; the UI test uses it.
+  engine = new Engine({ dataDir: arg('data-dir') || app.getPath('userData'), trashDir: arg('trash-dir') || path.join(os.homedir(), '.Trash'), home: arg('home') || os.homedir() });
   // The generated demo folder is safe to change freely.
   if (arg('demo-folder')) {
     engine.profile.setZone(arg('demo-folder'), 'free');

@@ -1,0 +1,120 @@
+US-08 (#9) green run, 2026-11-11 21:41. Branch us-08-xcode-cleanup, from beta.
+Built: backend/ecosystems/xcode.js (old DerivedData and unused simulator runtimes), the validator opening only those exact
+items in ~/Library (Archives always refused), the remove_simulator action, undo notes, and the Xcode request in both planners.
+
+$ npm test   (the 12 US-08 tests and the summary; the other 153 tests are unchanged)
+✔ US-08 DerivedData for a project that no longer exists is offered as rebuildable (12.665334ms)
+✔ US-08 simulator runtimes unused for 180 days are offered with size and a re-download note (2.796208ms)
+✔ US-08 Xcode Archives and the rest of ~/Library stay NEVER (3.101833ms)
+✔ US-08 DerivedData for a project that still exists is offered only after 30 days without a build (12.143166ms)
+✔ US-08 a simulator runtime is kept if any device booted in the last 180 days, or if there's no date to prove it (3.242208ms)
+✔ US-08 a simulator runtime that ships inside Xcode is never offered, however old (1.257583ms)
+✔ US-08 asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER (250.087833ms)
+✔ US-08 the validator opens only the exact Xcode items, and nothing else in ~/Library (120.129625ms)
+✔ US-08 DerivedData that is built again after the plan is made is refused at approval (107.9295ms)
+✔ US-08 undoing an Xcode cleanup says how each item comes back, instead of offering a command to run (179.458834ms)
+✔ US-08 the one-line summary counts simulator runtimes and doesn't claim nothing outside the folder changes (117.765666ms)
+✔ US-08 Claude is told which Xcode items it may use, and how (104.359ms)
+ℹ tests 165
+ℹ suites 0
+ℹ pass 143
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 22
+ℹ duration_ms 14986.993
+exit 0
+
+$ npm run test:todos
+22 todo tests are red, as expected.
+exit 0
+
+$ npm run test:ui
+✔ first launch asks about the usage log, and it stays off until answered  (ok)
+✔ saying yes turns the log on and the prompt goes away  (ok)
+✔ app starts and scans the demo folder  (19 files · 83.5 MB · zone: FREE)
+✔ there is no API key box: the key stays in the backend (.env), and the page cannot set one  (ok)
+✔ "Free up space" shows a plan that passed checks  (7 actions)
+✔ APPROVE runs the plan, and FREED is honest about the Dino Bin (US-12)  (freed 0 B, bin noted)
+✔ UNDO reverses it  (ok)
+✔ NEVER zone: dino refuses clearly, no plan card  (ok)
+✔ back to FREE: plan appears and asks about resume versions  (ok)
+✔ answering replaces the plan; the old card can no longer be approved  (ok)
+✔ approving the new plan runs it  (ok)
+✔ the practice folder stayed out of the usage log  (ok)
+✔ a run and undo on a real folder are logged  (5 events)
+✔ EXPORT saves a copy with counts and no file names  (logging_on, scan, plan, run, undo)
+✔ TURN OFF deletes the log  (ok)
+✔ FEAT-01 clicking a zone opens a picker with FREE, ASK and NEVER, and the current one marked  (free, ask (current), never)
+✔ FEAT-01 picking a zone changes nothing until CONFIRM, and CANCEL leaves it as it was  (ok)
+✔ FEAT-01 Escape, or clicking the zone again, closes the picker without changing anything  (ok)
+✔ FEAT-01 CONFIRM saves the zone, writes it to the Safety Log, and marks plans out of date  (ok)
+✔ FEAT-01 macOS folders are locked, and the page cannot change them through the backend either  (ok)
+✔ US-04 "keep anything on my resume" shows a checklist of projects, and SAVE protects only the ones picked  (capstone-team7, cs3140-hw1, portfolio-site)
+✔ US-04 later plans skip protected projects and say so  (ok)
+✔ US-04 removing a protection in DINO MEMORY lets the project back into plans  (ok)
+✔ US-08 asking to clean Xcode offers old build data, APPROVE deletes it, and UNDO says Xcode rebuilds it  (offered, deleted, undo explained)
+
+UI smoke test passed (24 steps)
+exit 0
+
+Three checks were added after the code: one new test (a runtime that ships inside Xcode is never offered) and two
+stronger assertions (recent DerivedData gets its own reason; Claude's rules close ~/Library except for xcode_items).
+They came from the check below, which first MISSED those three. Each guard was taken out in turn, the US-08 tests
+were run, and the code was put back:
+
+caught  validator: refuse a simulator runtime nobody offered
+        by: the validator opens only the exact Xcode items, and nothing else in ~/Library
+caught  validator: simulator steps come from the Xcode check, not the plan
+        by: asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER
+            undoing an Xcode cleanup says how each item comes back, instead of offering a command to run
+caught  validator: Xcode Archives always refused
+        by: Xcode Archives and the rest of ~/Library stay NEVER
+caught  validator: only the exact DerivedData folders offered
+        by: the validator opens only the exact Xcode items, and nothing else in ~/Library
+            undoing an Xcode cleanup says how each item comes back, instead of offering a command to run
+caught  validator: recent DerivedData gets its own reason
+        by: the validator opens only the exact Xcode items, and nothing else in ~/Library
+caught  engine: re-run the Xcode check at approval
+        by: DerivedData that is built again after the plan is made is refused at approval
+caught  engine: no "still active" note for Xcode build data
+        by: asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER
+caught  xcode: 30 days without a build
+        by: DerivedData for a project that still exists is offered only after 30 days without a build
+            asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER
+            the validator opens only the exact Xcode items, and nothing else in ~/Library
+            DerivedData that is built again after the plan is made is refused at approval
+caught  xcode: shared caches with no info.plist are skipped
+        by: DerivedData for a project that still exists is offered only after 30 days without a build
+caught  xcode: 180 days without a simulator boot
+        by: a simulator runtime is kept if any device booted in the last 180 days, or if there's no date to prove it
+caught  xcode: no date means no proof
+        by: a simulator runtime is kept if any device booted in the last 180 days, or if there's no date to prove it
+caught  xcode: every device boot counts
+        by: simulator runtimes unused for 180 days are offered with size and a re-download note
+            asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER
+            the validator opens only the exact Xcode items, and nothing else in ~/Library
+            undoing an Xcode cleanup says how each item comes back, instead of offering a command to run
+            the one-line summary counts simulator runtimes and doesn't claim nothing outside the folder changes
+            Claude is told which Xcode items it may use, and how
+caught  xcode: a runtime built into Xcode is skipped
+        by: a simulator runtime that ships inside Xcode is never offered, however old
+caught  executor: undo explains instead of offering a command
+        by: undoing an Xcode cleanup says how each item comes back, instead of offering a command to run
+caught  planner: an Xcode request plans only Xcode items
+        by: asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER
+            DerivedData that is built again after the plan is made is refused at approval
+            undoing an Xcode cleanup says how each item comes back, instead of offering a command to run
+            the one-line summary counts simulator runtimes and doesn't claim nothing outside the folder changes
+caught  planner: the ~/Library rule for Claude
+        by: Claude is told which Xcode items it may use, and how
+caught  summary: count simulator runtimes
+        by: the one-line summary counts simulator runtimes and doesn't claim nothing outside the folder changes
+caught  summary: no "nothing outside" claim when something is outside
+        by: the one-line summary counts simulator runtimes and doesn't claim nothing outside the folder changes
+
+Every mutation was caught.
+
+Not checked on a real Mac with Xcode: this one has only the Command Line Tools, so the simulator commands
+(xcrun simctl list devices --json, simctl runtime list -j, simctl delete, simctl runtime delete) ran against fake
+output shaped like Apple's. DerivedData uses real folders in the tests and the UI test.
