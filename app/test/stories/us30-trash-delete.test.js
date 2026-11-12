@@ -1,4 +1,4 @@
-// US-24 · Permanently delete what's already in the Trash, only after I confirm, and nothing else.
+// US-30 · Permanently delete what's already in the Trash, only after I confirm, and nothing else.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -23,7 +23,7 @@ function setup() {
 
 const del = (id, p) => ({ id, op: 'delete_from_trash', path: p, dest: '', keep: '', reason: 'already in the Trash' });
 
-test('US-24 "empty my trash" plans a permanent delete for each item in the Trash, every one unchecked with a warning', async () => {
+test('US-30 "empty my trash" plans a permanent delete for each item in the Trash, every one unchecked with a warning', async () => {
   const { trash, engine } = setup();
   const plan = await engine.plan('Empty my trash');
   const ops = plan.actions.filter((a) => a.op === 'delete_from_trash');
@@ -33,7 +33,7 @@ test('US-24 "empty my trash" plans a permanent delete for each item in the Trash
   assert.ok(plan.actions.every((a) => a.op === 'delete_from_trash'), 'nothing outside the Trash');
 });
 
-test('US-24 the validator rejects permanent deletes outside the Trash, escapes like "..", and the Trash folder itself (edge cases)', () => {
+test('US-30 the validator rejects permanent deletes outside the Trash, escapes like "..", and the Trash folder itself (edge cases)', () => {
   const { folder, trash, engine } = setup();
   const ctx = { scan: engine.snapshot, findings: [], profile: engine.profile, home: engine.home, trashDir: trash };
   const outside = validate({ actions: [del('a1', path.join(folder, 'notes.txt'))] }, ctx);
@@ -47,7 +47,7 @@ test('US-24 the validator rejects permanent deletes outside the Trash, escapes l
   assert.ok(inside.needsApproval.includes('a5'), 'always asks');
 });
 
-test('US-24 approving without the confirmation deletes nothing; confirming deletes for real, and undo says it cannot bring it back', async () => {
+test('US-30 approving without the confirmation deletes nothing; confirming deletes for real, and undo says it cannot bring it back', async () => {
   const { trash, engine } = setup();
   const plan = await engine.plan('Empty my trash');
   const ids = plan.actions.map((a) => a.id);
@@ -65,7 +65,7 @@ test('US-24 approving without the confirmation deletes nothing; confirming delet
   assert.ok(!fs.existsSync(path.join(trash, 'old portfolio.mov')));
 });
 
-test('US-24 the executor itself refuses a permanent delete outside the Trash, even if the validator were skipped', () => {
+test('US-30 the executor itself refuses a permanent delete outside the Trash, even if the validator were skipped', () => {
   const folder = tmp();
   const victim = write(path.join(folder, 'thesis.docx'), 'irreplaceable');
   const ex = new Executor(tmp(), { trashDir: tmp() });
@@ -74,7 +74,7 @@ test('US-24 the executor itself refuses a permanent delete outside the Trash, ev
   assert.ok(fs.existsSync(victim));
 });
 
-test('US-24 with Claude, the Trash contents are in the request and delete_from_trash is an allowed action', async () => {
+test('US-30 with Claude, the Trash contents are in the request and delete_from_trash is an allowed action', async () => {
   const { trash, engine } = setup();
   const requests = [];
   const client = { beta: { messages: { create: async (req) => { requests.push(req); return { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ summary: 's', actions: [], questions: [] }) }] }; } } } };

@@ -45,8 +45,18 @@ function countOps(actions) {
   return Object.fromEntries(OPS.map((op) => [`ops_${op}`, actions.filter((a) => a.op === op).length]));
 }
 
+// Red-team F13: a model that never answers can't leave the app stuck on "Planning...".
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Claude didn't answer within ${Math.round(ms / 1000)} seconds. Try again, or ask for something smaller.`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000 } = {}) {
+    this.planTimeoutMs = planTimeoutMs;
     this.llmClient = llmClient;
     this.dataDir = dataDir;
     this.home = home;
@@ -84,6 +94,9 @@ class Engine {
 
   // The user picked or rescanned a folder. plan() also rescans, so only this counts as a scan in the log.
   openFolder(folder) {
+    // The page picks a folder; it must be a full path to a real folder (red-team round 2 note).
+    if (typeof folder !== 'string' || !path.isAbsolute(folder)) throw new Error('Pick a folder with its full path.');
+    if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`${folder} isn't a folder I can open.`);
     const info = this.scanFolder(folder);
     this.track('scan', {
       files: info.fileCount,
@@ -178,8 +191,9 @@ class Engine {
     let check;
 
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined });
-      plan = made.plan;
+      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined }), this.planTimeoutMs);
+      // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
+      plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
       check = validate(plan, ctx);
       const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
       attempts.push(attempt);
@@ -188,11 +202,13 @@ class Engine {
       previous = { plan, errors: check.errors };
     }
 
-    const questions = [...(plan.questions || [])];
+    const questions = Array.isArray(plan.questions)
+      ? plan.questions.filter((q) => q && typeof q.text === 'string' && Array.isArray(q.options)).map((q) => ({ text: q.text, options: q.options.filter((o) => typeof o === 'string') }))
+      : [];
     if (!check.ok) {
       // Still failing after the retries: keep only the actions that pass on their own, and ask.
       const bad = new Set(check.errors.map((e) => e.action).filter(Boolean));
-      const actions = Array.isArray(plan.actions) ? plan.actions.filter((a) => !bad.has(a.id)) : [];
+      const actions = Array.isArray(plan.actions) ? plan.actions.filter((a) => a && typeof a === 'object' && !bad.has(a.id)) : [];
       plan = { ...plan, actions };
       check = validate(plan, ctx);
       if (!check.ok) plan = { ...plan, actions: [] };
@@ -210,9 +226,20 @@ class Engine {
     }
     for (const s of check.strange) questions.push({ text: s.text, options: ['Yes, go ahead', 'No, leave it'], action: s.action });
 
+    // Nothing safe to do: say why (the checker's reasons, or why a named project has nothing rebuildable),
+    // so the user isn't left with an empty reply and nothing to approve.
+    if (!(plan.actions || []).length && !questions.length) {
+      const why = [...new Set(attempts.flatMap((a) => a.errors))];
+      for (const name of intent.matched) {
+        const items = this.dev.filter((d) => path.basename(d.project) === name);
+        if (!items.some((d) => d.label === 'rebuildable')) why.push(...items.map((d) => `${name}: ${d.reason}`));
+      }
+      if (why.length) plan = { ...plan, summary: `I couldn't find anything safe to change, so there's nothing to approve:\n- ${why.join('\n- ')}` };
+    }
+
     // A project the user named but touched recently is allowed, and shown unchecked so they decide.
     for (const a of plan.actions || []) {
-      // US-24: permanent deletes start unchecked; the user opts in and confirms.
+      // US-30: permanent deletes start unchecked; the user opts in and confirms.
       if (a.op === 'delete_from_trash') Object.assign(a, { checked: false, note: 'Permanent: this deletes it from the Trash for good and cannot be undone.' });
       // Xcode's own build data has its own 30-day rule (US-08); its parent folder isn't a project.
       if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path)) continue;
@@ -318,6 +345,8 @@ class Engine {
   }
 
   execute(planId, actionIds, { confirmPermanent = false } = {}) {
+    // Only a list of exact ids: a string would match ids by substring (red-team note).
+    if (!Array.isArray(actionIds) || !actionIds.every((x) => typeof x === 'string')) return { ok: false, errors: ['Pick actions from the plan.'] };
     // Only the newest plan can run: older cards may point at files that have since changed.
     if (!this.lastPlan || this.lastPlan.id !== planId) {
       return { ok: false, errors: ['This plan is out of date. Ask me again and approve the newest plan.'] };
@@ -331,7 +360,7 @@ class Engine {
     const chosen = picked.filter((a) => a.op !== 'mkdir' || !filesInto(path.resolve(a.path), all) || filesInto(path.resolve(a.path), picked));
     const skippedFolders = picked.length - chosen.length;
     const uncheckedMoves = all.filter((a) => (a.op === 'move' || a.op === 'rename') && !actionIds.includes(a.id)).length;
-    // US-24: nothing is permanently deleted unless the user confirmed it in a separate step.
+    // US-30: nothing is permanently deleted unless the user confirmed it in a separate step.
     if (chosen.some((a) => a.op === 'delete_from_trash') && !confirmPermanent) {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }
@@ -392,8 +421,11 @@ class Engine {
   }
 
   // US-15: rebuild something we deleted, from the recipe the proof saved. Logged as a count, never a path.
-  rebuild(recipe) {
-    return rebuild(recipe, { record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
+  // The page names a deleted folder's recipe; the command that runs always comes from our own record (F1).
+  rebuild(request, { run } = {}) {
+    const recorded = this.executor.recordedRecipe(request);
+    if (!recorded) return { ok: false, message: 'I can only rebuild a folder I deleted myself, using the command I saved when I deleted it.' };
+    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
   }
 
   undoAction(batchId, actionId) {

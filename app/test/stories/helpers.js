@@ -66,14 +66,14 @@ function makeJsProject(root, name, { lock = 'npm', ageDays = 60, repo = true, ig
 const PY_RECIPES = { requirements: 'requirements.txt', uv: 'uv.lock', poetry: 'poetry.lock' };
 
 // A Python project with a .venv virtual environment.
-function makePyProject(root, name, { recipe = 'requirements', ageDays = 60, repo = false } = {}) {
+function makePyProject(root, name, { recipe = 'requirements', ageDays = 60, repo = false, venvName = '.venv' } = {}) {
   const dir = path.join(root, name);
   write(path.join(dir, 'main.py'), 'print("hi")\n');
   if (recipe) write(path.join(dir, PY_RECIPES[recipe]), 'numpy==2.1.0\n');
-  write(path.join(dir, '.venv', 'pyvenv.cfg'), 'home = /usr/bin\n');
-  write(path.join(dir, '.venv', 'lib', 'python3.12', 'site-packages', 'numpy', '__init__.py'), 'x'.repeat(32 * 1024));
+  write(path.join(dir, venvName, 'pyvenv.cfg'), 'home = /usr/bin\n');
+  write(path.join(dir, venvName, 'lib', 'python3.12', 'site-packages', 'numpy', '__init__.py'), 'x'.repeat(32 * 1024));
   if (repo) {
-    write(path.join(dir, '.gitignore'), '.venv/\n');
+    write(path.join(dir, '.gitignore'), `${venvName}/\n`);
     gitCommitAll(dir);
   }
   age(dir, ageDays);

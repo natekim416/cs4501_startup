@@ -15,12 +15,34 @@ class Executor {
     this.binDir = path.join(dataDir, 'dino-bin');
     this.quarantineDir = path.join(dataDir, 'quarantine');
     this.logFile = path.join(dataDir, 'undo-log.json');
+    this.recipeFile = path.join(dataDir, 'rebuild-recipes.json');
     this.history = [];
+    this.recipes = [];
     try {
       this.history = JSON.parse(fs.readFileSync(this.logFile, 'utf8'));
     } catch {
       // No history yet.
     }
+    try {
+      this.recipes = JSON.parse(fs.readFileSync(this.recipeFile, 'utf8'));
+    } catch {
+      // No recipes yet.
+    }
+  }
+
+  // Every rebuild command this app saved when it deleted a folder. Rebuild runs only these (F1): the page
+  // can name one, but it can never supply a command of its own.
+  recordRecipe(step) {
+    const r = step.recipe;
+    if (!r || !r.command || this.recordedRecipe(r)) return;
+    this.recipes.push({ path: step.path, ...r });
+    fs.mkdirSync(path.dirname(this.recipeFile), { recursive: true });
+    fs.writeFileSync(this.recipeFile, JSON.stringify(this.recipes, null, 2));
+  }
+
+  recordedRecipe(request) {
+    if (!request || typeof request.command !== 'string' || typeof request.cwd !== 'string') return null;
+    return this.recipes.find((r) => r.command === request.command && r.cwd === request.cwd) || null;
   }
 
   saveLog() {
@@ -35,6 +57,7 @@ class Executor {
       try {
         const step = this.apply(a, batch.id);
         if (step) batch.steps.push({ ...step, actionId: a.id });
+        if (step && step.type === 'deleted') this.recordRecipe(step);
         results.push({ id: a.id, ok: true });
       } catch (err) {
         results.push({ id: a.id, ok: false, error: err.message });
@@ -46,6 +69,10 @@ class Executor {
   }
 
   apply(a, batchId) {
+    // Defense in depth for red-team F3: never act on a path the validator could have read differently.
+    if (['path', 'dest', 'keep'].some((k) => typeof a[k] === 'string' && a[k].split(/[\\/]/).includes('..'))) {
+      throw new Error('Refusing a path with "..".');
+    }
     if (a.op === 'mkdir') {
       if (fs.existsSync(a.path)) return null;
       fs.mkdirSync(a.path, { recursive: true });
@@ -67,7 +94,8 @@ class Executor {
       const base = a.op === 'quarantine' ? this.quarantineDir : this.binDir;
       const dir = path.join(base, batchId);
       fs.mkdirSync(dir, { recursive: true });
-      const to = path.join(dir, `${Date.now()}-${path.basename(a.path)}`);
+      // A free name, never a timestamp: two same-named files in one run must not overwrite each other (F8).
+      const to = freeName(dir, path.basename(a.path));
       fs.renameSync(a.path, to);
       if (a.op === 'quarantine') stripExecute(to);
       return { type: 'move', from: a.path, to };
@@ -122,37 +150,48 @@ class Executor {
     if (step.type === 'deleted_permanently') return { undone: 0, needsRebuild: [] };
     try {
       if (step.type === 'move') {
+        if (!fs.existsSync(step.to)) return { undone: 0, needsRebuild: [], failed: { path: step.from, reason: `${path.basename(step.to)} is no longer where I put it` } };
         fs.mkdirSync(path.dirname(step.from), { recursive: true });
-        fs.renameSync(step.to, step.from);
+        // Never overwrite: if something new sits at the old spot, the old file comes back beside it (F6).
+        const back = fs.existsSync(step.from) ? freeName(path.dirname(step.from), path.basename(step.from)) : step.from;
+        fs.renameSync(step.to, back);
+        return { undone: 1, needsRebuild: [], restoredAs: back === step.from ? null : { path: step.from, as: back } };
       } else if (step.type === 'mkdir' && fs.existsSync(step.path) && !removeIfEmpty(step.path)) {
         // The user put their own files in it since; leave it and say so.
         return { undone: 0, needsRebuild: [], kept: step.path };
       }
       return { undone: 1, needsRebuild: [] };
-    } catch {
-      return { undone: 0, needsRebuild: [] };
+    } catch (err) {
+      return { undone: 0, needsRebuild: [], failed: step.type === 'move' ? { path: step.from, reason: err.code || 'could not move it back' } : null };
     }
   }
 
   // Reverses the most recent batch, newest step first.
   undoLast() {
     const batch = this.history.pop();
-    if (!batch) return { undone: 0, needsRebuild: [], keptFolders: [], notes: [] };
+    if (!batch) return { undone: 0, needsRebuild: [], keptFolders: [], notes: [], failed: [], restoredAs: [] };
     let undone = 0;
     const needsRebuild = [];
     const keptFolders = [];
     const notes = [];
+    const failed = [];
+    const restoredAs = [];
     // Keep undoing the rest even if one step can't be reversed; skip steps already undone one by one.
     for (const step of [...batch.steps].reverse()) {
       if (step.undone) continue;
       const res = this.reverse(step);
       undone += res.undone;
+      if (res.undone) step.undone = true;
       needsRebuild.push(...res.needsRebuild);
       if (res.kept) keptFolders.push(res.kept);
       if (res.note) notes.push(res.note);
+      if (res.failed) failed.push(res.failed);
+      if (res.restoredAs) restoredAs.push(res.restoredAs);
     }
+    // A step that couldn't be reversed stays in the log, so it can be tried again (F7).
+    if (failed.length) this.history.push(batch);
     this.saveLog();
-    return { undone, needsRebuild, keptFolders, notes };
+    return { undone, needsRebuild, keptFolders, notes, failed, restoredAs };
   }
 }
 

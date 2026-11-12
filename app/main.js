@@ -30,9 +30,29 @@ function createWindow() {
     minHeight: 720,
     backgroundColor: '#1B1A2E',
     title: 'Cleanasaurus',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
   });
+  // The window only ever shows our own page: no navigating away, no new windows (red-team F15).
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.split('#')[0] !== INDEX_URL) e.preventDefault();
+  });
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (e.url.split('#')[0] !== INDEX_URL) e.preventDefault();
+  });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-attach-webview', (e) => e.preventDefault());
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+}
+
+const INDEX_URL = require('url').pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href;
+
+// Every request must come from our own page. Anything else gets an error and does nothing (F15).
+function handle(channel, fn) {
+  ipcMain.handle(channel, (e, ...args) => {
+    const from = e.senderFrame && e.senderFrame.url.split('#')[0];
+    if (from !== INDEX_URL) throw new Error('Blocked: that request did not come from Cleanasaurus.');
+    return fn(e, ...args);
+  });
 }
 
 function diskInfo() {
@@ -61,7 +81,7 @@ function zoneChange(change) {
 }
 
 function registerIpc() {
-  ipcMain.handle('init', () => ({
+  handle('init', () => ({
     mode: engine.mode,
     disk: diskInfo(),
     profile: profileView(),
@@ -70,13 +90,13 @@ function registerIpc() {
     screenshot: Boolean(arg('screenshot')),
     screenshotRequest: arg('screenshot-request'),
   }));
-  ipcMain.handle('pick-folder', async () => {
+  handle('pick-folder', async () => {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'], defaultPath: path.join(os.homedir(), 'Downloads') });
     return res.canceled ? null : res.filePaths[0];
   });
-  ipcMain.handle('scan', (_e, folder) => engine.openFolder(folder));
+  handle('scan', (_e, folder) => engine.openFolder(folder));
   // The guided demo always runs on a fresh practice folder outside the user's real files.
-  ipcMain.handle('prepare-tour', () => {
+  handle('prepare-tour', () => {
     const folder = makeDemoFolder(path.join(os.tmpdir(), 'cleanasaurus-tour', 'Downloads'));
     engine.practiceFolders.add(folder);
     engine.profile.setZone(folder, 'free');
@@ -84,43 +104,43 @@ function registerIpc() {
     engine.profile.save();
     return { folder, profile: profileView() };
   });
-  ipcMain.handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
-  ipcMain.handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
-  ipcMain.handle('execute', (_e, planId, ids, opts) => ({ ...engine.execute(planId, ids, opts), disk: diskInfo() }));
-  ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
-  ipcMain.handle('undo-one', (_e, batchId, actionId) => ({ ...engine.undoAction(batchId, actionId), disk: diskInfo() }));
-  ipcMain.handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));
-  ipcMain.handle('set-zone', (_e, zonePath, zone) => zoneChange(() => engine.profile.setZone(zonePath, zone)));
-  ipcMain.handle('change-zone', (_e, zonePath, zone) => zoneChange(() => engine.profile.changeZone(zonePath, zone)));
-  ipcMain.handle('set-target', (_e, destRoot) => {
+  handle('plan', (e, request) => engine.plan(request, (attempt) => e.sender.send('attempt', attempt)));
+  handle('answer', (e, question, choice) => engine.answer(question, choice, (attempt) => e.sender.send('attempt', attempt)));
+  handle('execute', (_e, planId, ids, opts) => ({ ...engine.execute(planId, ids, opts), disk: diskInfo() }));
+  handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
+  handle('undo-one', (_e, batchId, actionId) => ({ ...engine.undoAction(batchId, actionId), disk: diskInfo() }));
+  handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));
+  handle('set-zone', (_e, zonePath, zone) => zoneChange(() => engine.profile.setZone(zonePath, zone)));
+  handle('change-zone', (_e, zonePath, zone) => zoneChange(() => engine.profile.changeZone(zonePath, zone)));
+  handle('set-target', (_e, destRoot) => {
     engine.profile.setTargetPlan({ destRoots: destRoot ? [destRoot] : [] });
     return profileView();
   });
-  ipcMain.handle('forget', (_e, pref) => {
+  handle('forget', (_e, pref) => {
     engine.profile.forget(pref);
     return profileView();
   });
   // US-04: names are checked in the backend; a refused one comes back as { error } and nothing is saved.
-  ipcMain.handle('protect', (_e, names) => {
+  handle('protect', (_e, names) => {
     try {
       return { ...engine.protect(names), profile: profileView() };
     } catch (err) {
       return { error: err.message };
     }
   });
-  ipcMain.handle('unprotect', (_e, name) => {
+  handle('unprotect', (_e, name) => {
     engine.profile.unprotect(name);
     return profileView();
   });
-  ipcMain.handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
-  ipcMain.handle('export-usage', async () => {
+  handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
+  handle('export-usage', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });
     if (res.canceled || !res.filePath) return null;
     engine.usage.exportTo(res.filePath);
     return res.filePath;
   });
   // Used by `npm run screenshot` to capture the window for slides.
-  ipcMain.handle('capture', async () => {
+  handle('capture', async () => {
     const out = arg('screenshot');
     const image = await win.webContents.capturePage();
     fs.writeFileSync(out, image.toPNG());

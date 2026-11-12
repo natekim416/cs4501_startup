@@ -7,6 +7,11 @@ const { hashFile } = require('./scanner');
 const { rebuildProof, measureFreeable, toolCaches, isXcodeArchive } = require('./devclutter');
 const { isDerivedData } = require('./ecosystems/xcode');
 const { inTrash, itemBytes } = require('./trash');
+const { realPath } = require('./profile');
+
+// "a/link/../b" means one place to path.resolve and another to the OS once "link" is a symlink, so a
+// plan path with ".." is never allowed (red-team F3).
+const hasDotDot = (p) => typeof p === 'string' && p.split(/[\\/]/).includes('..');
 
 const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator']);
 const BIG_FILE = 1024 ** 3;
@@ -49,7 +54,12 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     const id = a && a.id ? a.id : `#${i + 1}`;
     const fail = (message) => errors.push({ action: id, message });
 
-    if (!a || !OPS.has(a.op)) return fail(`Unknown op "${a && a.op}". Allowed: ${[...OPS].join(', ')}.`);
+    if (!a || typeof a !== 'object') return fail('Each action must be an object.');
+    // Red-team F11: every field the model fills is text; anything else is an error to fix, not a crash.
+    const wrong = ['id', 'op', 'path', 'dest', 'keep', 'reason'].find((k) => a[k] != null && typeof a[k] !== 'string');
+    if (wrong) return fail(`"${wrong}" must be text.`);
+    if (!OPS.has(a.op)) return fail(`Unknown op "${a.op}". Allowed: ${[...OPS].join(', ')}.`);
+    if (['path', 'dest', 'keep'].some((k) => hasDotDot(a[k]))) return fail('Paths may not contain "..". Use the full, direct path.');
     // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
     // and the steps that remove it come from that check, never from the plan.
     if (a.op === 'remove_simulator') {
@@ -80,7 +90,7 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (a.op === 'delete_rebuildable' && isDerivedData(src, home)) {
       return fail(`${path.basename(src)} is Xcode build data that was built in the last 30 days, or that I can't match to a project, so I won't delete it.`);
     }
-    // US-24: a permanent delete is allowed only for something already in the Trash, and always asks.
+    // US-30: a permanent delete is allowed only for something already in the Trash, and always asks.
     if (a.op === 'delete_from_trash') {
       if (!inTrash(src, trashDir)) return fail(`${src} isn't in the Trash. I can permanently delete only items already in the Trash.`);
       bytesFreed += itemBytes(src);
@@ -108,6 +118,8 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
       const into = protectedBy(profile, dest, scan.root);
       if (into) return fail(`${into.project} is protected in DINO MEMORY, so nothing moves into it either.`);
       if (!destRoots.some((r) => inside(dest, r))) return fail(`Destination ${dest} is outside the target plan (${destRoots.join(', ')}).`);
+      // Where the destination really leads, after symlinks, must also be inside the target plan (F4).
+      if (!destRoots.some((r) => inside(realPath(a.dest), realPath(r)))) return fail(`${a.dest} leads outside the target plan through a link.`);
       if (!dirExists(destDir)) return fail(`Destination folder ${destDir} does not exist. Add a "mkdir" action before this one.`);
       if (fileExists(dest) || isRealFile(dest)) return fail(`${dest} already exists; this would overwrite it. Pick another name.`);
       if (src === dest) return fail('Source and destination are the same.');
@@ -135,6 +147,8 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
       }
       recipes[id] = proof.recipe;
       bytesFreed += measureFreeable(src);
+      // Everything inside goes with it, so none of it can count as a surviving copy (F9).
+      for (const f of [...files]) if (inside(f, src)) files.delete(f);
       if (zone === 'ask') needsApproval.push(id);
     } else if (a.op === 'clear_cache') {
       // Only the package-manager caches we know re-download on demand; nothing else, wherever it is.

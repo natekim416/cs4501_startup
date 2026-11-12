@@ -334,6 +334,17 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 - **Given** I opt in for PDFs in Downloads, **then** only the first page's text is read, and the reason shows what was found ("course code on page 1: CS 2150").
 - **Given** no course code is found, **then** the file goes to Unsorted, or the dino asks.
 
+#### US-30 · Empty the Trash, only after I confirm
+`Should · 2 · New · NFR1 · Found while testing the Alpha (removed files sat in the Trash and freed nothing)`
+
+**As a** student whose Trash holds gigabytes, **I want** the dino to permanently delete what's already in the Trash after I confirm, **so that** removed files actually free space, without the app ever permanently deleting anything else.
+
+*Status: built (tests in `app/test/stories/us30-trash-delete.test.js` and the UI step "emptying the Trash…").*
+
+- **Given** I ask to empty the Trash, **then** each item in the Trash is listed as PERMANENT, unchecked, with a warning that it can't be undone.
+- **Given** a path outside the Trash (including `..` tricks, or the Trash folder itself), **then** the validator and the executor both refuse to delete it.
+- **Given** I approve, **then** a separate confirmation must say yes before anything is deleted; Cancel deletes nothing.
+
 ### Epic G · Already built in the MVP
 
 These work today, so they're size 0. They're part of Alpha, and any change we make has to keep them working.
