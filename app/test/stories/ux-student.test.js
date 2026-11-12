@@ -129,3 +129,11 @@ test('U18 with no API key, local mode says it is already offline instead of "slo
   const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
   assert.match(engine.setLocalMode(true), /already offline/i);
 });
+
+test('U13 "always keep X and free up space" saves the protection and still plans the cleanup', async () => {
+  const { engine } = student();
+  const res = await engine.plan('Always keep cs3140-final and free up space');
+  assert.ok((engine.profile.data.protected || []).includes('cs3140-final'));
+  assert.ok(res.actions.length > 0, res.summary);
+  assert.ok(!res.actions.some((a) => a.path.includes('cs3140-final')));
+});
