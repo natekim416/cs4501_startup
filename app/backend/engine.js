@@ -14,7 +14,7 @@ const { rebuild } = require('./rebuild');
 const { breakdown } = require('./breakdown');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
-const { makePlan } = require('./planner');
+const { makePlan, batches, mergeBatchPlans, MAX_FILES_IN_PROMPT } = require('./planner');
 const { Executor } = require('./executor');
 const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
@@ -199,21 +199,25 @@ class Engine {
     const namedModels = this.ml.filter((x) => [x.model, x.model.split('/').pop()].some((n) => n.length >= 4 && new RegExp(`(^|[^\\w-])${n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`).test(lower))).map((x) => x.model);
     if (namedModels.length) this.ml = this.findMl(namedModels);
     const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode, docker: this.docker, dockerMessage: this.dockerMessage, ml: this.ml };
-    const attempts = [];
-    let previous = null;
-    let plan;
-    let check;
-
-    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined }), this.planTimeoutMs);
-      // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
-      plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
+    let { plan, check, attempts } = { plan: null, check: null, attempts: [] };
+    if (this.mode === 'llm' && this.snapshot.files.length > MAX_FILES_IN_PROMPT) {
+      // US-22: a big folder goes to Claude in batches; each batch is planned and checked on its own, then
+      // the merged plan is checked once more against the whole folder below.
+      const results = [];
+      const groups = batches(this.snapshot.files, MAX_FILES_IN_PROMPT);
+      for (const [n, group] of groups.entries()) {
+        const inBatch = new Set(group.map((f) => f.path));
+        const scanPart = { ...this.snapshot, files: group, duplicates: this.snapshot.duplicates.filter((g) => g.files.every((f) => inBatch.has(f))) };
+        const r = await this.attemptPlan(request, { ...ctx, scan: scanPart }, onAttempt);
+        attempts.push(...r.attempts.map((a) => ({ ...a, batch: n + 1 })));
+        const actions = (Array.isArray(r.plan.actions) ? r.plan.actions : []).filter((a) => a && typeof a === 'object').map((a) => ({ ...a, id: `b${n + 1}-${a.id}` }));
+        results.push({ ok: r.check.ok, actions, error: r.check.ok ? null : r.check.errors[0] && r.check.errors[0].message });
+      }
+      const merged = mergeBatchPlans(results);
+      plan = { summary: `I planned this folder in ${groups.length} parts of up to ${MAX_FILES_IN_PROMPT} files.`, actions: merged.actions, questions: merged.questions };
       check = validate(plan, ctx);
-      const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
-      attempts.push(attempt);
-      onAttempt(attempt);
-      if (check.ok) break;
-      previous = { plan, errors: check.errors };
+    } else {
+      ({ plan, check, attempts } = await this.attemptPlan(request, ctx, onAttempt));
     }
 
     const questions = Array.isArray(plan.questions)
@@ -301,6 +305,26 @@ class Engine {
       protected: protectedNames,
       memoryChanged: Boolean(saved),
     };
+  }
+
+  // Plans, validates, and feeds the errors back until the plan passes or the tries run out.
+  async attemptPlan(request, ctx, onAttempt = () => {}) {
+    const attempts = [];
+    let previous = null;
+    let plan;
+    let check;
+    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined }), this.planTimeoutMs);
+      // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
+      plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
+      check = validate(plan, ctx);
+      const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
+      attempts.push(attempt);
+      onAttempt(attempt);
+      if (check.ok) break;
+      previous = { plan, errors: check.errors };
+    }
+    return { plan, check, attempts };
   }
 
   // US-08: Xcode build data and simulators unused long enough to offer. Run again at approval, so a

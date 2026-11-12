@@ -307,4 +307,23 @@ async function makePlan(args) {
   return { mode: 'demo', plan: demoPlan(args) };
 }
 
-module.exports = { makePlan, demoPlan, PLAN_SCHEMA, MODEL };
+// US-22: a big folder is planned in batches small enough for one request each.
+function batches(files, size = MAX_FILES_IN_PROMPT) {
+  const out = [];
+  for (let i = 0; i < files.length; i += size) out.push(files.slice(i, i + size));
+  return out;
+}
+
+// US-22: one plan from the batch results. A batch that still failed becomes a question instead of hiding
+// the batches that worked.
+function mergeBatchPlans(results) {
+  const actions = [];
+  const questions = [];
+  results.forEach((r, i) => {
+    if (r.ok) actions.push(...(r.actions || []));
+    else questions.push({ text: `I couldn't make a safe plan for part ${i + 1} of this folder, so I left it out. The rest is ready.${r.error ? ` (${r.error})` : ''}`, options: ['OK'] });
+  });
+  return { actions, questions };
+}
+
+module.exports = { batches, mergeBatchPlans, MAX_FILES_IN_PROMPT, makePlan, demoPlan, PLAN_SCHEMA, MODEL };
