@@ -87,10 +87,10 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
       needsApproval.push(id);
       return;
     }
-    // A code project is NEVER for moves, but its gitignored build folders are what the rebuild proof checks.
     // A package-manager cache we know is matched by its exact path before the zone check: the Yarn and pnpm
     // caches live in ~/Library, which is always NEVER (REG-8). Anything else there, even next to them, still is.
     const knownCache = a.op === 'clear_cache' && toolCaches(home).find((c) => path.resolve(c.path) === src);
+    // A code project is NEVER for moves, but its gitignored build folders are what the rebuild proof checks.
     const zone = a.op === 'delete_rebuildable' ? profile.zoneFor(src, { ignoreRepos: true }) : profile.zoneFor(src);
     if (zone === 'never' && !knownCache) return fail(`${src} is in a NEVER-touch zone. Remove this action.`);
 
