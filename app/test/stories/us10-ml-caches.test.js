@@ -266,6 +266,32 @@ test('US-10 Hugging Face snapshots may point to blobs within the same model, wit
   assert.ok(mlProof(dir, { home }).ok);
 });
 
+test('US-10 valid snapshot links work through an OS-level alias above home, while outside blobs stay refused', (t) => {
+  const base = tmp();
+  const realHome = path.join(base, 'home');
+  fs.mkdirSync(realHome);
+  const dir = hfCache(realHome, 'old/model', 60);
+  const payload = path.join(dir, 'snapshots', REV, 'model.safetensors');
+  fs.unlinkSync(payload);
+  const blob = write(path.join(dir, 'blobs', 'b'.repeat(64)), 'w'.repeat(1024));
+  const alias = path.join(tmp(), 'os-alias');
+  try {
+    fs.symlinkSync(path.relative(path.dirname(payload), blob), payload, 'file');
+    fs.symlinkSync(base, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch (err) { if (err.code === 'EPERM') return t.skip('Windows symlinks unavailable'); throw err; }
+  const when = new Date(Date.now() - 60 * 864e5);
+  fs.utimesSync(blob, when, when);
+  const home = path.join(alias, 'home');
+  const cache = path.join(home, '.cache', 'huggingface', 'hub', path.basename(dir));
+  assert.ok(mlItems({ home })[0].offered);
+  assert.ok(mlProof(cache, { home }).ok);
+  const outside = write(path.join(realHome, 'research', 'trained.pt'), 'precious');
+  fs.unlinkSync(payload);
+  fs.symlinkSync(outside, payload, 'file');
+  assert.equal(mlProof(cache, { home, named: ['old/model'] }).ok, false);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'precious');
+});
+
 test('US-10 links to outside data, shared blobs, and symlinked cache roots are never followed for removal', (t) => {
   const home = tmp();
   const dir = hfCache(home, 'old/model', 60);

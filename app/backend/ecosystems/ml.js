@@ -96,6 +96,9 @@ function inspectHf(dir) {
   let newest = 0;
   let payloads = 0;
   let invalid = null;
+  let realModel;
+  try { realModel = fs.realpathSync(dir); }
+  catch { return { newest: 0, bytes: 0, invalid: 'model cache is unreadable' }; }
   const top = list(dir);
   if (!top.includes('snapshots')) invalid = 'no downloaded snapshot/revision was found';
   if (top.some((n) => !['snapshots', 'blobs', 'refs', '.no_exist'].includes(n))) invalid = 'contains files outside the download-cache layout';
@@ -120,7 +123,9 @@ function inspectHf(dir) {
       // the model directory are deliberately retained until their reference accounting is supported.
       let regular = false;
       try { regular = fs.statSync(real).isFile(); } catch { /* Changed during inspection: refuse it. */ }
-      if (!inside(p, snapshots) || !inside(real, path.join(dir, 'blobs')) || !regular) invalid = 'contains a link outside this model cache';
+      // Canonicalize the model root, not the blobs child: /var on macOS resolves to /private/var.
+      // Keeping 'blobs' lexical beneath that root still refuses a blobs-directory link to elsewhere.
+      if (!inside(p, snapshots) || !inside(real, path.join(realModel, 'blobs')) || !regular) invalid = 'contains a link outside this model cache';
     } else if (s.isDirectory()) {
       let entries;
       try { entries = fs.readdirSync(p); } catch { invalid = 'a cache folder is unreadable'; continue; }

@@ -7,6 +7,8 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const mentions = (text, name) => new RegExp(`(^|[^\\w./-])${escape(name)}($|[^\\w./-])`, 'i').test(text);
 
 function cleanupIntent(request = '', models = [], dockerItems = []) {
+  const declined = [...String(request).matchAll(/\(User answered "([\s\S]*?)" with "([^"]*)"\)/g)]
+    .filter((match) => /^(?:no\b|cancel\b|leave\b|keep\b)/i.test(match[2]));
   // The planner's own question is appended by Engine.answer as context, not as new user authorization.
   const authorized = String(request).split(/\s*\(User (?:answered|picked)\b/i)[0];
   const clauses = authorized.replace(/[’‘]/g, "'").split(/[;!?,]|\.(?=\s|$)|\bbut\b|\band\s+(?=keep|leave|don'?t|do not)/i);
@@ -16,8 +18,8 @@ function cleanupIntent(request = '', models = [], dockerItems = []) {
   const cleaning = CLEAN.test(positive) || all;
   const keptModels = models.filter((m) => kept.some((c) => mentions(c, m.model))).map((m) => m.model);
   const namedModels = models.filter((m) => !keptModels.includes(m.model) && mentions(positive, m.model)).map((m) => m.model);
-  const negativeCategory = kept.some((c) => ML.test(models.reduce((text, m) => text.replace(new RegExp(escape(m.model), 'gi'), ''), c)));
-  const negativeDocker = kept.some((c) => /docker/i.test(c) || dockerItems.some((d) => {
+  const negativeCategory = declined.some((match) => ML.test(match[1])) || kept.some((c) => ML.test(models.reduce((text, m) => text.replace(new RegExp(escape(m.model), 'gi'), ''), c)));
+  const negativeDocker = declined.some((match) => /docker/i.test(match[1])) || kept.some((c) => /docker/i.test(c) || dockerItems.some((d) => {
     const name = d.name || '';
     const repo = name.split(':')[0].split('/').at(-1);
     return name && (c.toLowerCase().includes(name.toLowerCase()) || (repo && mentions(c, repo)));

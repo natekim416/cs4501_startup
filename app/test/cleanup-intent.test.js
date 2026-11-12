@@ -28,3 +28,9 @@ test('a quoted model question in a No answer grants no authority', () => {
   assert.equal(cleanupIntent('Sort my files (User answered "Should I clean models and Docker?" with "No")', models).docker, false);
   assert.equal(cleanupIntent('Sort my files (User answered "Should I clean models and Docker?" with "No")', models).ml, false);
 });
+
+test('declining a category question narrows the original cleanup authorization', () => {
+  assert.equal(cleanupIntent('Clean unused Docker images (User answered "Remove these Docker images?" with "No, leave them")').docker, false);
+  assert.equal(cleanupIntent('Clean model caches (User answered "Remove org/model?" with "No")', models).ml, false);
+  assert.equal(cleanupIntent('Clean Docker (User answered "Sort your lecture notes?" with "No")').docker, true);
+});
