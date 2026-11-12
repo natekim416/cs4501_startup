@@ -18,10 +18,14 @@ const JS_LOCKS = [
   ['yarn.lock', 'yarn install --frozen-lockfile'],
   ['package-lock.json', 'npm ci'],
 ];
+// A path that goes into a rebuild command. Plain names stay as they are; anything else is single-quoted,
+// so a folder named "env$(touch x)" or ";rm -rf ~" is only ever a name, never a command.
+const shq = (s) => (/^[\w./@+:-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
+
 const PY_RECIPES = [
   ['uv.lock', () => 'uv sync'],
   ['poetry.lock', () => 'poetry install'],
-  ['requirements.txt', (venv) => `python3 -m venv ${venv} && ${venv}/bin/pip install -r requirements.txt`],
+  ['requirements.txt', (venv) => `python3 -m venv ${shq(venv)} && ${shq(venv)}/bin/pip install -r requirements.txt`],
 ];
 const MINUTES = { node_modules: 'about 1 minute', 'python-venv': 'about 2 minutes', 'conda-env': 'about 5 minutes' };
 
@@ -49,7 +53,7 @@ function recipeFor(dir, type, { condaExports = {} } = {}) {
   }
   if (type === 'conda-env') {
     const yml = condaExports[dir] || [path.join(project, 'environment.yml'), path.join(dir, 'environment.yml')].find(exists);
-    return yml && { command: `conda env create -f "${yml}" -p "${dir}"`, cwd: project, lockfile: yml };
+    return yml && { command: `conda env create -f ${shq(yml)} -p ${shq(dir)}`, cwd: project, lockfile: yml };
   }
   return null;
 }
@@ -273,7 +277,7 @@ function exportCondaEnv(env, { dataDir, run = (cmd, args) => execFileSync(cmd, a
   const file = path.join(dataDir, 'conda-exports', `${path.basename(env)}-${Date.now()}.yml`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, yml);
-  return withHash({ command: `conda env create -f "${file}" -p "${env}"`, cwd: path.dirname(env), lockfile: file });
+  return withHash({ command: `conda env create -f ${shq(file)} -p ${shq(env)}`, cwd: path.dirname(env), lockfile: file });
 }
 
 // Every labeled item under root: rebuildable folders and things we must never touch.

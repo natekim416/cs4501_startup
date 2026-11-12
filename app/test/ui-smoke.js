@@ -360,6 +360,21 @@ const STEPS = [
       await __t.waitFor(() => /uncommitted/i.test(__t.botText()), 'the reason (uncommitted changes)');
       return 'ok';`);
   }],
+  // Last, so a failure can't strand the other steps on a foreign page. Red-team F15.
+  ['SEC: the window cannot be navigated to another page or open new windows, so no other page gets the app API', async ({ win, base }) => {
+    const evil = path.join(base, 'evil.html');
+    fs.writeFileSync(evil, '<!doctype html><title>EVIL</title><script>document.title = typeof window.api;</script>');
+    const before = win.webContents.getURL();
+    await win.webContents.executeJavaScript(`location.href = ${JSON.stringify('file://' + evil)}; true`).catch(() => {});
+    await new Promise((r) => setTimeout(r, 1000));
+    if (win.webContents.getURL() !== before) throw new Error('navigated to ' + win.webContents.getURL());
+    const opened = await win.webContents.executeJavaScript(`String(window.open(${JSON.stringify('file://' + evil)}))`);
+    if (opened !== 'null') throw new Error('window.open returned ' + opened);
+    const { BrowserWindow } = require('electron');
+    if (BrowserWindow.getAllWindows().length !== 1) throw new Error('a second window opened');
+    if (!win.webContents.getLastWebPreferences().sandbox) throw new Error('the renderer is not sandboxed');
+    return 'blocked';
+  }],
 ];
 
 let fresh2Before = new Set();

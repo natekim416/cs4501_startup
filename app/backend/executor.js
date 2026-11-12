@@ -15,12 +15,34 @@ class Executor {
     this.binDir = path.join(dataDir, 'dino-bin');
     this.quarantineDir = path.join(dataDir, 'quarantine');
     this.logFile = path.join(dataDir, 'undo-log.json');
+    this.recipeFile = path.join(dataDir, 'rebuild-recipes.json');
     this.history = [];
+    this.recipes = [];
     try {
       this.history = JSON.parse(fs.readFileSync(this.logFile, 'utf8'));
     } catch {
       // No history yet.
     }
+    try {
+      this.recipes = JSON.parse(fs.readFileSync(this.recipeFile, 'utf8'));
+    } catch {
+      // No recipes yet.
+    }
+  }
+
+  // Every rebuild command this app saved when it deleted a folder. Rebuild runs only these (F1): the page
+  // can name one, but it can never supply a command of its own.
+  recordRecipe(step) {
+    const r = step.recipe;
+    if (!r || !r.command || this.recordedRecipe(r)) return;
+    this.recipes.push({ path: step.path, ...r });
+    fs.mkdirSync(path.dirname(this.recipeFile), { recursive: true });
+    fs.writeFileSync(this.recipeFile, JSON.stringify(this.recipes, null, 2));
+  }
+
+  recordedRecipe(request) {
+    if (!request || typeof request.command !== 'string' || typeof request.cwd !== 'string') return null;
+    return this.recipes.find((r) => r.command === request.command && r.cwd === request.cwd) || null;
   }
 
   saveLog() {
@@ -35,6 +57,7 @@ class Executor {
       try {
         const step = this.apply(a, batch.id);
         if (step) batch.steps.push({ ...step, actionId: a.id });
+        if (step && step.type === 'deleted') this.recordRecipe(step);
         results.push({ id: a.id, ok: true });
       } catch (err) {
         results.push({ id: a.id, ok: false, error: err.message });

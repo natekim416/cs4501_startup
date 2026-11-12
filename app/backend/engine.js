@@ -403,8 +403,11 @@ class Engine {
   }
 
   // US-15: rebuild something we deleted, from the recipe the proof saved. Logged as a count, never a path.
-  rebuild(recipe) {
-    return rebuild(recipe, { record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
+  // The page names a deleted folder's recipe; the command that runs always comes from our own record (F1).
+  rebuild(request, { run } = {}) {
+    const recorded = this.executor.recordedRecipe(request);
+    if (!recorded) return { ok: false, message: 'I can only rebuild a folder I deleted myself, using the command I saved when I deleted it.' };
+    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
   }
 
   undoAction(batchId, actionId) {
