@@ -3,7 +3,7 @@
 // never file names, folder names, or what the user typed.
 const fs = require('fs');
 
-const LABELS = { mode: ['llm', 'demo'], zone: ['free', 'ask', 'never'], category: ['javascript', 'python', 'xcode', 'docker', 'ml', 'other'] };
+const LABELS = { mode: ['llm', 'demo', 'local'], zone: ['free', 'ask', 'never'], category: ['javascript', 'python', 'xcode', 'docker', 'ml', 'other'] };
 
 // Keeps only numbers, true/false, and known labels, so a file name can't slip into the log.
 function clean(fields) {

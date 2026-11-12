@@ -95,3 +95,57 @@ test('R3-5 a corrupt profile fails closed to local mode, so file names never lea
   const b = new Engine({ dataDir, apiKey: 'sk-test', home: tmp(), trashDir: tmp() });
   assert.strictEqual(b.mode, 'local');
 });
+
+test('R3-6 an image a container uses by digest or by full name is never offered, and one image with two tags is listed once (F4)', () => {
+  const { dockerItems } = require('../../backend/ecosystems/docker');
+  const run = (cmd, args) => {
+    const a = args.join(' ');
+    if (a.startsWith('info')) return '{}';
+    if (a.startsWith('image ls')) return ['{"ID":"sha256:aaa111","Repository":"nginx","Tag":"1.25","Size":"200MB"}', '{"ID":"sha256:bbb222","Repository":"docker.io/library/web","Tag":"v1","Size":"300MB"}', '{"ID":"sha256:ccc333","Repository":"node","Tag":"18","Size":"1.1GB"}', '{"ID":"sha256:ccc333","Repository":"node","Tag":"lts","Size":"1.1GB"}'].join('\n');
+    if (a.startsWith('ps -a')) return ['{"Image":"nginx@sha256:deadbeef"}', '{"Image":"web:v1"}'].join('\n');
+    if (a.startsWith('image inspect')) return { 'nginx@sha256:deadbeef': 'sha256:aaa111', 'web:v1': 'sha256:bbb222' }[args.at(-1)] || '';
+    if (a.startsWith('builder du')) return 'Total: 0B';
+    return '';
+  };
+  const items = dockerItems({ run }).items.filter((i) => i.type === 'docker-image');
+  assert.deepStrictEqual(items.map((i) => i.id), ['sha256:ccc333']);
+});
+
+test('R3-7 an image id that looks like a flag ("--all") is never passed to docker (F11)', () => {
+  const { dockerItems } = require('../../backend/ecosystems/docker');
+  const run = (cmd, args) => {
+    const a = args.join(' ');
+    if (a.startsWith('info')) return '{}';
+    if (a.startsWith('image ls')) return ['{"ID":"--all","Repository":"x","Tag":"1","Size":"1MB"}', '{"ID":"-f img1","Repository":"y","Tag":"1","Size":"1MB"}'].join('\n');
+    return a.startsWith('builder du') ? 'Total: 0B' : '';
+  };
+  assert.deepStrictEqual(dockerItems({ run }).items, []);
+});
+
+test('R3-8 clicking the storage-watch notification counts as handled, so it can notify again later instead of going silent (F10)', () => {
+  const { StorageWatch } = require('../../backend/storage-watch');
+  const sent = [];
+  const w = new StorageWatch({ notify: (n) => sent.push(n), estimate: () => 5e9 });
+  w.check({ usedFraction: 0.9, now: 0 });
+  w.opened({ now: 0 });
+  w.check({ usedFraction: 0.99, now: 8 * 864e5 });
+  assert.strictEqual(sent.length, 2);
+  // Even if the notification is never clicked or closed, it doesn't stay pending forever.
+  const quiet = [];
+  const w2 = new StorageWatch({ notify: (n) => quiet.push(n), estimate: () => 5e9 });
+  w2.check({ usedFraction: 0.9, now: 0 });
+  w2.check({ usedFraction: 0.9, now: 8 * 864e5 });
+  assert.strictEqual(quiet.length, 2);
+});
+
+test('R3-9 the usage log records local mode and Docker removals as counts (F12)', () => {
+  const { UsageLog } = require('../../backend/usage-log');
+  const { Profile } = require('../../backend/profile');
+  const dir = tmp();
+  const l = new UsageLog(path.join(dir, 'u.jsonl'), new Profile(path.join(dir, 'p.json')));
+  l.setEnabled(true);
+  l.record('plan', { mode: 'local', ops_remove_docker: 2 });
+  const text = fs.readFileSync(l.file, 'utf8');
+  assert.match(text, /"mode":"local"/);
+  assert.match(text, /"ops_remove_docker":2/);
+});

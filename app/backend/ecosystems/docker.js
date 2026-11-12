@@ -44,10 +44,24 @@ function dockerItems({ run = dockerFor(os.homedir()) } = {}) {
   }
   const images = rows(run('docker', ['image', 'ls', '--format', '{{json .}}']));
   const containers = rows(run('docker', ['ps', '-a', '--format', '{{json .}}']));
-  // An image is in use if any container, running or stopped, was made from it.
+  // An image is in use if any container, running or stopped, was made from it. A container can name its
+  // image by digest or full name, so each one is also resolved to an image id (red-team round 3 F4).
   const used = new Set(containers.flatMap((c) => [c.ImageID, c.Image]).filter(Boolean));
+  for (const c of containers) {
+    if (!c.Image) continue;
+    try {
+      const id = String(run('docker', ['image', 'inspect', '--format', '{{.Id}}', c.Image]) || '').trim();
+      if (id) used.add(id);
+    } catch {
+      // Gone already: nothing to protect.
+    }
+  }
+  const inUse = (id) => [...used].some((u) => u === id || (u.length >= 12 && id.length >= 12 && (u.startsWith(id) || id.startsWith(u))));
+  // An id is passed to docker as an argument, so it must look like an id, never a flag (F11).
+  const safeId = (id) => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9:._-]*$/.test(id);
+  const seen = new Set();
   const items = images
-    .filter((i) => i.ID && !used.has(i.ID) && !used.has(`${i.Repository}:${i.Tag}`) && !used.has(i.Repository))
+    .filter((i) => safeId(i.ID) && !seen.has(i.ID) && seen.add(i.ID) && !inUse(i.ID) && !used.has(`${i.Repository}:${i.Tag}`) && !used.has(i.Repository))
     .map((i) => {
       const tagged = i.Repository && i.Repository !== '<none>';
       const name = tagged ? `${i.Repository}:${i.Tag}` : `an untagged image (${i.ID.slice(0, 12)})`;

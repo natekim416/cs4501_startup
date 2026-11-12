@@ -162,6 +162,7 @@ function startStorageWatch() {
       if (!Notification.isSupported()) return;
       const note = new Notification({ title: 'Cleanasaurus', body: n.text });
       note.on('click', () => {
+        watch.opened();
         win.show();
         win.focus();
         win.webContents.send('storage-watch', n);
