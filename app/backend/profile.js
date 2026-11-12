@@ -98,10 +98,15 @@ class Profile {
 
   // True for a locked macOS folder, anything inside one, or a link that leads into one.
   isLocked(target) {
-    return [path.resolve(target), realPath(target)].some((p) => LOCKED.some((root) => within(p, root)));
+    return [path.resolve(target), realPath(target)].some((p) => LOCKED.some((root) => within(p, root) || within(p, realPath(root))));
   }
 
   setTargetPlan(targetPlan) {
+    // Organized files may only go to real, full paths outside NEVER zones (red-team note on set-target).
+    for (const root of (targetPlan && targetPlan.destRoots) || []) {
+      if (typeof root !== 'string' || !path.isAbsolute(root)) throw new Error('The target plan needs the full path of a folder.');
+      if (this.isLocked(root) || this.zoneFor(root) === 'never') throw new Error(`${root} is in a NEVER zone, so files can't be organized into it.`);
+    }
     this.data.targetPlan = { ...this.data.targetPlan, ...targetPlan };
     this.save();
   }

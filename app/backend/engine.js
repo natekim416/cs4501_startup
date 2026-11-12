@@ -45,8 +45,18 @@ function countOps(actions) {
   return Object.fromEntries(OPS.map((op) => [`ops_${op}`, actions.filter((a) => a.op === op).length]));
 }
 
+// Red-team F13: a model that never answers can't leave the app stuck on "Planning...".
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Claude didn't answer within ${Math.round(ms / 1000)} seconds. Try again, or ask for something smaller.`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000 } = {}) {
+    this.planTimeoutMs = planTimeoutMs;
     this.llmClient = llmClient;
     this.dataDir = dataDir;
     this.home = home;
@@ -178,8 +188,9 @@ class Engine {
     let check;
 
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined });
-      plan = made.plan;
+      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined }), this.planTimeoutMs);
+      // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
+      plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
       check = validate(plan, ctx);
       const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
       attempts.push(attempt);
@@ -188,11 +199,13 @@ class Engine {
       previous = { plan, errors: check.errors };
     }
 
-    const questions = [...(plan.questions || [])];
+    const questions = Array.isArray(plan.questions)
+      ? plan.questions.filter((q) => q && typeof q.text === 'string' && Array.isArray(q.options)).map((q) => ({ text: q.text, options: q.options.filter((o) => typeof o === 'string') }))
+      : [];
     if (!check.ok) {
       // Still failing after the retries: keep only the actions that pass on their own, and ask.
       const bad = new Set(check.errors.map((e) => e.action).filter(Boolean));
-      const actions = Array.isArray(plan.actions) ? plan.actions.filter((a) => !bad.has(a.id)) : [];
+      const actions = Array.isArray(plan.actions) ? plan.actions.filter((a) => a && typeof a === 'object' && !bad.has(a.id)) : [];
       plan = { ...plan, actions };
       check = validate(plan, ctx);
       if (!check.ok) plan = { ...plan, actions: [] };
@@ -329,6 +342,8 @@ class Engine {
   }
 
   execute(planId, actionIds, { confirmPermanent = false } = {}) {
+    // Only a list of exact ids: a string would match ids by substring (red-team note).
+    if (!Array.isArray(actionIds) || !actionIds.every((x) => typeof x === 'string')) return { ok: false, errors: ['Pick actions from the plan.'] };
     // Only the newest plan can run: older cards may point at files that have since changed.
     if (!this.lastPlan || this.lastPlan.id !== planId) {
       return { ok: false, errors: ['This plan is out of date. Ask me again and approve the newest plan.'] };

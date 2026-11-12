@@ -11,7 +11,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const INACTIVE_DAYS = 30;
 const SKIP = new Set(['.git', '.Trash', '.cleanasaurus']);
 const VM_EXTS = new Set(['.utm', '.vmwarevm', '.pvm', '.vmdk', '.qcow2', '.vdi', '.vhdx']);
-const SECRET = /^(\.env(\.(?!example$|sample$|template$)[\w.-]+)?|id_rsa|id_ed25519|.*\.pem|.*\.key)$/i;
+// Files that may hold secrets or keys we can't get back. Red-team F10 widened this list.
+const SECRET = /^(\.env(\.(?!example$|sample$|template$)[\w.-]+)?|\.envrc|\.npmrc|\.netrc|\.pgpass|credentials(\.json)?|service[-_]account.*\.json|id_(rsa|dsa|ecdsa|ed25519)|.*\.(pem|key|p12|pfx|keystore|jks|mobileprovision))$/i;
 
 const JS_LOCKS = [
   ['pnpm-lock.yaml', 'pnpm install --frozen-lockfile'],
@@ -58,8 +59,15 @@ function recipeFor(dir, type, { condaExports = {} } = {}) {
   return null;
 }
 
+// A lockfile that's a folder or can't be read means no recipe for this item only (red-team F12).
 function withHash(recipe) {
-  return recipe && { ...recipe, lockfileHash: sha256(recipe.lockfile) };
+  if (!recipe) return null;
+  try {
+    if (!fs.statSync(recipe.lockfile).isFile()) return null;
+    return { ...recipe, lockfileHash: sha256(recipe.lockfile) };
+  } catch {
+    return null;
+  }
 }
 
 // Xcode Archives hold the symbols that make crash reports readable, so nothing ever cleans them.
@@ -192,6 +200,8 @@ function lastChanged(project) {
   return newest;
 }
 
+// Returns the first secret-looking file, or the first folder we can't read: what we can't see, we can't
+// prove is safe to delete (red-team F10).
 function findSecret(dir) {
   const stack = [dir];
   while (stack.length) {
@@ -200,7 +210,7 @@ function findSecret(dir) {
     try {
       entries = fs.readdirSync(p, { withFileTypes: true });
     } catch {
-      continue;
+      return p;
     }
     for (const e of entries) {
       if (e.isDirectory()) stack.push(path.join(p, e.name));
@@ -246,7 +256,10 @@ function rebuildProof(dir, { now = Date.now(), named = [], home = os.homedir(), 
   }
 
   const secret = findSecret(target);
-  if (secret) fail('nothing_irreplaceable', `${where} contains ${path.basename(secret)}, which may hold secrets I can't get back.`);
+  if (secret) {
+    const unreadable = secret === target || (fs.existsSync(secret) && fs.statSync(secret).isDirectory());
+    fail('nothing_irreplaceable', unreadable ? `I can't read ${path.relative(path.dirname(target), secret) || path.basename(secret)}, so I can't check it for secrets.` : `${where} contains ${path.basename(secret)}, which may hold secrets I can't get back.`);
+  }
 
   const isNamed = named.some((n) => n.toLowerCase() === name.toLowerCase());
   const days = Math.floor((now - lastChanged(project)) / DAY);

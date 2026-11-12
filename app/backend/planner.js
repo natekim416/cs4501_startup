@@ -109,20 +109,25 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
   };
 }
 
-async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey }) }) {
+async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey, timeout: 60000, maxRetries: 1 }) }) {
   let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems, xcode))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
-  const response = await client.beta.messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: PLAN_SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: 'user', content }],
-  });
+  let response;
+  try {
+    response = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: PLAN_SCHEMA } },
+      system: SYSTEM,
+      messages: [{ role: 'user', content }],
+    });
+  } catch (err) {
+    throw new Error(friendlyApiError(err));
+  }
   if (response.stop_reason === 'refusal') throw new Error('The model declined this request.');
   const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
   try {
@@ -131,6 +136,20 @@ async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = []
     // Unparseable output becomes a validation error so the retry loop can fix it.
     return { summary: '', actions: null, questions: [] };
   }
+}
+
+// Red-team F13: what the user sees when Claude can't be reached. Never the raw response, which can
+// carry request ids and internal error JSON.
+function friendlyApiError(err) {
+  const status = err && err.status;
+  const code = err && (err.code || (err.cause && err.cause.code));
+  if (status === 429) return 'Claude is busy right now (too many requests). Try again in a minute.';
+  if (status === 401 || status === 403) return "Claude didn't accept the API key. Check the key in the .env file.";
+  if (status >= 500 || status === 529) return 'Claude is having trouble right now. Try again in a few minutes.';
+  if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN/.test(String(code)) || /timed? ?out|network|fetch failed/i.test(String(err && err.message))) {
+    return "I couldn't reach Claude. Check your internet connection and try again.";
+  }
+  return `Claude returned an error${status ? ` (${status})` : ''}. Try again.`;
 }
 
 // ---------- Offline demo planner (no LLM) ----------

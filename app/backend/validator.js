@@ -54,7 +54,11 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     const id = a && a.id ? a.id : `#${i + 1}`;
     const fail = (message) => errors.push({ action: id, message });
 
-    if (!a || !OPS.has(a.op)) return fail(`Unknown op "${a && a.op}". Allowed: ${[...OPS].join(', ')}.`);
+    if (!a || typeof a !== 'object') return fail('Each action must be an object.');
+    // Red-team F11: every field the model fills is text; anything else is an error to fix, not a crash.
+    const wrong = ['id', 'op', 'path', 'dest', 'keep', 'reason'].find((k) => a[k] != null && typeof a[k] !== 'string');
+    if (wrong) return fail(`"${wrong}" must be text.`);
+    if (!OPS.has(a.op)) return fail(`Unknown op "${a.op}". Allowed: ${[...OPS].join(', ')}.`);
     if (['path', 'dest', 'keep'].some((k) => hasDotDot(a[k]))) return fail('Paths may not contain "..". Use the full, direct path.');
     // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
     // and the steps that remove it come from that check, never from the plan.
