@@ -1,0 +1,220 @@
+US-04 (#5) red run, 2026-11-11 20:55: the 3 todo tests switched on and 7 tests added, no production code yet. Branch us-04-protect-projects, from beta.
+
+$ node --test test/stories/us04-protect-projects.test.js
+✖ US-04 protected projects are skipped in every later plan and listed as protected (150.544167ms)
+✖ US-04 a saved pattern like capstone-* protects new matching projects (49.286167ms)
+✖ US-04 removing a protection from DINO MEMORY lets the project appear again (48.597292ms)
+✖ US-04 "always keep" in chat saves the projects it names, plans nothing, and lasts after a restart (165.842666ms)
+✖ US-04 "keep anything on my resume" asks which projects to keep, then saves the ones picked (171.657833ms)
+✖ US-04 a protection said inside a cleanup request is saved, and the rest of the request still runs (206.244875ms)
+✖ US-04 the validator rejects any action inside a protected project, wherever the plan came from (106.72075ms)
+✖ US-04 Claude can't get around it: a protected project it proposes is rejected and left out (285.403417ms)
+✖ US-04 a protected folder that isn't a code project is left alone too, on the first try (14.552375ms)
+✖ US-04 a protection is a project name or a pattern, never a path (1.262083ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 0
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1410.481042
+
+✖ failing tests:
+
+test at test/stories/us04-protect-projects.test.js:37:1
+✖ US-04 protected projects are skipped in every later plan and listed as protected (150.544167ms)
+  TypeError: engine.profile.protect is not a function
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:39:18)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+
+test at test/stories/us04-protect-projects.test.js:47:1
+✖ US-04 a saved pattern like capstone-* protects new matching projects (49.286167ms)
+  TypeError: engine.profile.protect is not a function
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:49:18)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test/stories/us04-protect-projects.test.js:55:1
+✖ US-04 removing a protection from DINO MEMORY lets the project appear again (48.597292ms)
+  TypeError: engine.profile.protect is not a function
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:57:18)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test/stories/us04-protect-projects.test.js:64:1
+✖ US-04 "always keep" in chat saves the projects it names, plans nothing, and lasts after a restart (165.842666ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:69:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/stories/us04-protect-projects.test.js:82:1
+✖ US-04 "keep anything on my resume" asks which projects to keep, then saves the ones picked (171.657833ms)
+  AssertionError [ERR_ASSERTION]: should ask which projects to keep instead of guessing
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:88:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/stories/us04-protect-projects.test.js:99:1
+✖ US-04 a protection said inside a cleanup request is saved, and the rest of the request still runs (206.244875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - [
+  -   'cs3140-final'
+  - ]
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:103:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: [ 'cs3140-final' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test/stories/us04-protect-projects.test.js:110:1
+✖ US-04 the validator rejects any action inside a protected project, wherever the plan came from (106.72075ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:115:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/stories/us04-protect-projects.test.js:119:1
+✖ US-04 Claude can't get around it: a protected project it proposes is rejected and left out (285.403417ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!touches(plan, 'capstone-team7'))
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:131:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/stories/us04-protect-projects.test.js:137:1
+✖ US-04 a protected folder that isn't a code project is left alone too, on the first try (14.552375ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!touches(plan, 'portfolio'))
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:148:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/stories/us04-protect-projects.test.js:154:1
+✖ US-04 a protection is a project name or a pattern, never a path (1.262083ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /project name/. Input:
+  
+  'TypeError: engine.profile.protect is not a function'
+  
+      at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:157:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: TypeError: engine.profile.protect is not a function
+        at /Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:157:40
+        at getActual (node:assert:580:5)
+        at assert.throws (node:assert:728:24)
+        at TestContext.<anonymous> (/Users/nathanielkim/cs4501_startup/app/test/stories/us04-protect-projects.test.js:157:12)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1382:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+        at Test.postRun (node:internal/test_runner/test:1522:19)
+        at Test.run (node:internal/test_runner/test:1447:12)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:960:7),
+    expected: /project name/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+exit 1
+
+$ npm run test:ui
+✔ first launch asks about the usage log, and it stays off until answered  (ok)
+✔ saying yes turns the log on and the prompt goes away  (ok)
+✔ app starts and scans the demo folder  (19 files · 83.5 MB · zone: FREE)
+✔ there is no API key box: the key stays in the backend (.env), and the page cannot set one  (ok)
+✔ "Free up space" shows a plan that passed checks  (7 actions)
+✔ APPROVE runs the plan, and FREED is honest about the Dino Bin (US-12)  (freed 0 B, bin noted)
+✔ UNDO reverses it  (ok)
+✔ NEVER zone: dino refuses clearly, no plan card  (ok)
+✔ back to FREE: plan appears and asks about resume versions  (ok)
+✔ answering replaces the plan; the old card can no longer be approved  (ok)
+✔ approving the new plan runs it  (ok)
+✔ the practice folder stayed out of the usage log  (ok)
+✔ a run and undo on a real folder are logged  (5 events)
+✔ EXPORT saves a copy with counts and no file names  (logging_on, scan, plan, run, undo)
+✔ TURN OFF deletes the log  (ok)
+✖ US-04 "keep anything on my resume" shows a checklist of projects, and SAVE protects only the ones picked  (Timed out waiting for: project checklist | last dino message: -xzYOAA/exported.jsonl. Open it to see exactly what's in it, then send it to the team.
+CLEANASAURUSScanned 9 files (247 B).
+Found 3 build folders I may be able to rebuild (197 KB).
+Found 1 set of duplicates wasting 36 B.
+What should I do?
+CLEANASAURUSI could not find anything to do for that request.)
+UI smoke test FAILED
+exit 1
