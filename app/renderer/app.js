@@ -502,7 +502,10 @@ async function runPlan(planId, list, approve) {
     // US-08: Xcode items can't be put back by the app; say how they come back instead.
     const notes = (r.notes || []).map((n) => `\n${n}`).join('');
     const keptNote = kept.length ? `\nI kept ${kept.map(short).join(', ')} because you've put your own files in ${kept.length === 1 ? 'it' : 'them'} since.` : '';
-    const msg = botSay(`Undone. ${r.undone} steps reversed.${keptNote}${notes}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
+    // Red-team F6/F7: say when a file came back under a new name, or couldn't come back at all.
+    const renamed = (r.restoredAs || []).map((x) => `\nA newer ${short(x.path)} was already there, so the old one came back as ${short(x.as)}.`).join('');
+    const failedNote = (r.failed || []).length ? `\n${r.failed.length} step${r.failed.length === 1 ? '' : 's'} couldn't be undone (${r.failed.map((f) => `${short(f.path)}: ${f.reason}`).join('; ')}). I kept ${r.failed.length === 1 ? 'it' : 'them'} so you can try UNDO again.` : '';
+    const msg = botSay(`Undone. ${r.undone} steps reversed.${keptNote}${renamed}${failedNote}${notes}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
     for (const recipe of needs) {
       const b = el('button', { class: 'btn' }, `↻ REBUILD ${short(recipe.cwd)}`);
       b.title = recipe.command;
