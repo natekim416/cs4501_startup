@@ -203,7 +203,7 @@ function setDisk(disk) {
 
 function setMode(mode) {
   const m = $('#mode');
-  m.textContent = mode === 'llm' ? 'CLAUDE' : 'DEMO';
+  m.textContent = mode === 'llm' ? 'CLAUDE' : mode === 'local' ? 'LOCAL' : 'DEMO';
   m.className = `mode ${mode}`;
 }
 
@@ -264,6 +264,20 @@ async function useFolder(folder) {
   if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
   text += '\nWhat should I do?';
   botSay(text);
+  // US-17: once per semester, offer a sweep of class projects. Accepting it is an ordinary request.
+  if (info.sweep && info.sweep.offered) {
+    const offer = botSay(info.sweep.text);
+    const go = el('button', { class: 'btn btn-pink' }, 'Plan the cleanup');
+    const no = el('button', { class: 'btn' }, 'Not now');
+    go.addEventListener('click', () => {
+      go.disabled = no.disabled = true;
+      sendRequest(info.sweep.request);
+    });
+    no.addEventListener('click', () => {
+      go.disabled = no.disabled = true;
+    });
+    offer.append(el('div', { class: 'undo-row' }, go, no));
+  }
 }
 
 // ---------- Plans ----------
@@ -532,6 +546,15 @@ api.onAttempt((a) => {
 
 api.onUsage(renderUsage);
 
+// US-20: local mode keeps even file names on this Mac.
+$('#local-btn').addEventListener('click', async () => {
+  const on = $('#local-btn').classList.toggle('on');
+  $('#local-btn').textContent = on ? 'LOCAL: ON' : 'LOCAL: OFF';
+  const res = await api.setLocalMode(on);
+  setMode(res.mode);
+  if (res.notice) botSay(res.notice);
+});
+
 // US-21: the "Go Pro" fake door.
 $('#gopro-btn').addEventListener('click', async () => botSay((await api.goPro()).message));
 
@@ -596,6 +619,10 @@ document.querySelectorAll('.zone-btn').forEach((b) =>
   $('#logo-dino').append(makeDino(44));
   const init = await api.init();
   setMode(init.mode);
+  if (init.mode === 'local') {
+    $('#local-btn').classList.add('on');
+    $('#local-btn').textContent = 'LOCAL: ON';
+  }
   setDisk(init.disk);
   renderProfile(init.profile);
   renderUsage(init.usage);

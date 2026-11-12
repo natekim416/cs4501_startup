@@ -302,7 +302,14 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
 }
 
 // An injected client (tests, or a future server proxy) also means "use the LLM".
+// US-20: what the app says once when local mode is turned on.
+function localModeNotice() {
+  return "Local mode is on: nothing leaves your laptop, not even file names. Plans use on-device rules, so they may be slower or less accurate than Claude's.";
+}
+
 async function makePlan(args) {
+  // US-20: in local mode nothing goes over the network; the on-device planner makes the plan.
+  if (args.local) return { mode: 'local', plan: demoPlan(args) };
   if (args.apiKey || args.client) return { mode: 'llm', plan: await llmPlan(args) };
   return { mode: 'demo', plan: demoPlan(args) };
 }
@@ -326,4 +333,4 @@ function mergeBatchPlans(results) {
   return { actions, questions };
 }
 
-module.exports = { batches, mergeBatchPlans, MAX_FILES_IN_PROMPT, makePlan, demoPlan, PLAN_SCHEMA, MODEL };
+module.exports = { localModeNotice, batches, mergeBatchPlans, MAX_FILES_IN_PROMPT, makePlan, demoPlan, PLAN_SCHEMA, MODEL };

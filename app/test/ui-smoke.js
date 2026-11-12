@@ -374,6 +374,14 @@ const STEPS = [
       if ((__t.botText().match(/Done! /g) || []).length !== ${before}) throw new Error('something ran');
       return 'preview only';`);
   }],
+  ['US-20 LOCAL turns on local mode: the badge says LOCAL and the app explains the trade-off once', `
+    const b = await __t.waitFor(() => document.querySelector('#local-btn'), 'LOCAL button');
+    b.click();
+    await __t.waitFor(() => document.querySelector('#mode').textContent === 'LOCAL', 'LOCAL badge');
+    await __t.waitFor(() => /slower or less accurate/.test(__t.botText()), 'local-mode notice');
+    b.click();
+    await __t.waitFor(() => document.querySelector('#mode').textContent !== 'LOCAL', 'badge back');
+    return 'ok';`],
   // Last, so a failure can't strand the other steps on a foreign page. Red-team F15.
   ['SEC: the window cannot be navigated to another page or open new windows, so no other page gets the app API', async ({ win, base }) => {
     const evil = path.join(base, 'evil.html');

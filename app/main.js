@@ -134,6 +134,7 @@ function registerIpc() {
   });
   handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
   handle('go-pro', () => engine.usage.goPro());
+  handle('set-local-mode', (_e, on) => ({ notice: engine.setLocalMode(on === true), mode: engine.mode }));
   handle('export-usage', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });
     if (res.canceled || !res.filePath) return null;

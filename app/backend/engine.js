@@ -14,7 +14,8 @@ const { rebuild } = require('./rebuild');
 const { breakdown } = require('./breakdown');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
-const { makePlan, batches, mergeBatchPlans, MAX_FILES_IN_PROMPT } = require('./planner');
+const { makePlan, batches, mergeBatchPlans, localModeNotice, MAX_FILES_IN_PROMPT } = require('./planner');
+const { sweepOffer, lastSemesterEnd } = require('./semester');
 const { Executor } = require('./executor');
 const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
@@ -90,7 +91,30 @@ class Engine {
   }
 
   get mode() {
+    if (this.profile.data.localMode) return 'local';
     return this.apiKey || this.llmClient ? 'llm' : 'demo';
+  }
+
+  // US-20: local mode keeps even file names on this Mac. Returns the one-time notice, or null after that.
+  setLocalMode(on) {
+    const first = on && !this.profile.data.localModeExplained;
+    this.profile.data.localMode = Boolean(on);
+    if (first) this.profile.data.localModeExplained = true;
+    this.profile.save();
+    return first ? localModeNotice() : null;
+  }
+
+  // US-17: once per semester, after it ends, offer a sweep of class projects already quiet before the end.
+  sweepOffer() {
+    const end = this.profile.data.semesterEnd || lastSemesterEnd();
+    if (this.profile.data.sweepOfferedFor === end) return null;
+    const projects = [...new Set(this.dev.filter((d) => d.label === 'rebuildable' && d.project !== this.folder).map((d) => d.project))]
+      .map((p) => ({ name: path.basename(p), lastChanged: lastChanged(p) }));
+    const offer = sweepOffer({ semesterEnd: end, projects });
+    if (!offer.offered) return null;
+    this.profile.data.sweepOfferedFor = end;
+    this.profile.save();
+    return offer;
   }
 
   // Practice runs (the guided demo, --demo-folder) aren't real use, so they stay out of the usage log.
@@ -112,7 +136,7 @@ class Engine {
       flagged: info.findings.length,
       zone: info.zone,
     });
-    return info;
+    return { ...info, sweep: this.sweepOffer() };
   }
 
   scanFolder(folder) {
@@ -314,7 +338,7 @@ class Engine {
     let plan;
     let check;
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined }), this.planTimeoutMs);
+      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined, local: Boolean(this.profile.data.localMode) }), this.planTimeoutMs);
       // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
       plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
       check = validate(plan, ctx);
