@@ -90,6 +90,18 @@ function registerIpc() {
     engine.profile.forget(pref);
     return profileView();
   });
+  // US-04: names are checked in the backend; a refused one comes back as { error } and nothing is saved.
+  ipcMain.handle('protect', (_e, names) => {
+    try {
+      return { ...engine.protect(names), profile: profileView() };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+  ipcMain.handle('unprotect', (_e, name) => {
+    engine.profile.unprotect(name);
+    return profileView();
+  });
   ipcMain.handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
   ipcMain.handle('export-usage', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });

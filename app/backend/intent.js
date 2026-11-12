@@ -83,4 +83,30 @@ function matchProjects(request, names) {
   return { matched, kept: [...kept], ambiguous, codes, isIntent: Boolean(codes.length || matched.length || dept || DONE_WITH.test(include)) };
 }
 
-module.exports = { matchProjects, courseCodes };
+// US-04: "always keep X", "protect X" and "never touch X" are saved for every later plan. A plain
+// "keep X" only applies to the request it's in (KEEP above), unless the whole request is "keep …".
+const PROTECT = /\b(?:always\s+keep|protect|never\s+(?:clean|delete|remove|touch))\b/i;
+const CLEANUP = /\b(?:free|clean|cleanup|delete|remove|organi[sz]e|sort|tidy|space|room|storage|dup\w*|caches?|trash)\b/i;
+const PATTERN = /[\w.-]*\*[\w.*-]*/g;
+
+// Returns null, or the names and patterns to protect plus the rest of the request to plan.
+function matchProtect(request, names) {
+  const standalone = /^\s*(?:please\s+)?keep\b/i.test(request) && !CLEANUP.test(request) && !DONE_WITH.test(request);
+  const protecting = [];
+  const rest = [];
+  let mode = null;
+  for (const c of clauses(request)) {
+    // A clause with no verb of its own ("…, portfolio-site") continues the list before it.
+    if (standalone || PROTECT.test(c)) mode = 'protect';
+    else if (!mode || CLEANUP.test(c) || DONE_WITH.test(c) || KEEP.test(c)) mode = 'rest';
+    (mode === 'protect' ? protecting : rest).push(c);
+  }
+  if (!protecting.length) return null;
+  const text = protecting.join(' ').replace(new RegExp(PROTECT.source, 'gi'), ' ').replace(/\bkeep\b/gi, ' ');
+  const patterns = text.match(PATTERN) || [];
+  const named = find(text.replace(PATTERN, ' '), names);
+  const remaining = rest.join('. ');
+  return { names: [...new Set([...patterns, ...named])], rest: remaining, cleanup: CLEANUP.test(remaining) || DONE_WITH.test(remaining) };
+}
+
+module.exports = { matchProjects, matchProtect, courseCodes };

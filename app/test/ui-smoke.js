@@ -137,6 +137,8 @@ const STEPS = [
       const memory = () => document.querySelector('#memory').textContent;
       await __t.waitFor(() => /Always keep: capstone-team7/.test(memory()) && /Always keep: portfolio-site/.test(memory()), 'protections in DINO MEMORY');
       if (/cs3140-hw1/.test(memory())) throw new Error('a project that was not picked got protected');
+      const refused = await api.protect(['../code']);
+      if (!refused || !refused.error) throw new Error('the backend saved a path as a protection');
       return names.join(', ');
     })()`);
   }],

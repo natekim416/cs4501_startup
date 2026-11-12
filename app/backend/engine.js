@@ -5,7 +5,7 @@ const path = require('path');
 const { scan } = require('./scanner');
 const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
 const { listTrash } = require('./trash');
-const { matchProjects } = require('./intent');
+const { matchProjects, matchProtect } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
 const { breakdown } = require('./breakdown');
@@ -13,12 +13,15 @@ const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
 const { makePlan } = require('./planner');
 const { Executor } = require('./executor');
-const { Profile } = require('./profile');
+const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
 const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'];
 const ESTIMATE_GAP = 0.1;
+
+// "a", "a and b", "a, b and c"
+const listWords = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
 // Free space on the disk that holds p, measured by the OS.
 function diskFreeBytes(p) {
@@ -140,17 +143,7 @@ class Engine {
     this.lastPlan = null;
     if (this.profile.zoneFor(this.folder) === 'never') {
       this.track('plan', { refused: true, zone: 'never' });
-      return {
-        mode: this.mode,
-        planId: null,
-        summary: `This folder is in a NEVER zone (${this.profile.zoneInfo(this.folder).reason}), so I won't touch anything in it.`,
-        actions: [],
-        questions: [],
-        attempts: [],
-        bytesFreed: 0,
-        needsApproval: [],
-        warnings: [],
-      };
+      return this.emptyResult(`This folder is in a NEVER zone (${this.profile.zoneInfo(this.folder).reason}), so I won't touch anything in it.`);
     }
     this.scanFolder(this.folder);
     // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
@@ -158,9 +151,22 @@ class Engine {
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
     // The scanned folder itself isn't a project (a VM bundle at the top level would otherwise make it one).
     const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
+    // US-04: "always keep …" is saved before anything is planned. If that's all the request says, stop
+    // there; if it also asks for a cleanup, plan the rest with the new protection already in place.
+    const protect = matchProtect(request, this.protectableNames());
+    let saved = null;
+    if (protect) {
+      if (!protect.names.length) return this.askWhatToProtect();
+      saved = this.protect(protect.names);
+      if (!protect.cleanup) return this.emptyResult(saved.summary, { memoryChanged: true });
+      request = protect.rest;
+    }
+    // Protected folders are left out before planning (the validator also rejects them) and listed in the reply.
+    const dev = this.dev.filter((d) => !this.profile.protectedBy(d.path, this.folder));
+    const protectedNames = this.protectedHere();
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev: this.dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems };
+    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems };
     const attempts = [];
     let previous = null;
     let plan;
@@ -233,18 +239,55 @@ class Engine {
       }
     });
     const oneLine = summarize({ folder: this.folder, actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) })) }, { recentlyOpened });
+    const leftOut = protectedNames.length ? `Protected in DINO MEMORY, so I left out ${listWords(protectedNames)}.` : null;
     return {
       mode: this.mode,
       planId,
       oneLine,
-      summary: plan.summary,
+      summary: [saved && saved.summary, plan.summary, leftOut].filter(Boolean).join('\n'),
       actions: plan.actions || [],
       questions,
       attempts,
       bytesFreed: check.bytesFreed,
       needsApproval: check.needsApproval,
       warnings: check.warnings,
+      protected: protectedNames,
+      memoryChanged: Boolean(saved),
     };
+  }
+
+  // A reply with nothing to approve.
+  emptyResult(summary, extra = {}) {
+    return { mode: this.mode, planId: null, summary, actions: [], questions: [], attempts: [], bytesFreed: 0, needsApproval: [], warnings: [], protected: [], ...extra };
+  }
+
+  // US-04: saves folders to always keep. Every name is checked before any is saved.
+  protect(names) {
+    const list = [...new Set((Array.isArray(names) ? names : [names]).map(protectName))];
+    if (!list.length) throw new Error('Pick at least one project to keep.');
+    for (const name of list) this.profile.protect(name);
+    const them = list.length === 1 ? 'it' : 'them';
+    return { saved: list, summary: `Got it. I'll always keep ${listWords(list)}. Every plan from now on leaves ${them} out, until you remove ${them} under DINO MEMORY.` };
+  }
+
+  // US-04: "keep anything on my resume" names no folder, so ask which ones instead of guessing.
+  askWhatToProtect() {
+    const options = this.protectableNames();
+    if (!options.length) return this.emptyResult("I didn't find any projects or folders here to keep.");
+    return this.emptyResult(null, { questions: [{ text: "Which projects should I always keep? I can't tell from your message, so check them and press SAVE.", options, pick: 'protect' }] });
+  }
+
+  // Folders a request can protect by name: code projects, plus the top-level folders of the scan.
+  protectableNames() {
+    const projects = this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project));
+    const top = this.snapshot.dirs.filter((d) => !d.includes(path.sep) && !d.startsWith('.'));
+    return [...new Set([...projects, ...top])].sort();
+  }
+
+  // Folders in this scan that a saved protection names, for "I left out …".
+  protectedHere() {
+    const dirs = [this.folder, ...this.dev.map((d) => d.project), ...this.snapshot.dirs.map((d) => path.join(this.folder, d))];
+    return [...new Set(dirs.map((d) => path.basename(d)).filter((name) => this.profile.protectedPattern(name)))].sort();
   }
 
   // Saves the answer to the profile so the same question isn't asked twice, then re-plans.

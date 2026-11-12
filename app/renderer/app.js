@@ -81,14 +81,14 @@ function renderProfile(profile) {
   );
   const target = profile.targetPlan.destRoots[0];
   $('#target').textContent = target ? short(target) : 'Inside the selected folder';
-  const memory = $('#memory');
-  memory.replaceChildren(
-    ...(profile.preferences.length
-      ? profile.preferences.map((p) =>
-          el('li', {}, el('span', {}, p), el('button', { title: 'Forget', onclick: async () => renderProfile(await api.forget(p)) }, 'X')),
-        )
-      : [el('li', { class: 'muted' }, 'Nothing learned yet.')]),
+  // US-04: protected projects come first; X stops protecting one, so it can appear in plans again.
+  const kept = (profile.protected || []).map((p) =>
+    el('li', { class: 'kept' }, el('span', {}, `Always keep: ${p}`), el('button', { title: 'Stop protecting', onclick: async () => renderProfile(await api.unprotect(p)) }, 'X')),
   );
+  const learned = profile.preferences.map((p) =>
+    el('li', {}, el('span', {}, p), el('button', { title: 'Forget', onclick: async () => renderProfile(await api.forget(p)) }, 'X')),
+  );
+  $('#memory').replaceChildren(...(kept.length || learned.length ? [...kept, ...learned] : [el('li', { class: 'muted' }, 'Nothing learned yet.')]));
 }
 
 function log(text, kind = 'info') {
@@ -183,7 +183,10 @@ async function sendRequest(text) {
   document.body.classList.add('busy');
   const thinking = botSay('Planning... every plan goes through my safety checks first.');
   try {
-    showPlan(await api.plan(text));
+    const result = await api.plan(text);
+    showPlan(result);
+    // US-04: "always keep …" saved something, so DINO MEMORY needs to show it.
+    if (result.memoryChanged) renderProfile((await api.init()).profile);
   } catch (err) {
     botSay(`Something went wrong: ${err.message}`);
   } finally {
@@ -248,7 +251,34 @@ function showPlan(result) {
   for (const q of result.questions) askQuestion(q);
 }
 
+// US-04: "which projects should I always keep?" is a checklist. SAVE stays off until one is checked.
+function pickProjects(q) {
+  const boxes = q.options.map((name) => el('input', { type: 'checkbox', value: name }));
+  const save = el('button', { class: 'btn btn-pink', disabled: '' }, 'SAVE');
+  const cancel = el('button', { class: 'btn' }, 'CANCEL');
+  const list = el('div', { class: 'pick-list' }, boxes.map((box) => el('label', {}, box, box.value)));
+  list.addEventListener('change', () => (save.disabled = !boxes.some((b) => b.checked)));
+  const close = () => [save, cancel, ...boxes].forEach((b) => (b.disabled = true));
+  save.addEventListener('click', async () => {
+    if (isBusy()) return;
+    const names = boxes.filter((b) => b.checked).map((b) => b.value);
+    close();
+    userSay(`Always keep: ${names.join(', ')}`);
+    const res = await api.protect(names);
+    if (res.error) return botSay(`I didn't save that: ${res.error}`);
+    retirePlans();
+    renderProfile(res.profile);
+    botSay(res.summary);
+  });
+  cancel.addEventListener('click', () => {
+    close();
+    botSay('Okay, nothing changed.');
+  });
+  attach(el('div', { class: 'question pick' }, el('p', {}, q.text), list, el('div', { class: 'options' }, save, cancel)));
+}
+
 function askQuestion(q) {
+  if (q.pick === 'protect') return pickProjects(q);
   const options = el('div', { class: 'options' });
   const box = el('div', { class: 'question' }, el('p', {}, q.text), options);
   for (const choice of q.options) {

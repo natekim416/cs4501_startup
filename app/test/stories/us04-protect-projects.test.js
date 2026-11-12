@@ -132,6 +132,62 @@ test("US-04 Claude can't get around it: a protected project it proposes is rejec
   assert.ok(touches(plan, 'cs3140-hw1'));
   assert.match(plan.attempts[0].errors.join('\n'), /capstone-team7 is protected/);
   assert.match(client.requests[0].messages[0].content, /protected_projects/);
+  assert.match(client.requests[0].system, /protected_projects/, 'the rules tell Claude what the list means');
+});
+
+// Added after the code (no red phase). Each was checked to fail with the code it covers taken out.
+test('US-04 nothing moves into a protected folder either', (t) => {
+  const root = tempDir(t);
+  write(path.join(root, 'notes.txt'), 'notes');
+  write(path.join(root, 'portfolio', 'index.html'), '<h1>me</h1>');
+  const engine = new Engine({ dataDir: tempDir(t), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.profile.data.protected = ['portfolio'];
+  const plan = { actions: [{ id: 'a1', op: 'move', path: path.join(root, 'notes.txt'), dest: path.join(root, 'portfolio'), reason: 'tidy up' }] };
+  const check = validate(plan, { scan: scan(root), findings: [], profile: engine.profile, named: [], home: tempDir(t), condaExports: {} });
+  assert.strictEqual(check.ok, false);
+  assert.match(check.errors[0].message, /portfolio is protected .*nothing moves into it/);
+});
+
+test('US-04 protecting the scanned folder itself leaves everything in it alone, on the first try', async (t) => {
+  const root = tempDir(t);
+  write(path.join(root, 'CS4501_Lecture3.pdf'), 'lecture'); // would be sorted into School/CS4501
+  write(path.join(root, 'Resume.pdf'), 'first draft'); // two versions: would ask what to do
+  write(path.join(root, 'Resume_FINAL.pdf'), 'final draft');
+  write(path.join(root, 'photo.jpg'), 'same bytes'); // a duplicate: would go to the Trash
+  write(path.join(root, 'photo (1).jpg'), 'same bytes');
+  write(path.join(root, 'free_vst_crack.command'), '#!/bin/sh\n'); // flagged: would be quarantined
+  const engine = new Engine({ dataDir: tempDir(t), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.profile.data.protected = [path.basename(root)];
+  engine.scanFolder(root);
+  assert.ok(engine.findings.length, 'the test needs a file the malware scan flags');
+  const plan = await engine.plan('Organize everything and free up space');
+  assert.deepStrictEqual(plan.actions, []);
+  assert.ok(!plan.questions.some((q) => /versions/.test(q.text)), 'no question about files it will leave alone');
+  assert.strictEqual(plan.attempts.length, 1, 'nothing was proposed and then rejected');
+  assert.deepStrictEqual(plan.protected, [path.basename(root)]);
+});
+
+test('US-04 "always keep a, b" protects every project in the list', async (t) => {
+  const { root, engine } = setup(t, ['capstone-team7', 'portfolio-site', 'cs3140-hw1']);
+  engine.scanFolder(root);
+  const reply = await engine.plan('Always keep capstone-team7, portfolio-site');
+  assert.deepStrictEqual([...engine.profile.data.protected].sort(), ['capstone-team7', 'portfolio-site']);
+  assert.strictEqual(reply.actions.length, 0);
+});
+
+test('US-04 with nothing here to keep, it says so instead of asking, and an empty pick saves nothing', async (t) => {
+  const root = tempDir(t);
+  write(path.join(root, 'notes.txt'), 'notes');
+  const engine = new Engine({ dataDir: tempDir(t), apiKey: '' });
+  engine.profile.setZone(root, 'free');
+  engine.scanFolder(root);
+  const reply = await engine.plan('Keep anything on my resume');
+  assert.match(reply.summary, /didn't find any projects/);
+  assert.deepStrictEqual(reply.questions, []);
+  assert.throws(() => engine.protect([]), /Pick at least one/);
+  assert.deepStrictEqual(engine.profile.data.protected, []);
 });
 
 test("US-04 a protected folder that isn't a code project is left alone too, on the first try", async (t) => {

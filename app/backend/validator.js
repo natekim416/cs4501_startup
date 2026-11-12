@@ -52,6 +52,9 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (!a.reason) return fail('Every action needs a "reason" the user can read.');
 
     const src = path.resolve(a.path);
+    // US-04: nothing inside a folder the user asked to always keep, whatever the op.
+    const guard = protectedBy(profile, src, scan.root);
+    if (guard) return fail(`${guard.project} is protected in DINO MEMORY (always keep "${guard.pattern}"). Leave it out of the plan.`);
     // US-24: a permanent delete is allowed only for something already in the Trash, and always asks.
     if (a.op === 'delete_from_trash') {
       if (!inTrash(src, trashDir)) return fail(`${src} isn't in the Trash. I can permanently delete only items already in the Trash.`);
@@ -74,6 +77,8 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
       const dest = a.op === 'move' ? path.join(path.resolve(a.dest), path.basename(src)) : path.resolve(a.dest);
       const destDir = path.dirname(dest);
       if (zone === 'never' || profile.zoneFor(dest) === 'never') return fail(`Destination ${dest} is in a NEVER-touch zone.`);
+      const into = protectedBy(profile, dest, scan.root);
+      if (into) return fail(`${into.project} is protected in DINO MEMORY, so nothing moves into it either.`);
       if (!destRoots.some((r) => inside(dest, r))) return fail(`Destination ${dest} is outside the target plan (${destRoots.join(', ')}).`);
       if (!dirExists(destDir)) return fail(`Destination folder ${destDir} does not exist. Add a "mkdir" action before this one.`);
       if (fileExists(dest) || isRealFile(dest)) return fail(`${dest} already exists; this would overwrite it. Pick another name.`);
@@ -138,6 +143,11 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
 
 function result(ok, errors, warnings = [], needsApproval = [], strange = [], bytesFreed = 0, recipes = {}) {
   return { ok, errors, warnings, needsApproval, strange, bytesFreed, recipes };
+}
+
+// Older callers may pass a profile without US-04's protections.
+function protectedBy(profile, target, root) {
+  return typeof profile.protectedBy === 'function' ? profile.protectedBy(target, root) : null;
 }
 
 function sameContent(a, b) {

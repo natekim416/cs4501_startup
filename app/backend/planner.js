@@ -64,6 +64,7 @@ Rules:
 - Only put new folders and moved files inside the allowed destination roots.
 - Never act on files in "never" zones. Files in "ask" zones are allowed but the user will be asked.
 - Follow the user's saved preferences.
+- Never propose any action inside a folder listed in protected_projects (names, or patterns like capstone-*). The user asked to always keep them, and the validator will reject it.
 - Don't propose deleting anything in a project with uncommitted: true or last_changed_days under 30 unless the user named that project; the validator will reject it anyway.
 - If the user says which classes or projects they're done with, delete only artifacts from those projects (use the "projects" list; course codes like "CS 3140" match folder names like cs3140-hw1). Put the project name at the start of each reason. If you can't tell which projects they mean, ask with the candidate projects as options instead of guessing.
 - If something is ambiguous or unusual (files that look like versions of each other, a request that could mean two things), do not guess: add a question with 2-4 short options and leave those files alone.
@@ -101,6 +102,7 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
     target_plan_notes: profile.data.targetPlan.notes,
     saved_preferences: profile.data.preferences,
+    protected_projects: profile.data.protected || [],
   };
 }
 
@@ -150,6 +152,8 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
   const questions = [];
   const made = new Set(scan.dirs.map((d) => path.join(scan.root, d)));
   const gone = new Set();
+  // US-04: files inside a protected folder are left alone (the validator would reject them anyway).
+  const guarded = (p) => Boolean(profile.protectedBy && profile.protectedBy(p, scan.root));
   let n = 0;
   // On a retry, leave out anything the validator already rejected instead of proposing it again.
   const rejected = new Set();
@@ -176,6 +180,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
     for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
   }
   for (const f of findings) {
+    if (guarded(f.path)) continue;
     add({ op: 'quarantine', path: f.path, reason: f.evidence.join('; ') });
     gone.add(f.path);
   }
@@ -195,7 +200,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
     for (const g of doneWith ? [] : scan.duplicates) {
       const [keep, ...rest] = g.files;
       for (const p of rest) {
-        if (gone.has(p) || gone.has(keep)) continue;
+        if (gone.has(p) || gone.has(keep) || guarded(p)) continue;
         // Identical files inside code projects (a LICENSE, an index.js) aren't clutter.
         if (profile.zoneFor(p) === 'never' || profile.zoneFor(keep) === 'never') continue;
         add({ op: 'trash_duplicate', path: p, keep, reason: `Exact copy of ${path.basename(keep)}` });
@@ -207,7 +212,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
   const byStem = new Map();
   for (const f of scan.files) {
     // Files inside code projects are source, not versions of a document.
-    if (profile.zoneFor(f.path) === 'never') continue;
+    if (profile.zoneFor(f.path) === 'never' || guarded(f.path)) continue;
     const stem = f.name.toLowerCase().replace(/\s*\(\d+\)|[-_ ]?(final|v\d+|copy)(?=[-_ .(]|$)/gi, '');
     if (!byStem.has(stem)) byStem.set(stem, []);
     byStem.get(stem).push(f);
@@ -234,7 +239,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], findi
   }
   if (sortSchool || sortAll) {
     for (const f of scan.files) {
-      if (gone.has(f.path) || versionFiles.has(f.path) || f.isBundle) continue;
+      if (gone.has(f.path) || versionFiles.has(f.path) || f.isBundle || guarded(f.path)) continue;
       if (path.dirname(f.path) !== scan.root) continue; // only tidy the top level
       const course = f.name.match(COURSE);
       let dir = null;
