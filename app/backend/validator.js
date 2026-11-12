@@ -4,10 +4,11 @@
 const fs = require('fs');
 const path = require('path');
 const { hashFile } = require('./scanner');
-const { rebuildProof, measureFreeable, toolCaches } = require('./devclutter');
+const { rebuildProof, measureFreeable, toolCaches, isXcodeArchive } = require('./devclutter');
+const { isDerivedData } = require('./ecosystems/xcode');
 const { inTrash, itemBytes } = require('./trash');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -17,7 +18,8 @@ function inside(child, root) {
   return c === r || c.startsWith(r + path.sep);
 }
 
-function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir }) {
+// xcode: what the Xcode check found unused (US-08). Only those exact items in ~/Library can be cleaned.
+function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [] }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -48,6 +50,16 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     const fail = (message) => errors.push({ action: id, message });
 
     if (!a || !OPS.has(a.op)) return fail(`Unknown op "${a && a.op}". Allowed: ${[...OPS].join(', ')}.`);
+    // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
+    // and the steps that remove it come from that check, never from the plan.
+    if (a.op === 'remove_simulator') {
+      if (!a.reason) return fail('Every action needs a "reason" the user can read.');
+      const sim = xcode.find((x) => x.type === 'simulator' && x.path === a.path);
+      if (!sim) return fail(`${a.path} isn't a simulator runtime I found unused for 180 days.`);
+      recipes[id] = sim.rebuild;
+      bytesFreed += sim.bytes;
+      return;
+    }
     if (!a.path || !path.isAbsolute(a.path)) return fail('"path" must be an absolute path.');
     if (!a.reason) return fail('Every action needs a "reason" the user can read.');
 
@@ -55,6 +67,19 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     // US-04: nothing inside a folder the user asked to always keep, whatever the op.
     const guard = protectedBy(profile, src, scan.root);
     if (guard) return fail(`${guard.project} is protected in DINO MEMORY (always keep "${guard.pattern}"). Leave it out of the plan.`);
+    // US-08: Archives stay, whatever zone they're in.
+    if (isXcodeArchive(src)) return fail(`${src} is an Xcode Archive. Xcode Archives are what crash reports need to be readable, so they always stay NEVER.`);
+    // US-08: DerivedData lives in ~/Library, which is NEVER. Only the exact folders the Xcode check found
+    // unused are opened up (Xcode rebuilds them); any other folder there still meets the zone check below.
+    const built = a.op === 'delete_rebuildable' && xcode.find((x) => x.type === 'xcode-deriveddata' && path.resolve(x.path) === src);
+    if (built) {
+      recipes[id] = built.rebuild;
+      bytesFreed += built.bytes;
+      return;
+    }
+    if (a.op === 'delete_rebuildable' && isDerivedData(src, home)) {
+      return fail(`${path.basename(src)} is Xcode build data that was built in the last 30 days, or that I can't match to a project, so I won't delete it.`);
+    }
     // US-24: a permanent delete is allowed only for something already in the Trash, and always asks.
     if (a.op === 'delete_from_trash') {
       if (!inTrash(src, trashDir)) return fail(`${src} isn't in the Trash. I can permanently delete only items already in the Trash.`);

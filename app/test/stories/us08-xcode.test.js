@@ -139,6 +139,16 @@ test("US-08 a simulator runtime is kept if any device booted in the last 180 day
   assert.match(sims[0].reason, /iOS 16\.0/);
 });
 
+test('US-08 a simulator runtime that ships inside Xcode is never offered, however old', (t) => {
+  const { xcodeItems } = require('../../backend/ecosystems/xcode');
+  const xcrun = fakeXcrun({
+    devices: OLD_SIM.devices,
+    runtimes: { R16: { ...OLD_SIM.runtimes.R16, lastUsedAt: daysAgo(400), deletable: false } },
+  });
+  const sims = xcodeItems({ home: tempDir(t), run: xcrun.run }).filter((i) => i.type === 'simulator');
+  assert.deepStrictEqual(sims, [], 'offered a runtime that simctl cannot delete');
+});
+
 test('US-08 asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER', async (t) => {
   const xcrun = fakeXcrun(OLD_SIM);
   const { engine, home, root } = setup(t, xcrun);
@@ -179,7 +189,8 @@ test('US-08 the validator opens only the exact Xcode items, and nothing else in 
   }
   const recent = check('delete_rebuildable', busy);
   assert.strictEqual(recent.ok, false, 'DerivedData built today was allowed');
-  assert.match(recent.errors[0].message, /Xcode/);
+  // Its own reason, not the NEVER one (whose path also says "Xcode").
+  assert.match(recent.errors[0].message, /built in the last 30 days/);
   const made = check('remove_simulator', `simulator:${IOS17}`);
   assert.strictEqual(made.ok, false, 'a simulator nobody offered was allowed');
   assert.match(made.errors[0].message, /simulator runtime/);
@@ -237,5 +248,6 @@ test('US-08 Claude is told which Xcode items it may use, and how', async (t) => 
   assert.deepStrictEqual(snapshot.xcode_items.map((x) => x.path).sort(), [dd, `simulator:${IOS16}`].sort());
   assert.match(sent.system, /remove_simulator/);
   assert.match(sent.system, /xcode_items/);
+  assert.match(sent.system, /~\/Library is a never zone[^\n]*xcode_items/, 'the rules tell Claude ~/Library is closed except for xcode_items');
   assert.ok(sent.output_config.format.schema.properties.actions.items.properties.op.enum.includes('remove_simulator'));
 });

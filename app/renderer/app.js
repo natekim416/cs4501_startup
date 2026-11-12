@@ -3,7 +3,9 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR' };
+// US-08: "simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0" -> "iOS 16.0 simulator"
+const simulatorName = (p) => `${p.replace(/^simulator:.*SimRuntime\./, '').replace(/^([A-Za-z]+)-([\d-]+)$/, (_, os, v) => `${os} ${v.replace(/-/g, '.')}`)} simulator`;
 
 // Decimal units, the way macOS Finder and the plan's one-line summary report sizes.
 function formatBytes(n) {
@@ -313,7 +315,7 @@ function showPlan(result) {
       const box = el('input', { type: 'checkbox', 'data-id': a.id, 'data-op': a.op, 'aria-label': `Include ${OP_LABEL[a.op]} ${a.path}` });
       box.checked = !askFirst.has(a.id) && a.checked !== false;
       const dest = a.dest === state.folder ? './' : short(a.dest) + '/';
-      const target = a.op === 'move' ? `${short(a.path)}  →  ${dest}` : a.op === 'rename' ? `${short(a.path)}  →  ${short(a.dest)}` : short(a.path);
+      const target = a.op === 'move' ? `${short(a.path)}  →  ${dest}` : a.op === 'rename' ? `${short(a.path)}  →  ${short(a.dest)}` : a.op === 'remove_simulator' ? simulatorName(a.path) : short(a.path);
       return el(
         'li',
         { class: 'action' },
@@ -459,7 +461,7 @@ async function runPlan(planId, list, approve) {
         const r = await api.undoOne(res.batchId, box.dataset.id);
         setDisk(r.disk);
         log(r.undone ? `Undid ${label}` : `Could not undo ${label}`, r.undone ? 'info' : 'fail');
-        b.textContent = r.undone ? `✓ undone: ${label}` : r.needsRebuild.length ? `↻ rebuild with: ${r.needsRebuild[0].command}` : `✗ ${label}`;
+        b.textContent = r.undone ? `✓ undone: ${label}` : r.needsRebuild.length ? `↻ rebuild with: ${r.needsRebuild[0].command}` : r.note ? `ⓘ ${r.note}` : `✗ ${label}`;
       });
       one.append(el('div', { class: 'undo-one-row' }, b));
     }
@@ -474,8 +476,10 @@ async function runPlan(planId, list, approve) {
     log(`Undid ${r.undone} steps`, 'info');
     const needs = r.needsRebuild || [];
     const kept = r.keptFolders || [];
+    // US-08: Xcode items can't be put back by the app; say how they come back instead.
+    const notes = (r.notes || []).map((n) => `\n${n}`).join('');
     const keptNote = kept.length ? `\nI kept ${kept.map(short).join(', ')} because you've put your own files in ${kept.length === 1 ? 'it' : 'them'} since.` : '';
-    const msg = botSay(`Undone. ${r.undone} steps reversed.${keptNote}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
+    const msg = botSay(`Undone. ${r.undone} steps reversed.${keptNote}${notes}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
     for (const recipe of needs) {
       const b = el('button', { class: 'btn' }, `↻ REBUILD ${short(recipe.cwd)}`);
       b.title = recipe.command;

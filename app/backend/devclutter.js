@@ -58,6 +58,9 @@ function withHash(recipe) {
   return recipe && { ...recipe, lockfileHash: sha256(recipe.lockfile) };
 }
 
+// Xcode Archives hold the symbols that make crash reports readable, so nothing ever cleans them.
+const isXcodeArchive = (p) => /[/\\]Xcode[/\\]Archives([/\\]|$)/.test(p) || p.endsWith('.xcarchive');
+
 function vmBundle(p) {
   for (let dir = p; dir !== path.dirname(dir); dir = path.dirname(dir)) {
     if (VM_EXTS.has(path.extname(dir).toLowerCase())) return dir;
@@ -70,7 +73,7 @@ function labelPath(p, opts = {}) {
   if (p.startsWith('docker-volume:')) {
     return { label: 'not_rebuildable', type: 'docker-volume', reason: 'Not rebuildable: a Docker volume may hold a database.' };
   }
-  if (/[/\\]Xcode[/\\]Archives([/\\]|$)/.test(p) || p.endsWith('.xcarchive')) {
+  if (isXcodeArchive(p)) {
     return { label: 'not_rebuildable', type: 'xcode-archive', reason: 'Not rebuildable: Xcode Archives are what crash reports need to be readable.' };
   }
   if (vmBundle(p)) {
@@ -310,4 +313,4 @@ function findArtifacts(root, opts = {}) {
   return items.sort((a, b) => b.bytes - a.bytes);
 }
 
-module.exports = { typeOf, labelPath, rebuildProof, measureFreeable, toolCaches, exportCondaEnv, findArtifacts, lastChanged, projectInfo, INACTIVE_DAYS };
+module.exports = { typeOf, labelPath, isXcodeArchive, rebuildProof, measureFreeable, toolCaches, exportCondaEnv, findArtifacts, lastChanged, projectInfo, INACTIVE_DAYS };

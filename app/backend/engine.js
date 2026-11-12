@@ -5,6 +5,7 @@ const path = require('path');
 const { scan } = require('./scanner');
 const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
 const { listTrash } = require('./trash');
+const { xcodeItems, xcrunFor } = require('./ecosystems/xcode');
 const { matchProjects, matchProtect } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
@@ -17,7 +18,7 @@ const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
-const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache'];
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator'];
 const ESTIMATE_GAP = 0.1;
 
 // "a", "a and b", "a, b and c"
@@ -45,18 +46,21 @@ function countOps(actions) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null } = {}) {
     this.llmClient = llmClient;
     this.dataDir = dataDir;
     this.home = home;
     this.condaRun = condaRun;
+    // US-08: runs `xcrun simctl` to list and remove simulators. Tests pass a fake.
+    this.xcodeRun = xcodeRun || xcrunFor(home);
+    this.xcode = [];
     this.caches = [];
     this.condaExports = {};
     this.diskFree = diskFree;
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.trashDir = trashDir;
     this.trashItems = [];
-    this.executor = new Executor(dataDir, { trashDir });
+    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun });
     this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
     this.practiceFolders = new Set();
@@ -97,6 +101,7 @@ class Engine {
     this.snapshot = scan(folder);
     this.dev = findArtifacts(folder);
     this.caches = toolCaches(this.home);
+    this.xcode = this.findXcode();
     this.trashItems = listTrash(this.trashDir);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
@@ -166,7 +171,7 @@ class Engine {
     const protectedNames = this.protectedHere();
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems };
+    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode };
     const attempts = [];
     let previous = null;
     let plan;
@@ -209,7 +214,8 @@ class Engine {
     for (const a of plan.actions || []) {
       // US-24: permanent deletes start unchecked; the user opts in and confirms.
       if (a.op === 'delete_from_trash') Object.assign(a, { checked: false, note: 'Permanent: this deletes it from the Trash for good and cannot be undone.' });
-      if (a.op !== 'delete_rebuildable') continue;
+      // Xcode's own build data has its own 30-day rule (US-08); its parent folder isn't a project.
+      if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path)) continue;
       const days = Math.floor((Date.now() - lastChanged(path.dirname(a.path))) / 864e5);
       if (days < INACTIVE_DAYS) Object.assign(a, { checked: false, note: `${path.basename(path.dirname(a.path))} is still active (changed ${days} day${days === 1 ? '' : 's'} ago). Check it only if you're sure.` });
     }
@@ -228,7 +234,7 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
-    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
     const dayAgo = Date.now() - 864e5;
     const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
       try {
@@ -254,6 +260,12 @@ class Engine {
       protected: protectedNames,
       memoryChanged: Boolean(saved),
     };
+  }
+
+  // US-08: Xcode build data and simulators unused long enough to offer. Run again at approval, so a
+  // project rebuilt or a simulator booted since the plan was made is refused.
+  findXcode() {
+    return xcodeItems({ home: this.home, run: this.xcodeRun });
   }
 
   // A reply with nothing to approve.
@@ -324,7 +336,7 @@ class Engine {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode() });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };

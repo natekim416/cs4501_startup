@@ -8,8 +8,10 @@ const { inTrash } = require('./trash');
 class Executor {
   // trashDir: where removed personal files go. The app passes the macOS Trash (US-13); without it they go
   // to the app's own Dino Bin, which keeps tests away from the real Trash.
-  constructor(dataDir, { trashDir = null } = {}) {
+  // xcrun: runs `xcrun simctl …` to remove simulators (US-08). Tests pass a fake.
+  constructor(dataDir, { trashDir = null, xcrun = null } = {}) {
     this.trashDir = trashDir;
+    this.xcrun = xcrun;
     this.binDir = path.join(dataDir, 'dino-bin');
     this.quarantineDir = path.join(dataDir, 'quarantine');
     this.logFile = path.join(dataDir, 'undo-log.json');
@@ -81,6 +83,13 @@ class Executor {
       fs.rmSync(a.path, { recursive: true });
       return { type: 'deleted', path: a.path, recipe: a.recipe };
     }
+    if (a.op === 'remove_simulator') {
+      // The steps come from the Xcode check, through the validator, never from the plan itself.
+      const steps = a.recipe && a.recipe.xcrun;
+      if (!Array.isArray(steps) || !steps.length || !this.xcrun) throw new Error(`No simulator steps for ${a.path}; refusing to run anything.`);
+      for (const args of steps) this.xcrun('xcrun', args);
+      return { type: 'deleted', path: a.path, recipe: a.recipe };
+    }
     if (a.op === 'clear_cache') {
       // Empty the cache but keep its folder; the package manager re-downloads what it needs.
       for (const e of fs.readdirSync(a.path)) fs.rmSync(path.join(a.path, e), { recursive: true });
@@ -106,7 +115,9 @@ class Executor {
   }
 
   // Undoes one logged step. A deleted build folder can't be moved back, so it's returned for rebuilding.
+  // Xcode's items have no command to run (US-08): Xcode rebuilds or re-downloads them, so undo says how.
   reverse(step) {
+    if (step.type === 'deleted' && step.recipe && !step.recipe.command) return { undone: 0, needsRebuild: [], note: step.recipe.note || null };
     if (step.type === 'deleted') return { undone: 0, needsRebuild: [{ path: step.path, ...step.recipe }] };
     if (step.type === 'deleted_permanently') return { undone: 0, needsRebuild: [] };
     try {
@@ -126,10 +137,11 @@ class Executor {
   // Reverses the most recent batch, newest step first.
   undoLast() {
     const batch = this.history.pop();
-    if (!batch) return { undone: 0, needsRebuild: [], keptFolders: [] };
+    if (!batch) return { undone: 0, needsRebuild: [], keptFolders: [], notes: [] };
     let undone = 0;
     const needsRebuild = [];
     const keptFolders = [];
+    const notes = [];
     // Keep undoing the rest even if one step can't be reversed; skip steps already undone one by one.
     for (const step of [...batch.steps].reverse()) {
       if (step.undone) continue;
@@ -137,9 +149,10 @@ class Executor {
       undone += res.undone;
       needsRebuild.push(...res.needsRebuild);
       if (res.kept) keptFolders.push(res.kept);
+      if (res.note) notes.push(res.note);
     }
     this.saveLog();
-    return { undone, needsRebuild, keptFolders };
+    return { undone, needsRebuild, keptFolders, notes };
   }
 }
 
