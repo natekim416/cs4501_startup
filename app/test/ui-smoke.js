@@ -21,6 +21,20 @@ const HELPERS = `
       this.button(zone).click();
       await this.waitFor(() => this.scans() > before && !document.body.classList.contains('busy'), 'rescan after zone change');
     },
+    // FEAT-01: a row in the PERMISSION ZONES list, found by the path it shows.
+    zoneRow: (shown) => [...document.querySelectorAll('#zones .zone-row')].find((r) => r.querySelector('.zone-path').textContent === shown),
+    picker: () => document.querySelector('#zones .zone-edit'),
+    async savedZone(p) {
+      return (await api.init()).profile.zones.find((z) => z.path === p).zone;
+    },
+    async openPicker(shown) {
+      this.zoneRow(shown).click();
+      return this.waitFor(() => this.picker(), 'zone picker for ' + shown);
+    },
+    async pick(zone) {
+      this.picker().querySelector('.zone-pick[data-zone="' + zone + '"]').click();
+      return this.waitFor(() => document.querySelector('#zones .zone-confirm'), 'confirmation');
+    },
   };
   true;
 `;
@@ -118,6 +132,58 @@ const STEPS = [
     if (fs.existsSync(path.join(base, 'data', 'usage-log.jsonl'))) throw new Error('log file still there');
     return 'ok';
   }],
+  // FEAT-01 (#41): change a zone from the list, with a confirmation step so a stray click changes nothing.
+  ['FEAT-01 clicking a zone opens a picker with FREE, ASK and NEVER, and the current one marked', `
+    const picker = await __t.openPicker('~/Documents');
+    const picks = [...picker.querySelectorAll('.zone-pick')].map((b) => b.dataset.zone + (b.disabled ? ' (current)' : ''));
+    if (picks.join(', ') !== 'free, ask (current), never') throw new Error('picker shows ' + picks.join(', '));
+    return picks.join(', ');`],
+  ['FEAT-01 picking a zone changes nothing until CONFIRM, and CANCEL leaves it as it was', `
+    const docs = state.home + '/Documents';
+    const box = await __t.pick('free');
+    const text = box.textContent;
+    if (!text.includes('~/Documents') || !text.includes('ASK') || !text.includes('FREE')) throw new Error('confirmation does not name the folder and both zones: ' + text);
+    if (!/more access/i.test(text)) throw new Error('giving more access is not called out: ' + text);
+    if (document.activeElement !== __t.button('CANCEL')) throw new Error('CANCEL is not the default button');
+    if ((await __t.savedZone(docs)) !== 'ask') throw new Error('zone changed before CONFIRM');
+    __t.button('CANCEL').click();
+    await __t.waitFor(() => !__t.picker(), 'picker to close');
+    if ((await __t.savedZone(docs)) !== 'ask') throw new Error('CANCEL changed the zone');
+    return 'ok';`],
+  ['FEAT-01 Escape, or clicking the zone again, closes the picker without changing anything', `
+    await __t.openPicker('~/Documents');
+    await __t.pick('never');
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await __t.waitFor(() => !__t.picker(), 'picker to close on Escape');
+    await __t.openPicker('~/Documents');
+    __t.zoneRow('~/Documents').click();
+    await __t.waitFor(() => !__t.picker(), 'picker to close on a second click');
+    if ((await __t.savedZone(state.home + '/Documents')) !== 'ask') throw new Error('zone changed');
+    return 'ok';`],
+  ['FEAT-01 CONFIRM saves the zone, writes it to the Safety Log, and marks plans out of date', `
+    const cards = () => document.querySelectorAll('.card');
+    const n = cards().length;
+    __t.button('Free up space').click();
+    await __t.waitFor(() => cards().length > n && !document.body.classList.contains('busy'), 'plan card');
+    const card = [...cards()].pop();
+    await __t.openPicker('~/Documents');
+    await __t.pick('never');
+    __t.button('CONFIRM').click();
+    await __t.waitFor(() => /NEVER/.test(__t.zoneRow('~/Documents').textContent), 'NEVER tag on ~/Documents');
+    if ((await __t.savedZone(state.home + '/Documents')) !== 'never') throw new Error('zone not saved');
+    if (!/~\\/Documents.*ASK.*NEVER/.test(document.querySelector('#log').textContent)) throw new Error('Safety Log has no entry');
+    if (!card.classList.contains('stale')) throw new Error('the plan made before the change can still be approved');
+    return 'ok';`],
+  ['FEAT-01 macOS folders are locked, and the page cannot change them through the backend either', `
+    const lib = state.home + '/Library';
+    const picker = await __t.openPicker('~/Library');
+    if (picker.querySelector('.zone-pick')) throw new Error('a locked zone offers choices');
+    if (!/macOS/.test(picker.textContent)) throw new Error('no reason given: ' + picker.textContent);
+    for (const res of [await api.changeZone(lib, 'free'), await api.setZone(lib + '/Caches', 'free')]) {
+      if (!res || !res.error) throw new Error('backend accepted a change to a locked folder');
+    }
+    if ((await __t.savedZone(lib)) !== 'never') throw new Error('~/Library is no longer NEVER');
+    return 'ok';`],
   // US-04 (#5): protect projects once, see later plans skip them, and remove a protection in DINO MEMORY.
   ['US-04 "keep anything on my resume" shows a checklist of projects, and SAVE protects only the ones picked', async ({ win, base }) => {
     const { makeJsProject } = require('./stories/helpers');

@@ -5,6 +5,9 @@ const os = require('os');
 const path = require('path');
 
 const HOME = os.homedir();
+const ZONES = ['free', 'ask', 'never'];
+// FEAT-01: macOS and its apps need these, so they're always NEVER, and so is everything inside them.
+const LOCKED = [path.join(HOME, 'Library'), '/System', '/Applications'];
 
 const DEFAULT_PROFILE = {
   zones: [
@@ -60,10 +63,35 @@ class Profile {
     return best ? { zone: best.zone, reason: `zone set for ${best.root}` } : { zone: 'ask', reason: 'no zone set, so I ask first' };
   }
 
+  // Used by the "This folder" buttons: adds a zone for a folder, or replaces the one it has.
   setZone(zonePath, zone) {
+    this.checkZone(zonePath, zone);
     this.data.zones = this.data.zones.filter((z) => path.resolve(z.path) !== path.resolve(zonePath));
     this.data.zones.push({ path: zonePath, zone });
     this.save();
+  }
+
+  // FEAT-01: changes a zone already in the list, in place. Returns the old and new zone.
+  changeZone(zonePath, zone) {
+    const entry = typeof zonePath === 'string' && this.data.zones.find((z) => path.resolve(z.path) === path.resolve(zonePath));
+    if (!entry) throw new Error(`${zonePath} isn't in your zones list.`);
+    this.checkZone(zonePath, zone);
+    const from = entry.zone;
+    entry.zone = zone;
+    this.save();
+    return { from, to: zone };
+  }
+
+  // The rules every zone change must pass, whatever the page asks for.
+  checkZone(zonePath, zone) {
+    if (!ZONES.includes(zone)) throw new Error(`"${zone}" isn't a zone. Use free, ask, or never.`);
+    if (typeof zonePath !== 'string' || !path.isAbsolute(zonePath)) throw new Error('A zone needs the full path of a folder.');
+    if (zone !== 'never' && this.isLocked(zonePath)) throw new Error(`${zonePath} is a macOS folder, so it always stays NEVER.`);
+  }
+
+  // True for a locked macOS folder, anything inside one, or a link that leads into one.
+  isLocked(target) {
+    return [path.resolve(target), realPath(target)].some((p) => LOCKED.some((root) => p === root || p.startsWith(root + path.sep)));
   }
 
   setTargetPlan(targetPlan) {
@@ -135,6 +163,19 @@ function gitRepoRoot(target) {
     if (fs.existsSync(path.join(dir, '.git'))) return dir;
   }
   return null;
+}
+
+// Where a path really leads, following links. For a folder that doesn't exist yet, the nearest
+// existing parent is resolved and the rest is added back, so a link can't hide where it ends up.
+function realPath(target) {
+  const resolved = path.resolve(target);
+  for (let dir = resolved; ; dir = path.dirname(dir)) {
+    try {
+      return path.join(fs.realpathSync(dir), path.relative(dir, resolved));
+    } catch {
+      if (dir === path.dirname(dir)) return resolved;
+    }
+  }
 }
 
 module.exports = { Profile, DEFAULT_PROFILE, protectName };

@@ -1,0 +1,43 @@
+FEAT-01 (#41) green run, 2026-11-11 13:15: profile.changeZone, the macOS-folder lock, the IPC handlers, and the zones picker.
+
+$ npm test   (FEAT-01 tests and the summary; the other 139 tests are unchanged)
+✔ FEAT-01 changing a listed zone updates only that zone, in place, and saves it (2.901042ms)
+✔ FEAT-01 only folders already in the zones list can be changed (1.690875ms)
+✔ FEAT-01 a zone must be free, ask, or never (0.966833ms)
+✔ FEAT-01 macOS folders are locked to NEVER, and so is everything inside them (1.063542ms)
+✔ FEAT-01 a link that points into a locked folder is locked too (0.997167ms)
+✔ FEAT-01 a plan made before its folder became NEVER cannot run (637.436125ms)
+ℹ tests 145
+ℹ suites 0
+ℹ pass 117
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 28
+ℹ duration_ms 17809.86075
+
+$ npm run test:todos
+28 todo tests are red, as expected.
+
+$ npm run test:ui
+✔ first launch asks about the usage log, and it stays off until answered  (ok)
+✔ saying yes turns the log on and the prompt goes away  (ok)
+✔ app starts and scans the demo folder  (19 files · 83.5 MB · zone: FREE)
+✔ there is no API key box: the key stays in the backend (.env), and the page cannot set one  (ok)
+✔ "Free up space" shows a plan that passed checks  (7 actions)
+✔ APPROVE runs the plan, and FREED is honest about the Dino Bin (US-12)  (freed 0 B, bin noted)
+✔ UNDO reverses it  (ok)
+✔ NEVER zone: dino refuses clearly, no plan card  (ok)
+✔ back to FREE: plan appears and asks about resume versions  (ok)
+✔ answering replaces the plan; the old card can no longer be approved  (ok)
+✔ approving the new plan runs it  (ok)
+✔ the practice folder stayed out of the usage log  (ok)
+✔ a run and undo on a real folder are logged  (5 events)
+✔ EXPORT saves a copy with counts and no file names  (logging_on, scan, plan, run, undo)
+✔ TURN OFF deletes the log  (ok)
+✔ FEAT-01 clicking a zone opens a picker with FREE, ASK and NEVER, and the current one marked  (free, ask (current), never)
+✔ FEAT-01 picking a zone changes nothing until CONFIRM, and CANCEL leaves it as it was  (ok)
+✔ FEAT-01 Escape, or clicking the zone again, closes the picker without changing anything  (ok)
+✔ FEAT-01 CONFIRM saves the zone, writes it to the Safety Log, and marks plans out of date  (ok)
+✔ FEAT-01 macOS folders are locked, and the page cannot change them through the backend either  (ok)
+UI smoke test passed (20 steps)

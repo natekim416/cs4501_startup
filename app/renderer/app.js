@@ -72,12 +72,11 @@ function attach(node) {
 
 function renderProfile(profile) {
   state.home = profile.home;
-  const zones = $('#zones');
-  zones.replaceChildren(
+  $('#zones').replaceChildren(
     ...profile.zones
       .slice()
-      .sort((a, b) => ['free', 'ask', 'never'].indexOf(a.zone) - ['free', 'ask', 'never'].indexOf(b.zone))
-      .map((z) => el('li', {}, el('span', { class: `zone-tag ${z.zone}` }, z.zone.toUpperCase()), short(z.path))),
+      .sort((a, b) => ZONE_ORDER.indexOf(a.zone) - ZONE_ORDER.indexOf(b.zone))
+      .map(zoneItem),
   );
   const target = profile.targetPlan.destRoots[0];
   $('#target').textContent = target ? short(target) : 'Inside the selected folder';
@@ -89,6 +88,102 @@ function renderProfile(profile) {
     el('li', {}, el('span', {}, p), el('button', { title: 'Forget', onclick: async () => renderProfile(await api.forget(p)) }, 'X')),
   );
   $('#memory').replaceChildren(...(kept.length || learned.length ? [...kept, ...learned] : [el('li', { class: 'muted' }, 'Nothing learned yet.')]));
+}
+
+// ---------- Permission zones (FEAT-01) ----------
+// Clicking a zone opens a picker under it. Picking a zone only asks for confirmation; nothing changes
+// until CONFIRM, and CANCEL is the default. The backend checks every change again (profile.js).
+
+const ZONE_ORDER = ['free', 'ask', 'never']; // most access first
+const ZONE_HELP = {
+  free: 'I can move and remove files here without asking first. You still approve every plan.',
+  ask: 'I ask you before each change here.',
+  never: 'I never touch anything here.',
+};
+
+function zoneItem(z) {
+  const item = el('li', { class: 'zone-item', onkeydown: (e) => e.key === 'Escape' && closeZonePicker() });
+  item.append(
+    el(
+      'button',
+      { class: 'zone-row', 'aria-expanded': 'false', title: z.locked ? 'macOS folder: always NEVER' : 'Change this zone', onclick: () => toggleZonePicker(item, z) },
+      el('span', { class: `zone-tag ${z.zone}` }, z.zone.toUpperCase()),
+      el('span', { class: 'zone-path' }, short(z.path)),
+      z.locked ? el('span', { class: 'zone-lock' }, 'LOCKED') : null,
+    ),
+  );
+  return item;
+}
+
+function closeZonePicker() {
+  const open = $('#zones .zone-edit');
+  if (!open) return;
+  const row = open.parentElement.querySelector('.zone-row');
+  open.remove();
+  row.setAttribute('aria-expanded', 'false');
+  row.focus();
+}
+
+function toggleZonePicker(item, z) {
+  const wasOpen = item.querySelector('.zone-edit');
+  closeZonePicker();
+  if (wasOpen || isBusy()) return;
+  const box = el('div', { class: 'zone-edit' });
+  item.append(box);
+  item.querySelector('.zone-row').setAttribute('aria-expanded', 'true');
+  if (z.locked) {
+    zoneMessage(box, `macOS needs ${short(z.path)}, so it always stays NEVER. I can't change it.`);
+    return;
+  }
+  box.append(
+    el('p', {}, `Change ${short(z.path)} to:`),
+    ...ZONE_ORDER.map((zone) =>
+      el(
+        'div',
+        { class: 'zone-choice' },
+        el('button', { class: `zone-btn zone-pick ${zone}`, 'data-zone': zone, ...(zone === z.zone && { disabled: '' }), onclick: () => confirmZone(box, z, zone) }, zone.toUpperCase()),
+        el('span', { class: 'zone-help' }, zone === z.zone ? `Now. ${ZONE_HELP[zone]}` : ZONE_HELP[zone]),
+      ),
+    ),
+    el('div', { class: 'zone-actions' }, el('button', { class: 'btn', onclick: closeZonePicker }, 'CANCEL')),
+  );
+  box.querySelector('.zone-actions .btn').focus();
+}
+
+function confirmZone(box, z, to) {
+  const more = ZONE_ORDER.indexOf(to) < ZONE_ORDER.indexOf(z.zone);
+  box.replaceChildren(
+    el(
+      'div',
+      { class: 'zone-confirm' },
+      el('p', {}, `Change ${short(z.path)} from ${z.zone.toUpperCase()} to ${to.toUpperCase()}?`),
+      el('p', { class: more ? 'zone-warn' : 'zone-help' }, `${more ? 'This gives me more access.' : 'This gives me less access.'} ${ZONE_HELP[to]}`),
+      el(
+        'div',
+        { class: 'zone-actions' },
+        el('button', { class: `btn ${more ? 'btn-pink' : 'btn-primary'}`, onclick: () => applyZone(box, z, to) }, 'CONFIRM'),
+        el('button', { class: 'btn zone-cancel', onclick: closeZonePicker }, 'CANCEL'),
+      ),
+    ),
+  );
+  box.querySelector('.zone-cancel').focus();
+}
+
+async function applyZone(box, z, to) {
+  if (isBusy()) return;
+  box.querySelectorAll('button').forEach((b) => (b.disabled = true));
+  const res = await api.changeZone(z.path, to);
+  if (res.error) return zoneMessage(box, `I didn't change it: ${res.error}`, 'zone-warn');
+  // Plans on screen were checked against the old zones, so they can't be approved any more.
+  retirePlans();
+  renderProfile(res);
+  log(`Zone changed: ${short(z.path)} ${z.zone.toUpperCase()} → ${to.toUpperCase()}`, 'info');
+  if (state.folder && (state.folder === z.path || state.folder.startsWith(z.path + '/'))) await useFolder(state.folder);
+}
+
+function zoneMessage(box, text, cls = 'zone-help') {
+  box.replaceChildren(el('p', { class: cls }, text), el('div', { class: 'zone-actions' }, el('button', { class: 'btn', onclick: closeZonePicker }, 'CLOSE')));
+  box.querySelector('.btn').focus();
 }
 
 function log(text, kind = 'info') {
@@ -446,8 +541,14 @@ document.querySelectorAll('.zone-btn').forEach((b) =>
   b.addEventListener('click', async () => {
     if (!state.folder || isBusy()) return;
     document.body.classList.add('busy');
+    const res = await api.setZone(state.folder, b.dataset.zone);
+    if (res.error) {
+      document.body.classList.remove('busy');
+      botSay(`I didn't change the zone: ${res.error}`);
+      return;
+    }
     retirePlans();
-    renderProfile(await api.setZone(state.folder, b.dataset.zone));
+    renderProfile(res);
     await useFolder(state.folder);
   }),
 );

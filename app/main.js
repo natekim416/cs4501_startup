@@ -45,7 +45,19 @@ function diskInfo() {
 }
 
 function profileView() {
-  return { ...engine.profile.data, home: os.homedir() };
+  // FEAT-01: locked zones are marked so the page can say why they can't change. The backend enforces it either way.
+  const zones = engine.profile.data.zones.map((z) => ({ ...z, locked: engine.profile.isLocked(z.path) }));
+  return { ...engine.profile.data, zones, home: os.homedir() };
+}
+
+// A refused zone change comes back as { error } with the reason, and nothing is saved.
+function zoneChange(change) {
+  try {
+    change();
+    return profileView();
+  } catch (err) {
+    return { error: err.message };
+  }
 }
 
 function registerIpc() {
@@ -78,10 +90,8 @@ function registerIpc() {
   ipcMain.handle('undo', () => ({ ...engine.undo(), disk: diskInfo() }));
   ipcMain.handle('undo-one', (_e, batchId, actionId) => ({ ...engine.undoAction(batchId, actionId), disk: diskInfo() }));
   ipcMain.handle('rebuild', (_e, recipe) => ({ ...engine.rebuild(recipe), disk: diskInfo() }));
-  ipcMain.handle('set-zone', (_e, zonePath, zone) => {
-    engine.profile.setZone(zonePath, zone);
-    return profileView();
-  });
+  ipcMain.handle('set-zone', (_e, zonePath, zone) => zoneChange(() => engine.profile.setZone(zonePath, zone)));
+  ipcMain.handle('change-zone', (_e, zonePath, zone) => zoneChange(() => engine.profile.changeZone(zonePath, zone)));
   ipcMain.handle('set-target', (_e, destRoot) => {
     engine.profile.setTargetPlan({ destRoots: destRoot ? [destRoot] : [] });
     return profileView();
