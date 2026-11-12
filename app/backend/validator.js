@@ -13,7 +13,7 @@ const { realPath } = require('./profile');
 // plan path with ".." is never allowed (red-team F3).
 const hasDotDot = (p) => typeof p === 'string' && p.split(/[\\/]/).includes('..');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator', 'remove_docker']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -24,7 +24,7 @@ function inside(child, root) {
 }
 
 // xcode: what the Xcode check found unused (US-08). Only those exact items in ~/Library can be cleaned.
-function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [] }) {
+function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [], docker = [] }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -62,6 +62,16 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (['path', 'dest', 'keep'].some((k) => hasDotDot(a[k]))) return fail('Paths may not contain "..". Use the full, direct path.');
     // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
     // and the steps that remove it come from that check, never from the plan.
+    // US-09: a Docker image or the build cache is an id, not a file. Only what the Docker check found unused
+    // can go (never a volume, never an image a container uses), and the docker steps come from that check.
+    if (a.op === 'remove_docker') {
+      if (!a.reason) return fail('Every action needs a "reason" the user can read.');
+      const item = docker.find((d) => d.path === a.path);
+      if (!item) return fail(`${a.path} isn't a Docker image or build cache I found unused. Volumes and images a container uses are never removed.`);
+      recipes[id] = item.rebuild;
+      bytesFreed += item.bytes;
+      return;
+    }
     if (a.op === 'remove_simulator') {
       if (!a.reason) return fail('Every action needs a "reason" the user can read.');
       const sim = xcode.find((x) => x.type === 'simulator' && x.path === a.path);

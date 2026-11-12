@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR' , remove_docker: 'DOCKER' };
 // US-08: "simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0" -> "iOS 16.0 simulator"
 const simulatorName = (p) => `${p.replace(/^simulator:.*SimRuntime\./, '').replace(/^([A-Za-z]+)-([\d-]+)$/, (_, os, v) => `${os} ${v.replace(/-/g, '.')}`)} simulator`;
 

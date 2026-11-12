@@ -6,6 +6,7 @@ const { scan } = require('./scanner');
 const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
 const { listTrash } = require('./trash');
 const { xcodeItems, xcrunFor } = require('./ecosystems/xcode');
+const { dockerItems, dockerFor, reportDockerFreed } = require('./ecosystems/docker');
 const { matchProjects, matchProtect } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
@@ -55,7 +56,7 @@ function withTimeout(promise, ms) {
 }
 
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000 } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000, dockerRun = null } = {}) {
     this.planTimeoutMs = planTimeoutMs;
     this.llmClient = llmClient;
     this.dataDir = dataDir;
@@ -63,6 +64,9 @@ class Engine {
     this.condaRun = condaRun;
     // US-08: runs `xcrun simctl` to list and remove simulators. Tests pass a fake.
     this.xcodeRun = xcodeRun || xcrunFor(home);
+    this.dockerRun = dockerRun || dockerFor(home);
+    this.docker = [];
+    this.dockerMessage = null;
     this.xcode = [];
     this.caches = [];
     this.condaExports = {};
@@ -70,7 +74,7 @@ class Engine {
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.trashDir = trashDir;
     this.trashItems = [];
-    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun });
+    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun, dockerRun: this.dockerRun });
     this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
     this.practiceFolders = new Set();
@@ -115,6 +119,9 @@ class Engine {
     this.dev = findArtifacts(folder);
     this.caches = toolCaches(this.home);
     this.xcode = this.findXcode();
+    const docker = this.findDocker();
+    this.docker = docker.items;
+    this.dockerMessage = docker.message;
     this.trashItems = listTrash(this.trashDir);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
@@ -184,7 +191,7 @@ class Engine {
     const protectedNames = this.protectedHere();
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode };
+    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode, docker: this.docker, dockerMessage: this.dockerMessage };
     const attempts = [];
     let previous = null;
     let plan;
@@ -261,7 +268,7 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
-    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.docker.map((d) => [d.path, d.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
     const dayAgo = Date.now() - 864e5;
     const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
       try {
@@ -293,6 +300,11 @@ class Engine {
   // project rebuilt or a simulator booted since the plan was made is refused.
   findXcode() {
     return xcodeItems({ home: this.home, run: this.xcodeRun });
+  }
+
+  // US-09: Docker images no container uses, and the build cache. Re-checked at approval, like Xcode.
+  findDocker() {
+    return dockerItems({ run: this.dockerRun });
   }
 
   // A reply with nothing to approve.
@@ -365,7 +377,7 @@ class Engine {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode() });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode(), docker: this.findDocker().items });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };
@@ -406,6 +418,9 @@ class Engine {
     const notes = [];
     if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
     if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
+    const insideDocker = actions.filter((a) => a.op === 'remove_docker').reduce((n, a) => n + ((this.docker.find((d) => d.path === a.path) || {}).bytes || 0), 0);
+    const docker = reportDockerFreed({ insideDocker, diskChange: measuredFreed });
+    if (docker.showBoth) notes.push(docker.text);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
   }
 

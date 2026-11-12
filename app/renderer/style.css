@@ -247,3 +247,4 @@ body.tour-talking #tour-guide .dino { animation: talk 0.25s steps(2) infinite; }
 .undo-one summary { cursor: pointer; margin-top: 6px; }
 .undo-one .btn { white-space: normal; text-align: left; }
 .action.skipped .file { text-decoration: line-through; opacity: 0.6; }
+.op.remove_docker { background: #9FD3FF; }

@@ -9,9 +9,10 @@ class Executor {
   // trashDir: where removed personal files go. The app passes the macOS Trash (US-13); without it they go
   // to the app's own Dino Bin, which keeps tests away from the real Trash.
   // xcrun: runs `xcrun simctl …` to remove simulators (US-08). Tests pass a fake.
-  constructor(dataDir, { trashDir = null, xcrun = null } = {}) {
+  constructor(dataDir, { trashDir = null, xcrun = null, dockerRun = null } = {}) {
     this.trashDir = trashDir;
     this.xcrun = xcrun;
+    this.dockerRun = dockerRun;
     this.binDir = path.join(dataDir, 'dino-bin');
     this.quarantineDir = path.join(dataDir, 'quarantine');
     this.logFile = path.join(dataDir, 'undo-log.json');
@@ -110,6 +111,13 @@ class Executor {
       if (!a.recipe) throw new Error(`No rebuild recipe for ${a.path}; refusing to delete it.`);
       fs.rmSync(a.path, { recursive: true });
       return { type: 'deleted', path: a.path, recipe: a.recipe };
+    }
+    if (a.op === 'remove_docker') {
+      // The docker steps come from the Docker check, through the validator, never from the plan itself (US-09).
+      const steps = a.recipe && a.recipe.docker;
+      if (!Array.isArray(steps) || !steps.length || !this.dockerRun) throw new Error(`No Docker steps for ${a.path}; refusing to run anything.`);
+      for (const args of steps) this.dockerRun('docker', args);
+      return { type: 'deleted', path: a.path, recipe: { note: a.recipe.note } };
     }
     if (a.op === 'remove_simulator') {
       // The steps come from the Xcode check, through the validator, never from the plan itself.
