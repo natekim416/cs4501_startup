@@ -24,7 +24,7 @@ function inside(child, root) {
 }
 
 // xcode: what the Xcode check found unused (US-08). Only those exact items in ~/Library can be cleaned.
-function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [], docker = [] }) {
+function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [], docker = [], ml = [] }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -95,6 +95,17 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (built) {
       recipes[id] = built.rebuild;
       bytesFreed += built.bytes;
+      return;
+    }
+    // US-10: a model in the Hugging Face download cache re-downloads when loaded. Only models the ML check
+    // offered (unused 30 days, or named) can go; anything the user saved elsewhere is never on that list.
+    const model = a.op === 'delete_rebuildable' && ml.find((x) => path.resolve(x.path) === src);
+    if (model) {
+      if (!model.offered) return fail(`${model.model} was used in the last 30 days, so I'll only remove it if you name it.`);
+      if (profile.zoneFor(src) === 'never') return fail(`${src} is in a NEVER-touch zone. Remove this action.`);
+      recipes[id] = model.rebuild;
+      bytesFreed += model.bytes;
+      if (profile.zoneFor(src) === 'ask') needsApproval.push(id);
       return;
     }
     if (a.op === 'delete_rebuildable' && isDerivedData(src, home)) {

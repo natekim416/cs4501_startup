@@ -7,6 +7,7 @@ const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACT
 const { listTrash } = require('./trash');
 const { xcodeItems, xcrunFor } = require('./ecosystems/xcode');
 const { dockerItems, dockerFor, reportDockerFreed } = require('./ecosystems/docker');
+const { mlItems } = require('./ecosystems/ml');
 const { matchProjects, matchProtect } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
@@ -67,6 +68,7 @@ class Engine {
     this.dockerRun = dockerRun || dockerFor(home);
     this.docker = [];
     this.dockerMessage = null;
+    this.ml = [];
     this.xcode = [];
     this.caches = [];
     this.condaExports = {};
@@ -122,6 +124,7 @@ class Engine {
     const docker = this.findDocker();
     this.docker = docker.items;
     this.dockerMessage = docker.message;
+    this.ml = this.findMl();
     this.trashItems = listTrash(this.trashDir);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
@@ -191,7 +194,11 @@ class Engine {
     const protectedNames = this.protectedHere();
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode, docker: this.docker, dockerMessage: this.dockerMessage };
+    // US-10: a model the request names by name may go even if it was used recently.
+    const lower = request.toLowerCase();
+    const namedModels = this.ml.filter((x) => [x.model, x.model.split('/').pop()].some((n) => n.length >= 4 && new RegExp(`(^|[^\\w-])${n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`).test(lower))).map((x) => x.model);
+    if (namedModels.length) this.ml = this.findMl(namedModels);
+    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode, docker: this.docker, dockerMessage: this.dockerMessage, ml: this.ml };
     const attempts = [];
     let previous = null;
     let plan;
@@ -255,7 +262,7 @@ class Engine {
     }
 
     const planId = ++this.planCount;
-    this.lastPlan = { id: planId, request, plan, check, named: ctx.named };
+    this.lastPlan = { id: planId, request, plan, check, named: ctx.named, namedModels };
     this.track('plan', {
       zone: this.profile.zoneFor(this.folder),
       tries: attempts.length,
@@ -268,7 +275,7 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
-    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.docker.map((d) => [d.path, d.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.docker.map((d) => [d.path, d.bytes]), ...this.ml.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
     const dayAgo = Date.now() - 864e5;
     const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
       try {
@@ -300,6 +307,11 @@ class Engine {
   // project rebuilt or a simulator booted since the plan was made is refused.
   findXcode() {
     return xcodeItems({ home: this.home, run: this.xcodeRun });
+  }
+
+  // US-10: models in the Hugging Face download cache. A model used in the last 30 days is offered only if named.
+  findMl(named = []) {
+    return mlItems({ home: this.home, named });
   }
 
   // US-09: Docker images no container uses, and the build cache. Re-checked at approval, like Xcode.
@@ -377,7 +389,7 @@ class Engine {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode(), docker: this.findDocker().items });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode(), docker: this.findDocker().items, ml: this.findMl(this.lastPlan.namedModels) });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };
