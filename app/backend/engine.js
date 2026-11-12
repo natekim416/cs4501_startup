@@ -227,11 +227,14 @@ class Engine {
     this.pendingSweep = null;
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     // U5: a class folder above the project counts too (~/school/CS3140/hw3 is CS 3140).
-    if (!this.pendingProjects && (intent.codes || []).length) {
+    // Only a parent folder whose own name is the class code counts, and a project named exactly is never widened (RN1).
+    const exactName = intent.matched.some((n) => new RegExp(`(^|[^\\w-])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`, 'i').test(request));
+    if (!this.pendingProjects && !exactName && (intent.codes || []).length) {
       for (const d of this.dev) {
         const name = path.basename(d.project);
-        const parents = path.relative(this.folder, path.dirname(d.project)).toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (intent.codes.some((c) => parents.includes(c)) && !intent.matched.includes(name) && !(intent.kept || []).includes(name)) intent.matched.push(name);
+        const parents = path.relative(this.folder, path.dirname(d.project)).split(path.sep);
+        const inClass = parents.some((seg) => courseCodes(seg).some((c) => intent.codes.includes(c)));
+        if (inClass && !intent.matched.includes(name) && !(intent.kept || []).includes(name)) intent.matched.push(name);
       }
       if (intent.matched.length) intent.ambiguous = null;
     }

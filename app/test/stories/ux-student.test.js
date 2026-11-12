@@ -137,3 +137,55 @@ test('U13 "always keep X and free up space" saves the protection and still plans
   assert.ok(res.actions.length > 0, res.summary);
   assert.ok(!res.actions.some((a) => a.path.includes('cs3140-final')));
 });
+
+test('N1 "remove duplicates" is about duplicates: no Docker, Xcode, or model deletes ride along', async () => {
+  const { engine } = student();
+  const plan = await engine.plan('Remove duplicates');
+  assert.ok(!plan.actions.some((a) => ['remove_docker', 'remove_simulator'].includes(a.op) || a.path.includes('huggingface')), plan.actions.map((a) => a.op).join(', '));
+  const org = await engine.plan('Organize my files and remove duplicates');
+  assert.ok(!org.actions.some((a) => a.op === 'remove_docker'));
+});
+
+test('N2 naming one model deletes that model only', async () => {
+  const { engine, home } = student();
+  const other = path.join(home, '.cache', 'huggingface', 'hub', 'models--org--whisper-small');
+  write(path.join(other, 'snapshots', 'a', 'w.bin'), 'w');
+  engine.ml = engine.findMl();
+  const plan = await engine.plan('delete whisper-small');
+  assert.deepStrictEqual(plan.actions.map((a) => a.path), [other]);
+});
+
+test('N4 "delete my old node_modules" deletes node_modules only, not Python environments', async () => {
+  const { engine } = student();
+  const plan = await engine.plan('delete my old node_modules');
+  assert.ok(plan.actions.length && plan.actions.every((a) => path.basename(a.path) === 'node_modules'), plan.actions.map((a) => a.path).join(', '));
+});
+
+test('U5b "I\'m done with the robotics class" asks nothing about resumes or essays', async () => {
+  const base = tmp();
+  const home = path.join(base, 'home');
+  makeJsProject(home, 'cs4501-robotics');
+  write(path.join(home, 'Downloads', 'Resume.pdf'), 'a');
+  write(path.join(home, 'Downloads', 'Resume_final.pdf'), 'bb');
+  const engine = new Engine({ dataDir: path.join(base, 'd'), apiKey: '', home, trashDir: path.join(base, 'T') });
+  engine.profile.setZone(home, 'free');
+  engine.openFolder(home);
+  const plan = await engine.plan("I'm done with the robotics class");
+  assert.ok(!plan.questions.some((q) => /Resume/.test(q.text)), plan.questions.map((q) => q.text).join(' | '));
+});
+
+test('RN1 a parent folder counts only when its own name is the class code, and an exact project name is never widened', async () => {
+  const base = tmp();
+  const home = path.join(base, 'home');
+  makeJsProject(path.join(home, 'school', 'CS3140'), 'hw1');
+  makeJsProject(path.join(home, 'school', 'CS3140'), 'final', { ageDays: 2 });
+  makeJsProject(path.join(home, 'docs3140x-archive'), 'thesis-site', { ageDays: 2 });
+  const engine = new Engine({ dataDir: path.join(base, 'd'), apiKey: '', home, trashDir: path.join(base, 'T') });
+  engine.profile.setZone(home, 'free');
+  engine.openFolder(home);
+  const all = await engine.plan("I'm done with CS 3140. Free up space.");
+  const names = [...new Set(all.actions.map((a) => path.basename(path.dirname(a.path))))].sort();
+  assert.ok(!names.includes('thesis-site'), names.join(', '));
+  const one = await engine.plan("I'm done with hw1 for CS 3140");
+  assert.deepStrictEqual([...new Set(one.actions.map((a) => path.basename(path.dirname(a.path))))], ['hw1']);
+});

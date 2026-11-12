@@ -172,7 +172,8 @@ const CAMERA = /^(img|dsc|dscn|dscf|mov|vid|pxl|scn|dji|gopr|mvi|cimg|wp|photo|s
 
 function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], docker = [], dockerMessage = null, ml = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
-  const sortSchool = want(/school|class|course|lecture/i);
+  // "I'm done with the robotics class" is a cleanup, not a request to sort files (U5b).
+  const sortSchool = !want(/done with|finished with|over with/i) && want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
   const doneWith = want(/done with|finished with|over with/i);
   // U6: natural wording ("delete my old node_modules", "my disk is full") is a space request too.
@@ -211,7 +212,8 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
   }
   // US-10: an ML-cache request plans only downloaded models the ML check offered.
   if (want(/hugging ?face|pytorch|\bmodels?\b|ml cache/i) || ml.some((x) => x.named)) {
-    const offered = ml.filter((x) => x.offered);
+    // Naming a model means that model only (N2).
+    const offered = ml.some((x) => x.named) ? ml.filter((x) => x.named) : ml.filter((x) => x.offered);
     for (const x of offered) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
     return { summary: offered.length ? `I found ${offered.length} downloaded model(s) you haven't used in 30 days.` : "I didn't find any downloaded models you haven't used in 30 days.", actions, questions };
   }
@@ -239,16 +241,22 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     // ("done with CS 3140"), only those; if it's ambiguous, ask instead.
     if (intent.ambiguous) questions.push(intent.ambiguous);
     const named = new Set(intent.matched);
+    // "delete my old node_modules" means node_modules; "my venvs" means Python environments (N4).
+    const onlyType = want(/node_modules/i) && !want(/venv|python|conda/i) ? 'node_modules' : want(/venv|python|conda/i) && !want(/node_modules/i) ? 'python' : null;
     for (const d of dev) {
       if (d.label !== 'rebuildable' || rejected.has(d.path) || intent.ambiguous) continue;
+      if (onlyType === 'node_modules' && d.type !== 'node_modules') continue;
+      if (onlyType === 'python' && !['python-venv', 'conda-env'].includes(d.type)) continue;
       const project = path.basename(d.project);
       if (doneWith && !named.has(project)) continue;
       if ((intent.kept || []).includes(project)) continue;
       const why = named.has(project) ? `${project}: you said you're done with it. ${d.reason}` : `${project}: ${d.reason}`;
       add({ op: 'delete_rebuildable', path: d.path, project, reason: why });
     }
-    // U1: a general space request also offers what Docker, old models, and Xcode can give back.
-    if (!devIntent && !intent.matched.length) {
+    // U1: a general space request also offers what Docker, old models, and Xcode can give back. Not for a
+    // request about duplicates or organizing (N1).
+    const spaceIntent = want(/space|storage|free up|reclaim|disk|full|\bgb\b|as much|everything/i) && !want(/dup|copies|organi[sz]e|sort|tidy/i);
+    if (spaceIntent && !devIntent && !intent.matched.length) {
       for (const d of docker) add({ op: 'remove_docker', path: d.path, reason: d.reason });
       for (const x of ml.filter((m) => m.offered)) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
       for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
