@@ -254,6 +254,7 @@ async function useFolder(folder) {
   $('#zone-add').hidden = false;
   document.body.classList.add('busy');
   const info = await api.scan(folder);
+  renderSemesterOffer(info.semesterOffer);
   document.body.classList.remove('busy');
   $('#folder-stats').textContent = `${info.fileCount} files · ${formatBytes(info.totalBytes)} · zone: ${info.zone.toUpperCase()}`;
   log(`Scanned with ${info.malwareEngine}`, 'info');
@@ -532,6 +533,35 @@ api.onAttempt((a) => {
 
 api.onUsage(renderUsage);
 
+let semesterProjects = [];
+function renderSemesterOffer(offer) {
+  semesterProjects = offer?.projects || [];
+  $('#semester-offer').hidden = !semesterProjects.length;
+  $('#semester-description').textContent = `${semesterProjects.length} old class project(s): ${semesterProjects.join(', ')}. Preview only; you decide what runs.`;
+}
+
+$('#semester-end').addEventListener('change', async () => {
+  try {
+    renderSemesterOffer(await api.setSemesterEnd($('#semester-end').value));
+  } catch (err) {
+    botSay(err.message);
+  }
+});
+
+$('#semester-preview').addEventListener('click', () => {
+  if (semesterProjects.length) sendRequest(`I'm done with ${semesterProjects.map((name) => JSON.stringify(name)).join(' and ')}. Free up space.`);
+});
+
+$('#go-pro').addEventListener('click', async () => {
+  const message = $('#go-pro-message');
+  try {
+    message.textContent = (await api.goPro()).message;
+  } catch {
+    message.textContent = "I couldn't open Pro information. Please try again.";
+  }
+  message.hidden = false;
+});
+
 $('#usage-toggle').addEventListener('click', async () => {
   const on = !state.usageOn;
   if (!on && !confirm('Turn off the usage log and delete what it has recorded?')) return;
@@ -590,6 +620,7 @@ document.querySelectorAll('.zone-btn').forEach((b) =>
   setDisk(init.disk);
   renderProfile(init.profile);
   renderUsage(init.usage);
+  $('#semester-end').value = init.profile.semesterEnd || '';
   botSay(
     `RAWR! I'm Cleanasaurus, your file maid.\nPick a folder, then tell me what you want in plain English.\nI check every plan for safety before you see it, and I never touch your NEVER zones.${init.mode === 'demo' ? '\n(No Claude API key found, so I\'m in DEMO MODE with offline rules.)' : ''}`,
   );

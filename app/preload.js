@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   protect: (names) => ipcRenderer.invoke('protect', names),
   unprotect: (name) => ipcRenderer.invoke('unprotect', name),
   setUsage: (on) => ipcRenderer.invoke('set-usage', on),
+  goPro: () => ipcRenderer.invoke('go-pro'),
+  setSemesterEnd: (date) => ipcRenderer.invoke('set-semester-end', date),
   rebuild: (recipe) => ipcRenderer.invoke('rebuild', recipe),
   undoOne: (batchId, actionId) => ipcRenderer.invoke('undo-one', batchId, actionId),
   exportUsage: () => ipcRenderer.invoke('export-usage'),

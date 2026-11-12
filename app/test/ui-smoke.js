@@ -41,6 +41,33 @@ const HELPERS = `
 
 // A step is either page code (a string) or a function that runs in the main process.
 const STEPS = [
+  ['US-17 semester sweep offers a preview and leaves files in place', async ({ win, base }) => {
+    const { makeJsProject } = require('./stories/helpers');
+    const root = path.join(base, 'semester');
+    const project = makeJsProject(root, 'cs3140-old');
+    await page(win, `
+      await api.setZone(${JSON.stringify(root)}, 'free');
+      await useFolder(${JSON.stringify(root)});
+      document.querySelector('#semester-end').value = '2000-01-01';
+      document.querySelector('#semester-end').dispatchEvent(new Event('change'));
+      await __t.waitFor(() => !document.querySelector('#semester-offer').hidden, 'semester offer');
+      document.querySelector('#semester-preview').click();
+      await __t.waitFor(() => __t.liveCards().length && !document.body.classList.contains('busy'), 'semester preview');
+      if (!__t.liveCards().at(-1).textContent.includes('cs3140-old')) throw new Error('missing class project');
+      await api.setSemesterEnd('');
+      document.querySelector('#semester-end').value = '';
+      retirePlans();
+      await useFolder((await api.init()).demoFolder);
+      return 'ok';`);
+    if (!fs.existsSync(path.join(project, 'node_modules'))) throw new Error('preview deleted files');
+    return 'preview only; files unchanged';
+  }],
+  ['US-21 Go Pro shows its message without opting the user into logging', `
+    document.querySelector('#go-pro').click();
+    await __t.waitFor(() => !document.querySelector('#go-pro-message').hidden, 'Pro message');
+    if (!/Pro isn't available yet/.test(document.querySelector('#go-pro-message').textContent)) throw new Error('missing Pro message');
+    if ((await api.init()).usage.enabled) throw new Error('Go Pro enabled logging');
+    return 'ok';`],
   ['first launch asks about the usage log, and it stays off until answered', `
     await __t.waitFor(() => document.querySelector('.consent'), 'usage log prompt');
     if ((await api.init()).usage.enabled) throw new Error('log is on before the user answered');
@@ -387,7 +414,9 @@ module.exports = function runUiTest(win, resultFile) {
     try {
       await win.webContents.executeJavaScript(HELPERS);
       await win.webContents.executeJavaScript(`__t.real = ${JSON.stringify(path.join(base, 'Real'))}; true`);
-      for (const [name, body] of STEPS) {
+      const steps = process.env.CLEANASAURUS_UI_FILTER ? STEPS.filter(([name]) => name.includes(process.env.CLEANASAURUS_UI_FILTER)) : STEPS;
+      if (!steps.length) throw new Error('No UI steps matched the filter');
+      for (const [name, body] of steps) {
         try {
           const detail = typeof body === 'function' ? await body({ win, base }) : await win.webContents.executeJavaScript(`(async () => { ${body} })()`);
           results.push({ name, ok: true, detail });
@@ -398,7 +427,8 @@ module.exports = function runUiTest(win, resultFile) {
       }
     } finally {
       fs.writeFileSync(resultFile, JSON.stringify(results, null, 2));
-      require('electron').app.exit(results.every((r) => r.ok) && results.length === STEPS.length ? 0 : 1);
+      const expected = process.env.CLEANASAURUS_UI_FILTER ? STEPS.filter(([name]) => name.includes(process.env.CLEANASAURUS_UI_FILTER)).length : STEPS.length;
+      require('electron').app.exit(results.every((r) => r.ok) && results.length === expected ? 0 : 1);
     }
   });
 };

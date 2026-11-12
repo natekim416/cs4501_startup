@@ -3,7 +3,7 @@
 // never file names, folder names, or what the user typed.
 const fs = require('fs');
 
-const LABELS = { mode: ['llm', 'demo'], zone: ['free', 'ask', 'never'] };
+const LABELS = { mode: ['llm', 'demo'], zone: ['free', 'ask', 'never'], category: ['javascript', 'python', 'xcode', 'other'] };
 
 // Keeps only numbers, true/false, and known labels, so a file name can't slip into the log.
 function clean(fields) {
@@ -58,6 +58,11 @@ class UsageLog {
 
   exportTo(dest) {
     fs.copyFileSync(this.file, dest);
+  }
+
+  goPro() {
+    this.record('go_pro_click');
+    return { message: "Pro isn't available yet. Want us to email you when it is?" };
   }
 }
 

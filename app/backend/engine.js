@@ -16,6 +16,7 @@ const { makePlan } = require('./planner');
 const { Executor } = require('./executor');
 const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
+const { sweepOffer, semesterDate } = require('./semester');
 
 const MAX_ATTEMPTS = 3;
 const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator'];
@@ -132,6 +133,7 @@ class Engine {
       malwareEngine: malware.engine,
       findings: this.findings,
       unknownApps: this.unknownApps.map((f) => ({ name: f.name, label: f.label })),
+      semesterOffer: this.semesterOffer(),
       zone: this.profile.zoneFor(folder),
       zoneReason: this.profile.zoneInfo(folder).reason,
     };
@@ -152,6 +154,21 @@ class Engine {
       const label = labelPath(d.path, { condaExports: this.condaExports });
       Object.assign(d, { label: label.label, reason: label.reason, rebuild: label.rebuild || null });
     }
+  }
+
+  setSemesterEnd(date) {
+    if (date !== '' && !semesterDate(date)) throw new Error('Choose a valid semester-end date.');
+    this.profile.data.semesterEnd = date || null;
+    this.profile.save();
+    return this.semesterOffer();
+  }
+
+  semesterOffer() {
+    if (!semesterDate(this.profile.data.semesterEnd) || !this.folder || this.profile.zoneFor(this.folder) === 'never') return null;
+    const projects = [...new Set(this.dev.map((d) => d.project))].filter((p) => p !== this.folder);
+    return sweepOffer({ semesterEnd: this.profile.data.semesterEnd, projects: projects.map((p) => ({
+      name: path.basename(p), lastChanged: lastChanged(p), protected: Boolean(this.profile.protectedBy(p, this.folder)),
+    })) });
   }
 
   // Plans, validates, and feeds errors back to the planner until the plan passes or attempts run out.
@@ -425,7 +442,12 @@ class Engine {
   rebuild(request, { run } = {}) {
     const recorded = this.executor.recordedRecipe(request);
     if (!recorded) return { ok: false, message: 'I can only rebuild a folder I deleted myself, using the command I saved when I deleted it.' };
-    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
+    // Classify only the trusted saved command; no project names or command text enter the usage log.
+    const command = recorded.command || '';
+    const category = /^(npm|yarn|pnpm) /.test(command) ? 'javascript'
+      : /^(python|python3|uv|poetry|conda) /.test(command) ? 'python'
+      : /^xcodebuild /.test(command) ? 'xcode' : 'other';
+    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms, count: 1, category }) });
   }
 
   undoAction(batchId, actionId) {

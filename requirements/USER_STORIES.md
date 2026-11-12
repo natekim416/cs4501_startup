@@ -272,6 +272,8 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 
 **As a** dev student finishing a semester, **I want** the dino to offer to clean up that semester's class projects, **so that** old classes don't pile up year after year.
 
+*Implemented on `feature/simple-user-stories`: set the semester-end date in the side panel. Scanning a folder after that date offers a preview of inactive class projects; recent and protected projects are excluded. Clearing the date turns offers off. Tests: `app/test/stories/us17-semester-sweep.test.js` and the US-17 UI smoke step. macOS validation is recorded in the branch's CI.*
+
 - **Given** the semester-end date I set has passed, **then** the dino offers a sweep of class projects unchanged for 30 days.
 - **Given** I accept, **then** the sweep is an ordinary plan: nothing runs until I approve it.
 
@@ -309,7 +311,7 @@ Each story lists **Priority · Size · Status · Requirements · Evidence**.
 
 **As a** Cleanasaurus team member, **I want** opt-in logs of plans, approvals, undos, rebuilds, and "Go Pro" clicks, **so that** I can measure the pivot test without sitting next to testers.
 
-*Status: the opt-in log, its first-launch prompt, the USAGE LOG panel, and EXPORT are already built for the MVP validation. Still to do: log rebuilds, and add the "Go Pro" fake door.*
+*Implemented on `feature/simple-user-stories`: the existing opt-in log now records rebuild outcomes, counts, fixed categories, and timings without names or paths. The GO PRO button shows the not-available message and records clicks only when logging is enabled. No email address is collected or sent. Tests: `app/test/stories/us21-logs-go-pro.test.js` and the US-21 UI smoke step. macOS validation is recorded in the branch's CI.*
 
 - **Given** a tester opts in, **then** we log counts, sizes, categories, and timings, but never file names or paths.
 - **Given** a tester clicks "Go Pro," **then** they see "Pro isn't available yet. Want us to email you when it is?" and the click is logged.

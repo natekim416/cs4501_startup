@@ -22,3 +22,4 @@ jobs:
       - run: npm test
       # A todo test that passes can't be testing its story, so fail the build.
       - run: npm run test:todos
+      - run: npm run test:ui

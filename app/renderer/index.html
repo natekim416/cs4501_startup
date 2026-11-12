@@ -82,6 +82,21 @@
           <button id="usage-export" class="btn" hidden>EXPORT</button>
         </div>
       </div>
+      <div class="panel">
+        <h2>SEMESTER SWEEP</h2>
+        <label for="semester-end">Semester-end date</label>
+        <input id="semester-end" type="date">
+        <p class="muted">After this date, offer a preview for class projects unchanged for 30 days. Clear the date to turn it off.</p>
+        <div id="semester-offer" hidden>
+          <p id="semester-description" class="muted"></p>
+          <button id="semester-preview" class="btn">PREVIEW SWEEP</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>GO PRO</h2>
+        <button id="go-pro" class="btn">GO PRO</button>
+        <p id="go-pro-message" class="muted" role="status" hidden></p>
+      </div>
     </aside>
   </main>
 

@@ -133,6 +133,8 @@ function registerIpc() {
     return profileView();
   });
   handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
+  handle('go-pro', () => engine.usage.goPro());
+  handle('set-semester-end', (_e, date) => engine.setSemesterEnd(date));
   handle('export-usage', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });
     if (res.canceled || !res.filePath) return null;
