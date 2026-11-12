@@ -69,6 +69,10 @@ class Executor {
   }
 
   apply(a, batchId) {
+    // Defense in depth for red-team F3: never act on a path the validator could have read differently.
+    if (['path', 'dest', 'keep'].some((k) => typeof a[k] === 'string' && a[k].split(/[\\/]/).includes('..'))) {
+      throw new Error('Refusing a path with "..".');
+    }
     if (a.op === 'mkdir') {
       if (fs.existsSync(a.path)) return null;
       fs.mkdirSync(a.path, { recursive: true });
