@@ -215,7 +215,9 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     // Naming a model means that model only (N2).
     const offered = ml.some((x) => x.named) ? ml.filter((x) => x.named) : ml.filter((x) => x.offered);
     for (const x of offered) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
-    return { summary: offered.length ? `I found ${offered.length} downloaded model(s) you haven't used in 30 days.` : "I didn't find any downloaded models you haven't used in 30 days.", actions, questions };
+    const named = ml.some((x) => x.named);
+    const summary = named ? `Here's the model you named: ${offered.map((x) => x.model).join(', ')}. It re-downloads the next time you load it.` : offered.length ? `I found ${offered.length} downloaded model(s) you haven't used in 30 days.` : "I didn't find any downloaded models you haven't used in 30 days.";
+    return { summary, actions, questions };
   }
   // US-09: a Docker request plans only Docker's own clutter, nothing in the folder.
   if (want(/docker|containers?\b|images?\b.*docker/i)) {

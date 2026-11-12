@@ -180,3 +180,25 @@ test('R3-12 a batch that fails is reported without raw paths or internal error t
   const merged = mergeBatchPlans([{ ok: false, actions: [], error: '/Users/x/secret-project/file.txt does not exist (or was already moved/removed earlier in this plan).' }]);
   assert.doesNotMatch(merged.questions[0].text, /\/Users|secret-project/);
 });
+
+test('R3-13 real docker inspect ids ("sha256:" + 64 hex) match image ls short ids, so used images stay protected (F4)', () => {
+  const { dockerItems } = require('../../backend/ecosystems/docker');
+  const full = 'sha256:aaa111bbb222ccc333ddd444eee555fff666aaa111bbb222ccc333ddd444eee5';
+  const run = (cmd, args) => {
+    const a = args.join(' ');
+    if (a.startsWith('info')) return '{}';
+    if (a.startsWith('image ls')) return '{"ID":"aaa111bbb222","Repository":"nginx","Tag":"1.25","Size":"200MB"}';
+    if (a.startsWith('ps -a')) return '{"Image":"nginx@sha256:deadbeef"}';
+    if (a.startsWith('image inspect')) return `${full}\n`;
+    return a.startsWith('builder du') ? 'Total: 0B' : '';
+  };
+  assert.deepStrictEqual(dockerItems({ run }).items, []);
+});
+
+test('R3-14 the usage log counts Docker and simulator removals (F12)', () => {
+  const { Engine } = require('../../backend/engine');
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  const counts = engine.countOpsFor([{ op: 'remove_docker' }, { op: 'remove_docker' }, { op: 'remove_simulator' }]);
+  assert.strictEqual(counts.ops_remove_docker, 2);
+  assert.strictEqual(counts.ops_remove_simulator, 1);
+});

@@ -1,641 +1,272 @@
 
 > cleanasaurus@0.1.0 test:coverage
-> node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='scripts/**' test/*.test.js test/stories/*.test.js
+> node --import ./test/setup.js --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='scripts/**' test/*.test.js test/stories/*.test.js
 
-✔ scan finds duplicates and flags the test malware (1055.934958ms)
-✔ demo plan passes validation, asks about resume versions, and can be undone (2284.422041ms)
-✔ answers are remembered and used on the next plan (2559.712ms)
-✔ validator rejects unsafe plans with errors the LLM can act on (929.348833ms)
-✔ failed plans are retried with the validator errors, then the user is asked (2264.801875ms)
-✔ a NEVER-zone folder gets a clear refusal instead of three failed tries (778.830167ms)
-✔ only the newest plan can be approved (1706.001041ms)
-✔ a git repo at the home folder does not make everything NEVER, but real projects stay protected (1.265291ms)
-✔ LLM-1 the request sent to Claude lists rebuildable items and allows delete_rebuildable in the schema (1217.891209ms)
-✔ LLM-2 Claude proposes an unprovable deletion, the validator rejects it, the reason goes back, and the corrected plan passes (2286.913125ms)
-✔ LLM-3 if Claude never fixes it, only the safe part is shown and the user is asked (2371.556333ms)
-✔ LLM-4 Claude output that is not valid JSON becomes a validator error, not a crash (1872.885458ms)
-✔ LLM-5 a refusal from the model is reported, not silently treated as an empty plan (1515.287583ms)
-✔ LLM-6 only file names and metadata are sent to Claude, never file contents (784.227625ms)
-✔ LLM-7 Claude is told each project's course, how long since it changed, and whether it has uncommitted work (729.226166ms)
-✔ MIN-1 free up space: removes exact duplicates and keeps one copy of each (2166.68675ms)
-✔ MIN-2 sort school files: lecture PDFs end up in class folders (2087.616667ms)
-✔ MIN-3 scan for malware: only flagged files are quarantined (1728.992917ms)
-✔ MIN-4 nothing is lost: every file is either still in the folder or in the bin/quarantine (1781.758166ms)
-✔ MIN-5 undo restores the folder exactly (1569.927792ms)
-✔ MIN-6 unchecking actions: only approved actions run (1379.735958ms)
-✔ MIN-7 NEVER zone: nothing is planned or touched (571.4375ms)
-✔ MIN-8 asks about look-alike versions instead of guessing, and remembers the answer (1370.452334ms)
-✔ MIN-9 running the same request twice is safe (second run finds less to do) (1091.56475ms)
-✔ REG-1 identical files inside code projects are not proposed as duplicates (found by US-11 test) (2011.917875ms)
-✔ REG-2 source files in different code projects do not trigger a "versions" question (found in a screenshot) (1840.718375ms)
-✔ REG-3 approving a named, still-active project passes the re-check at run time (found while wiring US-06/07; test written after the fix) (1692.778375ms)
-✔ REG-4 the scripted demo request never targets a course the user did not name (found by grader round 1) (2505.235083ms)
-✔ REG-5 the scanned folder itself is never offered as a project (found by grader round 3) (1806.099666ms)
-✔ US-01 shows measured totals by type and the 10 largest projects, and modifies nothing (1137.489625ms)
-✔ US-01 scans about 50 projects within 60 seconds and reports progress (124.30075ms)
-✔ US-01 a folder macOS blocks is named with how to grant access, not silently skipped (2.214875ms)
-✔ US-01 asking "where did my space go?" answers with the breakdown and proposes nothing (2025.703667ms)
-✖ US-01 Xcode, Docker, and ML totals are measured, not just present as keys (partial until US-08–10) (3.538ms) # US-01 (#2): needs US-08, US-09, US-10
-✔ US-02 a node_modules folder with a lockfile is "Rebuildable: npm ci, about 1 minute" (91.470291ms)
-✔ US-02 Xcode Archives, VM disks, and Docker volumes are "Not rebuildable" with a reason (3.307875ms)
-✔ US-02 not-rebuildable items never appear among cleanup candidates (88.304583ms)
-✔ US-02 an unrecognized folder is "Unknown" and treated as not rebuildable (0.922833ms)
-✔ US-02 a node_modules folder with no lockfile is not rebuildable (edge case) (106.80825ms)
-✔ US-03 "done with CS 3140 and the hackathon" plans only those projects, each action naming its project (2522.400709ms)
-✔ US-03 an ambiguous request asks a question with options instead of guessing (2121.815958ms)
-✔ US-03 a named project changed in the last 30 days shows up unchecked, with a note (1524.997041ms)
-✔ US-03 course codes match however they are written, and filler words match nothing (edge cases) (1.3285ms)
-✔ US-03 with Claude, a named project still in use passes the 30-day rule but comes back unchecked (1581.494875ms)
-✔ US-03 "but keep the final" excludes that project (found by grader round 2) (1782.954ms)
-✔ US-03 a "done with" request that matches no project asks which ones, listing them (found by grader round 2) (1370.479875ms)
-✔ US-03 "free up space but keep my capstone" leaves the capstone alone (935.984292ms)
-✔ US-03 negations and keep-first phrasing are respected (found by grader round 3) (0.392917ms)
-✔ US-03 answering "which projects?" with one project plans exactly that project (found by grader round 3) (1230.437292ms)
-✖ US-04 protected projects are skipped in every later plan and listed as protected (297.322708ms) # US-04 (#5): protected projects not built yet
-✖ US-04 a saved pattern like capstone-* protects new matching projects (87.690208ms) # US-04 (#5): protected projects not built yet
-✖ US-04 removing a protection from DINO MEMORY lets the project appear again (86.494666ms) # US-04 (#5): protected projects not built yet
-✔ US-05 a gitignored node_modules with a lockfile in a project unchanged for 60 days passes, and the recipe is saved (161.908ms)
-✔ US-05 a project with uncommitted changes is rejected, and the reason says so (161.541583ms)
-✔ US-05 a folder where git tracks any file is rejected (it is source, not clutter) (195.563084ms)
-✔ US-05 a folder that is not gitignored in a repo is rejected (132.19175ms)
-✔ US-05 a folder with no lockfile or manifest is rejected (140.491625ms)
-✔ US-05 a folder holding a .env file is rejected (irreplaceable secrets) (143.597917ms)
-✔ US-05 a project changed in the last 30 days is rejected unless the user named it (202.64575ms)
-✔ US-05 an unknown folder type is rejected even with a lockfile next to it (95.918375ms)
-✔ US-05 source code itself is never deletable, even if the planner proposes it (129.828708ms)
-✔ US-05 the validator passes a proven deletion and rejects an unproven one, sending the reason back (329.760166ms)
-✔ US-05 a delete_rebuildable inside a user-set NEVER zone is still rejected (100.237792ms)
-✔ US-05 a git repo at the home folder (dotfiles) does not make every project look "not gitignored" (edge case) (93.546542ms)
-✔ US-06 the rebuild command matches the lockfile: npm ci, yarn, or pnpm with a frozen lockfile (436.317666ms)
-✔ US-06 pnpm files hard-linked to the shared store are not counted as freed space (88.268125ms)
-✔ US-06 a file hard-linked twice inside the same folder is counted once (edge case) (2.282542ms)
-✔ US-06 the npm, Yarn, and pnpm caches are offered as one item each with a measured size (3.487583ms)
-✔ US-06 findArtifacts lists every node_modules once, with its project and size (192.775125ms)
-✔ US-06 node_modules nested inside another node_modules is not listed separately (edge case) (92.768583ms)
-✔ US-06 asking to clear package caches offers each cache as one action, and the validator only allows known caches (343.205833ms)
-✔ US-07 a .venv is offered with the rebuild command that matches its recipe (61.471458ms)
-✔ US-07 a .venv with no requirements, uv.lock, or poetry.lock is rejected (18.377958ms)
-✔ US-07 a conda environment with no environment.yml is exported first, and the export becomes the recipe (2.2525ms)
-✔ US-07 an environment changed in the last 30 days is not offered unless named (32.545291ms)
-✔ US-07 findArtifacts recognizes a venv by pyvenv.cfg even when it is not named .venv (edge case) (5.255375ms)
-✔ US-07 an inactive conda environment is exported during the scan, offered in the plan, and passes the proof (1944.067459ms)
-✖ US-08 DerivedData for a project that no longer exists is offered as rebuildable (1.711542ms) # US-08 (#9): Xcode cleanup not built yet
-✖ US-08 simulator runtimes unused for 180 days are offered with size and a re-download note (0.433958ms) # US-08 (#9): Xcode cleanup not built yet
-✖ US-08 Xcode Archives and the rest of ~/Library stay NEVER (10.548542ms) # US-08 (#9): Xcode cleanup not built yet
-✖ US-09 images no container uses are offered with size and "re-downloads on the next pull" (1.25925ms) # US-09 (#10): Docker cleanup not built yet
-✖ US-09 Docker volumes are never offered (0.35ms) # US-09 (#10): Docker cleanup not built yet
-✖ US-09 when Docker is not running, it is skipped with a message instead of failing the plan (0.28075ms) # US-09 (#10): Docker cleanup not built yet
-✖ US-09 when the disk change is smaller than the space freed inside Docker, both numbers are shown (0.231958ms) # US-09 (#10): Docker cleanup not built yet
-✖ US-10 each cached model shows name, size, last used, and re-download time (1.668459ms) # US-10 (#11): ML cache cleanup not built yet
-✖ US-10 models unused for 30 days are offered; recent ones only if named (0.322208ms) # US-10 (#11): ML cache cleanup not built yet
-✖ US-10 a model the user trained or saved outside the download cache is never offered (0.198375ms) # US-10 (#11): ML cache cleanup not built yet
-✔ US-11 a rebuild-proof failure names which condition failed and the project, e.g. "no lockfile in hoohacks-2026" (138.020167ms)
-✔ US-11 each failing condition gets its own plain-English reason (407.874709ms)
-✔ US-11 the planner gets the rejection back and the Safety Log attempts show it (1908.378125ms)
-✔ US-12 FREED is the measured change in free disk space, not the size of the files touched (1952.502958ms)
-✔ US-12 a rebuildable folder is really deleted, so the space really comes back (1632.619292ms)
-✔ US-12 when the estimate and the measured change differ by more than 10%, both are shown (1545.736792ms)
-✔ US-12 files moved to the bin are noted as freeing up only when it is emptied (1309.798292ms)
-✔ US-13 a removed duplicate appears in the Trash under its original name, and undo brings it back (4.800291ms)
-✔ US-13 a quarantined file still goes to the app quarantine folder, not the Trash (2.118541ms)
-✔ US-14 undoing one action leaves every other action done (6.316083ms)
-✔ US-14 "Undo all" still reverses the whole run (guard: already works, must keep working) (2.395375ms)
-✔ US-14 undoing a move whose original folder was deleted recreates the folder (3.541167ms)
-✔ US-15 Rebuild runs the recorded command in the project and reports success (135.313542ms)
-✔ US-15 if the lockfile changed since deletion, the app warns first (138.958958ms)
-✔ US-15 a failed rebuild shows the command to run by hand and is recorded (137.212625ms)
-✖ US-16 passing 85% full sends one notification that opens the plan preview and runs nothing (1.2475ms) # US-16 (#17): storage watch not built yet
-✖ US-16 after a dismissal it stays quiet until 5% more or 7 days pass (0.564833ms) # US-16 (#17): storage watch not built yet
-✖ US-16 when the watch is turned off, no notifications (0.2205ms) # US-16 (#17): storage watch not built yet
-✖ US-17 after the semester-end date, the dino offers a sweep of class projects unchanged for 30 days (1.544292ms) # US-17 (#18): end-of-semester sweep not built yet (Could)
-✖ US-17 accepting the sweep produces an ordinary plan that waits for approval (0.442416ms) # US-17 (#18): end-of-semester sweep not built yet (Could)
-✔ US-18 one sentence says what changes (2.217833ms)
-✔ US-18 a file opened in the last 24 hours is named in the summary (0.288667ms)
-✔ US-18 the summary uses plain words ("Trash", not "Dino Bin") (0.152209ms)
-✔ US-19 an unsigned app with no other evidence is "Unknown", with no quarantine (51.447833ms)
-✔ US-19 unsigned plus a pirated-software name still proposes quarantine, in plain words (29.924208ms)
-✖ US-20 local mode makes no network request during scan, plan, or validation (1456.157042ms) # US-20 (#21): local model mode not built yet (Could)
-✖ US-20 turning local mode on explains once that plans may be slower (0.167584ms) # US-20 (#21): local model mode not built yet (Could)
-✖ US-21 "Go Pro" shows the not-available message and logs the click (4.064167ms) # US-21 (#22): rebuild logging and Go Pro fake door not built yet
-✖ US-21 rebuilds are logged with counts and categories, never paths (2.778333ms) # US-21 (#22): rebuild logging and Go Pro fake door not built yet
-✖ US-22 2,800 files are planned in batches of 400 or fewer and shown as one plan (152.67825ms) # US-22 (#23): batched planning not built yet (Should)
-✖ US-22 a batch that still fails after 3 tries does not hide the other batches (0.182875ms) # US-22 (#23): batched planning not built yet (Should)
-✖ US-23 without opting in, only file names are used (1.02675ms) # US-23 (#24): first-page sorting not built yet (Could)
-✖ US-23 when opted in, the first page finds the course code and the reason says so (0.543667ms) # US-23 (#24): first-page sorting not built yet (Could)
-✖ US-23 no course code found means Unsorted or a question (0.205083ms) # US-23 (#24): first-page sorting not built yet (Could)
-✔ the log is off until the user says yes, and nothing is written (2011.969833ms)
-✔ a logged run has what the KPIs need: proposed, approved, undone, and when (1792.393041ms)
-✔ the log never holds file names, folder names, or what the user typed (2200.826083ms)
-✔ text that is not a known label gets dropped (82.794875ms)
-✔ practice folders stay out of the log (1271.117417ms)
-✔ turning the log off deletes it, and the answer survives a restart (80.243666ms)
-✔ a logging failure does not stop a cleanup (1025.201959ms)
-✔ export makes an exact copy (85.733708ms)
-ℹ tests 129
+✔ scan finds duplicates and flags the test malware (379.578125ms)
+✔ demo plan passes validation, asks about resume versions, and can be undone (1168.652583ms)
+✔ answers are remembered and used on the next plan (2037.679ms)
+✔ validator rejects unsafe plans with errors the LLM can act on (1460.331959ms)
+✔ failed plans are retried with the validator errors, then the user is asked (1102.193875ms)
+✔ a NEVER-zone folder gets a clear refusal instead of three failed tries (656.791417ms)
+✔ only the newest plan can be approved (2471.509375ms)
+✔ a git repo at the home folder does not make everything NEVER, but real projects stay protected (5.121334ms)
+✔ FEAT-01 changing a listed zone updates only that zone, in place, and saves it (5.405542ms)
+✔ FEAT-01 only folders already in the zones list can be changed (1.328416ms)
+✔ FEAT-01 a zone must be free, ask, or never (1.710792ms)
+✔ FEAT-01 macOS folders are locked to NEVER, and so is everything inside them (5.309791ms)
+✔ FEAT-01 a link that points into a locked folder is locked too (2.944917ms)
+✔ FEAT-01 a plan made before its folder became NEVER cannot run (1000.402042ms)
+✔ LLM-1 the request sent to Claude lists rebuildable items and allows delete_rebuildable in the schema (595.209375ms)
+✔ LLM-2 Claude proposes an unprovable deletion, the validator rejects it, the reason goes back, and the corrected plan passes (1051.038083ms)
+✔ LLM-3 if Claude never fixes it, only the safe part is shown and the user is asked (3632.608625ms)
+✔ LLM-4 Claude output that is not valid JSON becomes a validator error, not a crash (1503.08775ms)
+✔ LLM-5 a refusal from the model is reported, not silently treated as an empty plan (1367.400125ms)
+✔ LLM-6 only file names and metadata are sent to Claude, never file contents (898.414ms)
+✔ LLM-7 Claude is told each project's course, how long since it changed, and whether it has uncommitted work (583.355917ms)
+✔ MIN-1 free up space: removes exact duplicates and keeps one copy of each (1063.637583ms)
+✔ MIN-2 sort school files: lecture PDFs end up in class folders (929.567625ms)
+✔ MIN-3 scan for malware: only flagged files are quarantined (1592.908167ms)
+✔ MIN-4 nothing is lost: every file is either still in the folder or in the bin/quarantine (2100.16175ms)
+✔ MIN-5 undo restores the folder exactly (1864.830875ms)
+✔ MIN-6 unchecking actions: only approved actions run (1378.450833ms)
+✔ MIN-7 NEVER zone: nothing is planned or touched (611.330125ms)
+✔ MIN-8 asks about look-alike versions instead of guessing, and remembers the answer (1541.991291ms)
+✔ MIN-9 running the same request twice is safe (second run finds less to do) (1710.756583ms)
+✔ REG-1 identical files inside code projects are not proposed as duplicates (found by US-11 test) (633.307208ms)
+✔ REG-2 source files in different code projects do not trigger a "versions" question (found in a screenshot) (434.55925ms)
+✔ REG-3 approving a named, still-active project passes the re-check at run time (found while wiring US-06/07; test written after the fix) (377.31ms)
+✔ REG-4 the scripted demo request never targets a course the user did not name (found by grader round 1) (4239.258792ms)
+✔ REG-5 the scanned folder itself is never offered as a project (found by grader round 3) (2856.346667ms)
+✔ REG-6 in an ASK zone, approving with the moves unchecked creates no empty folders and says why (found by Papa on ~/Documents) (1017.730833ms)
+✔ REG-6b checking the moves too makes every file land exactly where the plan said (717.515792ms)
+✔ REG-7 undo removes the folders it created even after Finder left a hidden .DS_Store in them (found by Papa) (1235.555917ms)
+✔ REG-7b undo keeps a created folder that now holds the user's own file, and says so (edge case) (1278.517583ms)
+✔ REG-7c undoing one move removes the folder it created once that folder is empty (691.276667ms)
+✔ REG-8 the Yarn and pnpm caches in ~/Library can be cleared, though ~/Library stays NEVER (found while building US-08) (159.017167ms)
+✔ REG-9 an answer that leaves nothing safe to do says why, instead of an empty reply (found by Papa) (2359.308917ms)
+✔ REG-9b every option of every question gives an approvable plan or says why there is nothing to approve (10780.972042ms)
+✔ TEST-1 tests run with a throwaway HOME, so caches, Xcode data, and the Trash on this Mac are never scanned (1.128208ms)
+✔ INPUT-1 more kinds of secrets make a build folder irreplaceable, and an unreadable subfolder fails the proof (F10) (4199.1725ms)
+✔ INPUT-2 malformed plans from the model become validator errors and retries, never a crash (F11) (804.941208ms)
+✔ INPUT-3 a lockfile that is a folder, or unreadable, fails only that item's proof instead of the whole plan (F12) (1150.113667ms)
+✔ INPUT-4 a rate-limited, failing, or silent Claude gives a plain message, not raw JSON, and never hangs (F13) (565.309125ms)
+✔ INPUT-5 execute takes only a list of exact action ids; a string can't match ids by substring (148.153791ms)
+✔ INPUT-6 the target plan only accepts real folders outside NEVER zones (9.249083ms)
+✔ INPUT-7 a folder to scan must be a full path to a real folder (red-team round 2 note) (22.056667ms)
+✔ INPUT-8 an API account out of credit gets a plain message that says so, and how to keep going (93.5135ms)
+✔ SEC-3 a path with ".." is rejected, so a symlink can never point the executor somewhere the validator did not check (F3) (39.223458ms)
+✔ SEC-3b the executor itself refuses a path with "..", even if the validator were skipped (F3) (21.47375ms)
+✔ SEC-3c a build folder reached through a symlink with ".." is rejected, and the vault node_modules survives (F3) (50.145625ms)
+✔ SEC-4 moving into a symlinked folder that leads into a NEVER zone is rejected (F4) (39.787ms)
+✔ SEC-5 on macOS, a different letter case still lands in the same NEVER zone, and locked folders stay locked (F5) (9.404791ms)
+✔ SEC-6 a duplicate is not "kept" by a copy inside a build folder the same plan deletes (F9) (348.929791ms)
+✔ R3-1 two actions sharing an id are rejected, so approving one can never run the other (F1) (42.726709ms)
+✔ R3-2 a Mac-wide item (a build folder, a Docker image) appears once in a batched plan, not once per batch (F2) (2437.361416ms)
+✔ R3-3 a batched plan over 500 actions keeps the first 500 and says so, instead of throwing everything away (F3) (14134.008416ms)
+✔ R3-4 when every docker rm fails, the result does not claim space was freed inside Docker (F5) (25.178125ms)
+✔ R3-5 a corrupt profile fails closed to local mode, so file names never leave the Mac by accident (F7) (1.377583ms)
+✔ R3-6 an image a container uses by digest or by full name is never offered, and one image with two tags is listed once (F4) (0.6835ms)
+✔ R3-7 an image id that looks like a flag ("--all") is never passed to docker (F11) (0.241166ms)
+✔ R3-8 clicking the storage-watch notification counts as handled, so it can notify again later instead of going silent (F10) (0.969875ms)
+✔ R3-9 the usage log records local mode and Docker removals as counts (F12) (1.234ms)
+✔ R3-10 a model read yesterday is not "unused" just because its files are old (F9) (2.103583ms)
+✔ R3-11 the semester sweep plans exactly its own projects; a folder name can't add another (F8) (229.016041ms)
+✔ R3-12 a batch that fails is reported without raw paths or internal error text (F6) (0.41475ms)
+✔ R3-13 real docker inspect ids ("sha256:" + 64 hex) match image ls short ids, so used images stay protected (F4) (0.329459ms)
+✔ R3-14 the usage log counts Docker and simulator removals (F12) (0.852333ms)
+✔ STATE-1 undo never overwrites a newer file saved at the old spot; the old one comes back under a free name (F6) (9.14675ms)
+✔ STATE-2 a step undo cannot reverse stays in the log and is reported, instead of being dropped (F7) (2.404083ms)
+✔ STATE-3 two flagged files with the same name are both quarantined and both come back on undo (F8) (9.077334ms)
+✔ SEC-1 rebuild refuses a command the app never recorded, so the page cannot run arbitrary commands (F1) (492.97475ms)
+✔ SEC-1b rebuild runs the recorded recipe, never the command text the page sent along with it (F1) (493.896ms)
+✔ SEC-2 a venv or conda folder name with shell characters can never run as a command when rebuilt (F2) (240.932375ms)
+✔ US-01 shows measured totals by type and the 10 largest projects, and modifies nothing (2481.537375ms)
+✔ US-01 scans about 50 projects within 60 seconds and reports progress (1324.951792ms)
+✔ US-01 a folder macOS blocks is named with how to grant access, not silently skipped (2.310667ms)
+✔ US-01 asking "where did my space go?" answers with the breakdown and proposes nothing (770.66475ms)
+✔ US-01 Xcode, Docker, and ML totals are measured, not just present as keys (6.412958ms)
+✔ US-01 "Where did my space go?" reports measured Xcode, Docker, and ML totals from this Mac (81.366292ms)
+✔ US-02 a node_modules folder with a lockfile is "Rebuildable: npm ci, about 1 minute" (137.205875ms)
+✔ US-02 Xcode Archives, VM disks, and Docker volumes are "Not rebuildable" with a reason (1.86175ms)
+✔ US-02 not-rebuildable items never appear among cleanup candidates (110.674917ms)
+✔ US-02 an unrecognized folder is "Unknown" and treated as not rebuildable (0.753709ms)
+✔ US-02 a node_modules folder with no lockfile is not rebuildable (edge case) (158.253125ms)
+✔ US-03 "done with CS 3140 and the hackathon" plans only those projects, each action naming its project (3206.164375ms)
+✔ US-03 an ambiguous request asks a question with options instead of guessing (1607.90675ms)
+✔ US-03 a named project changed in the last 30 days shows up unchecked, with a note (800.049708ms)
+✔ US-03 course codes match however they are written, and filler words match nothing (edge cases) (4.813166ms)
+✔ US-03 with Claude, a named project still in use passes the 30-day rule but comes back unchecked (900.38125ms)
+✔ US-03 "but keep the final" excludes that project (found by grader round 2) (1421.329583ms)
+✔ US-03 a "done with" request that matches no project asks which ones, listing them (found by grader round 2) (1048.552416ms)
+✔ US-03 "free up space but keep my capstone" leaves the capstone alone (714.764375ms)
+✔ US-03 negations and keep-first phrasing are respected (found by grader round 3) (1.135166ms)
+✔ US-03 answering "which projects?" with one project plans exactly that project (found by grader round 3) (1207.611166ms)
+✔ US-04 protected projects are skipped in every later plan and listed as protected (2298.709041ms)
+✔ US-04 a saved pattern like capstone-* protects new matching projects (310.069416ms)
+✔ US-04 removing a protection from DINO MEMORY lets the project appear again (396.94ms)
+✔ US-04 "always keep" in chat saves the projects it names, plans nothing, and lasts after a restart (1235.400041ms)
+✔ US-04 "keep anything on my resume" asks which projects to keep, then saves the ones picked (1607.4085ms)
+✔ US-04 a protection said inside a cleanup request is saved, and the rest of the request still runs (993.532875ms)
+✔ US-04 the validator rejects any action inside a protected project, wherever the plan came from (200.398625ms)
+✔ US-04 Claude can't get around it: a protected project it proposes is rejected and left out (1158.66425ms)
+✔ US-04 nothing moves into a protected folder either (8.394541ms)
+✔ US-04 protecting the scanned folder itself leaves everything in it alone, on the first try (140.786459ms)
+✔ US-04 "always keep a, b" protects every project in the list (859.061083ms)
+✔ US-04 with nothing here to keep, it says so instead of asking, and an empty pick saves nothing (59.7915ms)
+✔ US-04 a protected folder that isn't a code project is left alone too, on the first try (84.954791ms)
+✔ US-04 a protection is a project name or a pattern, never a path (8.145959ms)
+✔ US-05 a gitignored node_modules with a lockfile in a project unchanged for 60 days passes, and the recipe is saved (606.055875ms)
+✔ US-05 a project with uncommitted changes is rejected, and the reason says so (493.661042ms)
+✔ US-05 a folder where git tracks any file is rejected (it is source, not clutter) (508.568ms)
+✔ US-05 a folder that is not gitignored in a repo is rejected (715.536958ms)
+✔ US-05 a folder with no lockfile or manifest is rejected (390.027208ms)
+✔ US-05 a folder holding a .env file is rejected (irreplaceable secrets) (349.419458ms)
+✔ US-05 a project changed in the last 30 days is rejected unless the user named it (566.142834ms)
+✔ US-05 an unknown folder type is rejected even with a lockfile next to it (127.11575ms)
+✔ US-05 source code itself is never deletable, even if the planner proposes it (156.902959ms)
+✔ US-05 the validator passes a proven deletion and rejects an unproven one, sending the reason back (549.913ms)
+✔ US-05 a delete_rebuildable inside a user-set NEVER zone is still rejected (176.37925ms)
+✔ US-05 a git repo at the home folder (dotfiles) does not make every project look "not gitignored" (edge case) (165.193583ms)
+✔ US-06 the rebuild command matches the lockfile: npm ci, yarn, or pnpm with a frozen lockfile (1428.864958ms)
+✔ US-06 pnpm files hard-linked to the shared store are not counted as freed space (193.8055ms)
+✔ US-06 a file hard-linked twice inside the same folder is counted once (edge case) (4.061583ms)
+✔ US-06 the npm, Yarn, and pnpm caches are offered as one item each with a measured size (3.33625ms)
+✔ US-06 findArtifacts lists every node_modules once, with its project and size (313.611625ms)
+✔ US-06 node_modules nested inside another node_modules is not listed separately (edge case) (157.724959ms)
+✔ US-06 asking to clear package caches offers each cache as one action, and the validator only allows known caches (459.728167ms)
+✔ US-07 a .venv is offered with the rebuild command that matches its recipe (90.337708ms)
+✔ US-07 a .venv with no requirements, uv.lock, or poetry.lock is rejected (35.34775ms)
+✔ US-07 a conda environment with no environment.yml is exported first, and the export becomes the recipe (5.87625ms)
+✔ US-07 an environment changed in the last 30 days is not offered unless named (70.157042ms)
+✔ US-07 findArtifacts recognizes a venv by pyvenv.cfg even when it is not named .venv (edge case) (6.808041ms)
+✔ US-07 an inactive conda environment is exported during the scan, offered in the plan, and passes the proof (446.3255ms)
+✔ US-08 DerivedData for a project that no longer exists is offered as rebuildable (39.412458ms)
+✔ US-08 simulator runtimes unused for 180 days are offered with size and a re-download note (4.22975ms)
+✔ US-08 Xcode Archives and the rest of ~/Library stay NEVER (22.294792ms)
+✔ US-08 DerivedData for a project that still exists is offered only after 30 days without a build (16.083375ms)
+✔ US-08 a simulator runtime is kept if any device booted in the last 180 days, or if there's no date to prove it (3.923917ms)
+✔ US-08 a simulator runtime that ships inside Xcode is never offered, however old (0.77475ms)
+✔ US-08 asking to clean Xcode offers only the Xcode items, and they run even though ~/Library is NEVER (618.072625ms)
+✔ US-08 the validator opens only the exact Xcode items, and nothing else in ~/Library (321.524791ms)
+✔ US-08 DerivedData that is built again after the plan is made is refused at approval (369.265584ms)
+✔ US-08 undoing an Xcode cleanup says how each item comes back, instead of offering a command to run (359.356625ms)
+✔ US-08 the one-line summary counts simulator runtimes and doesn't claim nothing outside the folder changes (329.304917ms)
+✔ US-08 Claude is told which Xcode items it may use, and how (128.709333ms)
+✔ US-09 images no container uses are offered with size and "re-downloads on the next pull" (4.805583ms)
+✔ US-09 Docker volumes are never offered (0.392458ms)
+✔ US-09 when Docker is not running, it is skipped with a message instead of failing the plan (0.314ms)
+✔ US-09 when the disk change is smaller than the space freed inside Docker, both numbers are shown (0.176417ms)
+✔ US-09 "clean up Docker" plans the unused image and the build cache; approving removes exactly those, and undo says how they come back (536.551291ms)
+✔ US-09 the validator refuses an image a container uses, a volume, or anything the Docker check didn't find (46.191209ms)
+✔ US-10 each cached model shows name, size, last used, and re-download time (21.774792ms)
+✔ US-10 models unused for 30 days are offered; recent ones only if named (6.9695ms)
+✔ US-10 a model the user trained or saved outside the download cache is never offered (4.731125ms)
+✔ US-10 "clear old Hugging Face models" plans only the unused download, deletes it, and undo says it re-downloads (504.120041ms)
+✔ US-10 the validator refuses a model folder the ML check didn't offer (recent, or not in the download cache) (43.3495ms)
+✔ US-10 naming a recently used model in the request offers it, matched as a whole name, not a word inside "models" (161.368792ms)
+✔ US-11 a rebuild-proof failure names which condition failed and the project, e.g. "no lockfile in hoohacks-2026" (482.858875ms)
+✔ US-11 each failing condition gets its own plain-English reason (998.951125ms)
+✔ US-11 the planner gets the rejection back and the Safety Log attempts show it (434.378083ms)
+✔ US-12 FREED is the measured change in free disk space, not the size of the files touched (595.204583ms)
+✔ US-12 a rebuildable folder is really deleted, so the space really comes back (613.549417ms)
+✔ US-12 when the estimate and the measured change differ by more than 10%, both are shown (299.05075ms)
+✔ US-12 files moved to the bin are noted as freeing up only when it is emptied (34.436ms)
+✔ US-13 a removed duplicate appears in the Trash under its original name, and undo brings it back (24.562583ms)
+✔ US-13 a quarantined file still goes to the app quarantine folder, not the Trash (6.231208ms)
+✔ US-14 undoing one action leaves every other action done (14.769167ms)
+✔ US-14 "Undo all" still reverses the whole run (guard: already works, must keep working) (4.948167ms)
+✔ US-14 undoing a move whose original folder was deleted recreates the folder (3.99075ms)
+✔ US-15 Rebuild runs the recorded command in the project and reports success (524.020209ms)
+✔ US-15 if the lockfile changed since deletion, the app warns first (298.347542ms)
+✔ US-15 a failed rebuild shows the command to run by hand and is recorded (182.999125ms)
+✔ US-16 passing 85% full sends one notification that opens the plan preview and runs nothing (5.158708ms)
+✔ US-16 after a dismissal it stays quiet until 5% more or 7 days pass (0.360709ms)
+✔ US-16 when the watch is turned off, no notifications (0.134458ms)
+✔ US-17 after the semester-end date, the dino offers a sweep of class projects unchanged for 30 days (13.810625ms)
+✔ US-17 accepting the sweep produces an ordinary plan that waits for approval (0.287125ms)
+✔ US-17 after a scan past the semester end, the engine offers the sweep once, and its request plans only those projects (836.544416ms)
+✔ US-18 one sentence says what changes (2.92325ms)
+✔ US-18 a file opened in the last 24 hours is named in the summary (1.12ms)
+✔ US-18 the summary uses plain words ("Trash", not "Dino Bin") (0.7115ms)
+✔ US-19 an unsigned app with no other evidence is "Unknown", with no quarantine (74.396042ms)
+✔ US-19 unsigned plus a pirated-software name still proposes quarantine, in plain words (67.531333ms)
+✔ US-20 local mode makes no network request during scan, plan, or validation (220.410666ms)
+✔ US-20 turning local mode on explains once that plans may be slower (0.263666ms)
+✔ US-20 with local mode on, the engine plans with on-device rules and makes no network request, even with a key set (64.995167ms)
+✔ US-21 "Go Pro" shows the not-available message and logs the click (6.035ms)
+✔ US-21 rebuilds are logged with counts and categories, never paths (2.726875ms)
+✔ US-22 2,800 files are planned in batches of 400 or fewer and shown as one plan (146.242458ms)
+✔ US-22 a batch that still fails after 3 tries does not hide the other batches (0.287833ms)
+✔ US-22 with Claude, a 900-file folder is sent in batches of 400 or fewer that together cover every file, and comes back as one plan (616.489ms)
+✔ US-23 without opting in, only file names are used (3.28575ms)
+✔ US-23 when opted in, the first page finds the course code and the reason says so (0.820417ms)
+✔ US-23 no course code found means Unsorted or a question (0.298125ms)
+✔ US-30 "empty my trash" plans a permanent delete for each item in the Trash, every one unchecked with a warning (53.313042ms)
+✔ US-30 the validator rejects permanent deletes outside the Trash, escapes like "..", and the Trash folder itself (edge cases) (15.169875ms)
+✔ US-30 approving without the confirmation deletes nothing; confirming deletes for real, and undo says it cannot bring it back (61.5175ms)
+✔ US-30 the executor itself refuses a permanent delete outside the Trash, even if the validator were skipped (2.317ms)
+✔ US-30 with Claude, the Trash contents are in the request and delete_from_trash is an allowed action (16.625125ms)
+✔ U1 "Free up space" includes Docker and old models, not just node_modules, and a GB target is answered (1383.848125ms)
+✔ U2 the storage-watch estimate only counts what a plan would actually offer (1647.107417ms)
+✔ U3 a camera file like IMG_4802.png is never sorted as a class called "IMG 4802" (53.901917ms)
+✔ U4 a project the student named but that can't be cleaned is explained in the reply, not hidden in the try log (1004.873375ms)
+✔ U6 natural wording works: "delete my old node_modules", and "why is my disk full?" gets the breakdown (920.322166ms)
+✔ U6b naming a model works without the word "model" (578.885125ms)
+✔ U5 a developer request stays on dev clutter: no Downloads quarantine or resume questions, and a class folder's parent counts (108.32ms)
+✔ U7 an old model is not marked "still active" because its cache folder changed (553.276125ms)
+✔ U8 a folder with no zone says why everything starts unchecked, and each action carries its size (1086.719166ms)
+✔ U14 picking a project from the question never shows the internal "(User picked …)" text (1061.773417ms)
+✔ U16 the breakdown calls them folders, labels Docker as unused, and ends with a next step (545.885667ms)
+✔ U18 with no API key, local mode says it is already offline instead of "slower" (1.03225ms)
+✔ U13 "always keep X and free up space" saves the protection and still plans the cleanup (1133.765583ms)
+✔ N1 "remove duplicates" is about duplicates: no Docker, Xcode, or model deletes ride along (1489.668458ms)
+✔ N2 naming one model deletes that model only (553.54375ms)
+✔ N4 "delete my old node_modules" deletes node_modules only, not Python environments (862.287291ms)
+✔ U5b "I'm done with the robotics class" asks nothing about resumes or essays (107.351666ms)
+✔ RN1 a parent folder counts only when its own name is the class code, and an exact project name is never widened (352.293917ms)
+✔ the log is off until the user says yes, and nothing is written (845.722417ms)
+✔ a logged run has what the KPIs need: proposed, approved, undone, and when (619.627875ms)
+✔ the log never holds file names, folder names, or what the user typed (1010.544583ms)
+✔ text that is not a known label gets dropped (150.436292ms)
+✔ practice folders stay out of the log (723.727292ms)
+✔ turning the log off deletes it, and the answer survives a restart (156.07375ms)
+✔ a logging failure does not stop a cleanup (624.950666ms)
+✔ export makes an exact copy (135.615042ms)
+ℹ tests 230
 ℹ suites 0
-ℹ pass 101
+ℹ pass 230
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
-ℹ todo 28
-ℹ duration_ms 14019.944916
+ℹ todo 0
+ℹ duration_ms 27163.01225
 ℹ start of coverage report
-ℹ -----------------------------------------------------------------------------------------------------
-ℹ file           | line % | branch % | funcs % | uncovered lines
-ℹ -----------------------------------------------------------------------------------------------------
-ℹ backend        |        |          |         | 
-ℹ  breakdown.js  |  96.23 |    90.00 |  100.00 | 29-30
-ℹ  devclutter.js |  95.53 |    92.56 |   96.55 | 54 99-100 105-106 168-169 175 180-181 196-197 261-262
-ℹ  engine.js     |  97.30 |    84.69 |   89.36 | 268-270 317-318 321-324
-ℹ  executor.js   |  95.27 |    73.17 |  100.00 | 37-38 82 108-109 144-145
-ℹ  intent.js     | 100.00 |   100.00 |  100.00 | 
-ℹ  malware.js    |  85.71 |    84.85 |   90.00 | 23-32 42-43 71-72 78-80
-ℹ  planner.js    | 100.00 |    99.04 |   89.29 | 
-ℹ  profile.js    |  93.68 |   100.00 |   80.00 | 68-70 78-80
-ℹ  rebuild.js    |  84.85 |    75.00 |   75.00 | 9-11 20-21
-ℹ  scanner.js    |  94.06 |    84.85 |  100.00 | 20-21 54-55 79-80
-ℹ  summary.js    | 100.00 |    93.10 |  100.00 | 
-ℹ  usage-log.js  | 100.00 |   100.00 |  100.00 | 
-ℹ  validator.js  |  96.23 |    85.71 |  100.00 | 29-30 112-113 139-140
-ℹ -----------------------------------------------------------------------------------------------------
-ℹ all files      |  95.99 |    90.36 |   93.75 | 
-ℹ -----------------------------------------------------------------------------------------------------
+ℹ ----------------------------------------------------------------------------------------------------
+ℹ file               | line % | branch % | funcs % | uncovered lines
+ℹ ----------------------------------------------------------------------------------------------------
+ℹ backend            |        |          |         | 
+ℹ  breakdown.js      |  96.83 |    88.89 |  100.00 | 31-32
+ℹ  devclutter.js     |  96.10 |    94.78 |   96.77 | 59 69-70 114-115 120-121 183-184 195-196 281-282
+ℹ  ecosystems        |        |          |         | 
+ℹ   docker.js        |  99.11 |    82.22 |  100.00 | 14
+ℹ   ml.js            |  97.33 |    85.71 |  100.00 | 36-37
+ℹ   xcode.js         |  95.57 |    81.25 |  100.00 | 26 42-43 67-68 121-122
+ℹ  engine.js         | 100.00 |    92.93 |   96.12 | 
+ℹ  executor.js       |  97.10 |    87.50 |  100.00 | 135 174-175 219-220 237-238
+ℹ  first-page.js     | 100.00 |    85.71 |  100.00 | 
+ℹ  intent.js         | 100.00 |   100.00 |  100.00 | 
+ℹ  malware.js        |  85.71 |    84.85 |   90.00 | 23-32 42-43 71-72 78-80
+ℹ  planner.js        | 100.00 |    93.83 |   91.49 | 
+ℹ  profile.js        |  98.52 |    93.18 |   93.33 | 122-124
+ℹ  rebuild.js        |  84.85 |    85.71 |   75.00 | 9-11 20-21
+ℹ  scanner.js        |  96.04 |    90.63 |  100.00 | 20-21 54-55
+ℹ  semester.js       | 100.00 |    92.31 |  100.00 | 
+ℹ  storage-watch.js  |  88.57 |    72.73 |   71.43 | 23-24 29-34
+ℹ  summary.js        | 100.00 |    91.11 |  100.00 | 
+ℹ  trash.js          |  95.35 |    88.24 |  100.00 | 13-14
+ℹ  usage-log.js      | 100.00 |   100.00 |  100.00 | 
+ℹ  validator.js      |  97.60 |    94.70 |  100.00 | 37-38 198-199 230-231
+ℹ ----------------------------------------------------------------------------------------------------
+ℹ all files          |  97.46 |    91.69 |   96.25 | 
+ℹ ----------------------------------------------------------------------------------------------------
 ℹ end of coverage report
-
-✖ failing tests:
-
-test at test/stories/us01-storage-breakdown.test.js:63:1
-✖ US-01 Xcode, Docker, and ML totals are measured, not just present as keys (partial until US-08–10) (3.538ms) # US-01 (#2): needs US-08, US-09, US-10
-  AssertionError [ERR_ASSERTION]: DerivedData should count toward Xcode
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us01-storage-breakdown.test.js:68:10)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
-    generatedMessage: false,
-    code: 'ERR_ASSERTION',
-    actual: false,
-    expected: true,
-    operator: '==',
-    diff: 'simple'
-  }
-
-test at test/stories/us04-protect-projects.test.js:16:1
-✖ US-04 protected projects are skipped in every later plan and listed as protected (297.322708ms) # US-04 (#5): protected projects not built yet
-  TypeError: engine.profile.protect is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us04-protect-projects.test.js:18:18)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.start (node:internal/test_runner/test:1003:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
-
-test at test/stories/us04-protect-projects.test.js:26:1
-✖ US-04 a saved pattern like capstone-* protects new matching projects (87.690208ms) # US-04 (#5): protected projects not built yet
-  TypeError: engine.profile.protect is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us04-protect-projects.test.js:28:18)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
-
-test at test/stories/us04-protect-projects.test.js:34:1
-✖ US-04 removing a protection from DINO MEMORY lets the project appear again (86.494666ms) # US-04 (#5): protected projects not built yet
-  TypeError: engine.profile.protect is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us04-protect-projects.test.js:36:18)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
-
-test at test/stories/us08-xcode.test.js:8:1
-✖ US-08 DerivedData for a project that no longer exists is offered as rebuildable (1.711542ms) # US-08 (#9): Xcode cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/xcode'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js:9:26)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js' ]
-  }
-
-test at test/stories/us08-xcode.test.js:19:1
-✖ US-08 simulator runtimes unused for 180 days are offered with size and a re-download note (0.433958ms) # US-08 (#9): Xcode cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/xcode'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js:20:26)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js' ]
-  }
-
-test at test/stories/us08-xcode.test.js:29:1
-✖ US-08 Xcode Archives and the rest of ~/Library stay NEVER (10.548542ms) # US-08 (#9): Xcode cleanup not built yet
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Xcode Archives.*crash reports/. Input:
-  
-  '/Users/weschang/Library/Developer/Xcode/Archives/2026-01-01 is in a NEVER-touch zone. Remove this action.'
-  
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us08-xcode.test.js:38:10)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: '/Users/weschang/Library/Developer/Xcode/Archives/2026-01-01 is in a NEVER-touch zone. Remove this action.',
-    expected: /Xcode Archives.*crash reports/,
-    operator: 'match',
-    diff: 'simple'
-  }
-
-test at test/stories/us09-docker.test.js:17:1
-✖ US-09 images no container uses are offered with size and "re-downloads on the next pull" (1.25925ms) # US-09 (#10): Docker cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/docker'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js:18:27)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js' ]
-  }
-
-test at test/stories/us09-docker.test.js:25:1
-✖ US-09 Docker volumes are never offered (0.35ms) # US-09 (#10): Docker cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/docker'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js:26:27)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js' ]
-  }
-
-test at test/stories/us09-docker.test.js:31:1
-✖ US-09 when Docker is not running, it is skipped with a message instead of failing the plan (0.28075ms) # US-09 (#10): Docker cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/docker'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js:32:27)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js' ]
-  }
-
-test at test/stories/us09-docker.test.js:39:1
-✖ US-09 when the disk change is smaller than the space freed inside Docker, both numbers are shown (0.231958ms) # US-09 (#10): Docker cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/docker'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js:40:33)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us09-docker.test.js' ]
-  }
-
-test at test/stories/us10-ml-caches.test.js:15:1
-✖ US-10 each cached model shows name, size, last used, and re-download time (1.668459ms) # US-10 (#11): ML cache cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/ml'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js:16:23)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js' ]
-  }
-
-test at test/stories/us10-ml-caches.test.js:25:1
-✖ US-10 models unused for 30 days are offered; recent ones only if named (0.322208ms) # US-10 (#11): ML cache cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/ml'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js:26:23)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js' ]
-  }
-
-test at test/stories/us10-ml-caches.test.js:35:1
-✖ US-10 a model the user trained or saved outside the download cache is never offered (0.198375ms) # US-10 (#11): ML cache cleanup not built yet
-  Error: Cannot find module '../../backend/ecosystems/ml'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js:36:23)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us10-ml-caches.test.js' ]
-  }
-
-test at test/stories/us16-storage-watch.test.js:14:1
-✖ US-16 passing 85% full sends one notification that opens the plan preview and runs nothing (1.2475ms) # US-16 (#17): storage watch not built yet
-  Error: Cannot find module '../../backend/storage-watch'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at watch (/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js:8:28)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js:15:23) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js' ]
-  }
-
-test at test/stories/us16-storage-watch.test.js:24:1
-✖ US-16 after a dismissal it stays quiet until 5% more or 7 days pass (0.564833ms) # US-16 (#17): storage watch not built yet
-  Error: Cannot find module '../../backend/storage-watch'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at watch (/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js:8:28)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js:25:23) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js' ]
-  }
-
-test at test/stories/us16-storage-watch.test.js:37:1
-✖ US-16 when the watch is turned off, no notifications (0.2205ms) # US-16 (#17): storage watch not built yet
-  Error: Cannot find module '../../backend/storage-watch'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at watch (/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js:8:28)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js:38:23) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us16-storage-watch.test.js' ]
-  }
-
-test at test/stories/us17-semester-sweep.test.js:6:1
-✖ US-17 after the semester-end date, the dino offers a sweep of class projects unchanged for 30 days (1.544292ms) # US-17 (#18): end-of-semester sweep not built yet (Could)
-  Error: Cannot find module '../../backend/semester'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us17-semester-sweep.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us17-semester-sweep.test.js:7:26)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us17-semester-sweep.test.js' ]
-  }
-
-test at test/stories/us17-semester-sweep.test.js:13:1
-✖ US-17 accepting the sweep produces an ordinary plan that waits for approval (0.442416ms) # US-17 (#18): end-of-semester sweep not built yet (Could)
-  Error: Cannot find module '../../backend/semester'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us17-semester-sweep.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us17-semester-sweep.test.js:14:26)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us17-semester-sweep.test.js' ]
-  }
-
-test at test/stories/us20-local-model.test.js:6:1
-✖ US-20 local mode makes no network request during scan, plan, or validation (1456.157042ms) # US-20 (#21): local model mode not built yet (Could)
-  Error: Connection error.
-      at Anthropic.makeRequest (/Users/weschang/cs4501_startup/app/node_modules/@anthropic-ai/sdk/client.js:684:23)
-      at async llmPlan (/Users/weschang/cs4501_startup/app/backend/planner.js:110:20)
-      at async makePlan (/Users/weschang/cs4501_startup/app/backend/planner.js:251:63)
-      at async TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us20-local-model.test.js:12:5)
-      at async Test.run (node:internal/test_runner/test:1113:7)
-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
-    status: undefined,
-    headers: undefined,
-    requestID: undefined,
-    workspaceID: undefined,
-    error: undefined,
-    type: null,
-    cause: Error: network
-        at globalThis.fetch (/Users/weschang/cs4501_startup/app/test/stories/us20-local-model.test.js:10:45)
-        at timedFetch (/Users/weschang/cs4501_startup/app/node_modules/@anthropic-ai/sdk/client.js:782:44)
-        at innerFetch (/Users/weschang/cs4501_startup/app/node_modules/@anthropic-ai/sdk/client.js:823:24)
-  }
-
-test at test/stories/us20-local-model.test.js:19:1
-✖ US-20 turning local mode on explains once that plans may be slower (0.167584ms) # US-20 (#21): local model mode not built yet (Could)
-  TypeError: localModeNotice is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us20-local-model.test.js:21:16)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
-
-test at test/stories/us21-logs-go-pro.test.js:19:1
-✖ US-21 "Go Pro" shows the not-available message and logs the click (4.064167ms) # US-21 (#22): rebuild logging and Go Pro fake door not built yet
-  TypeError: l.goPro is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us21-logs-go-pro.test.js:21:17)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.start (node:internal/test_runner/test:1003:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
-
-test at test/stories/us21-logs-go-pro.test.js:26:1
-✖ US-21 rebuilds are logged with counts and categories, never paths (2.778333ms) # US-21 (#22): rebuild logging and Go Pro fake door not built yet
-  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"category":"javascript"/. Input:
-  
-  '{"at":"2026-11-04T22:07:00.316Z","event":"logging_on"}\n' +
-    '{"at":"2026-11-04T22:07:00.317Z","event":"rebuild","ok":true,"ms":41000}\n'
-  
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us21-logs-go-pro.test.js:30:10)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
-    generatedMessage: true,
-    code: 'ERR_ASSERTION',
-    actual: '{"at":"2026-11-04T22:07:00.316Z","event":"logging_on"}\n{"at":"2026-11-04T22:07:00.317Z","event":"rebuild","ok":true,"ms":41000}\n',
-    expected: /"category":"javascript"/,
-    operator: 'match',
-    diff: 'simple'
-  }
-
-test at test/stories/us22-huge-folder.test.js:6:1
-✖ US-22 2,800 files are planned in batches of 400 or fewer and shown as one plan (152.67825ms) # US-22 (#23): batched planning not built yet (Should)
-  TypeError: batches is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us22-huge-folder.test.js:9:13)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.start (node:internal/test_runner/test:1003:17)
-      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
-
-test at test/stories/us22-huge-folder.test.js:14:1
-✖ US-22 a batch that still fails after 3 tries does not hide the other batches (0.182875ms) # US-22 (#23): batched planning not built yet (Should)
-  TypeError: mergeBatchPlans is not a function
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us22-huge-folder.test.js:16:18)
-      at Test.runInAsyncScope (node:async_hooks:214:14)
-      at Test.run (node:internal/test_runner/test:1106:25)
-      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
-      at Test.postRun (node:internal/test_runner/test:1235:19)
-      at Test.run (node:internal/test_runner/test:1163:12)
-      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
-
-test at test/stories/us23-first-page.test.js:6:1
-✖ US-23 without opting in, only file names are used (1.02675ms) # US-23 (#24): first-page sorting not built yet (Could)
-  Error: Cannot find module '../../backend/first-page'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js:7:25)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js' ]
-  }
-
-test at test/stories/us23-first-page.test.js:11:1
-✖ US-23 when opted in, the first page finds the course code and the reason says so (0.543667ms) # US-23 (#24): first-page sorting not built yet (Could)
-  Error: Cannot find module '../../backend/first-page'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js:12:25)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js' ]
-  }
-
-test at test/stories/us23-first-page.test.js:18:1
-✖ US-23 no course code found means Unsorted or a question (0.205083ms) # US-23 (#24): first-page sorting not built yet (Could)
-  Error: Cannot find module '../../backend/first-page'
-  Require stack:
-  - /Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js
-      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
-      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
-      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
-      at Module._load (node:internal/modules/cjs/loader:1227:37)
-      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
-      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
-      at Module.require (node:internal/modules/cjs/loader:1504:12)
-      at require (node:internal/modules/helpers:152:16)
-      at TestContext.<anonymous> (/Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js:19:25)
-      at Test.runInAsyncScope (node:async_hooks:214:14) {
-    code: 'MODULE_NOT_FOUND',
-    requireStack: [ '/Users/weschang/cs4501_startup/app/test/stories/us23-first-page.test.js' ]
-  }

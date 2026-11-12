@@ -21,7 +21,7 @@ const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
-const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator'];
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator', 'remove_docker', 'delete_from_trash'];
 const ESTIMATE_GAP = 0.1;
 
 // "a", "a and b", "a, b and c"
@@ -398,6 +398,11 @@ class Engine {
   // project rebuilt or a simulator booted since the plan was made is refused.
   findXcode() {
     return xcodeItems({ home: this.home, run: this.xcodeRun });
+  }
+
+  // Counts per action type for the usage log (round 3 F12).
+  countOpsFor(actions) {
+    return countOps(actions);
   }
 
   // US-16: about how much a cleanup could free, from the last scan, for the storage-watch notification.

@@ -61,7 +61,8 @@ class Executor {
         if (step && step.type === 'deleted') this.recordRecipe(step);
         results.push({ id: a.id, ok: true });
       } catch (err) {
-        results.push({ id: a.id, ok: false, error: err.message });
+        // One short line, without full paths: raw tool output stays out of what the page receives (round 3 F6).
+        results.push({ id: a.id, ok: false, error: String(err.message || err).split('\n')[0].replace(/(\/[^\s'"]+)+/g, (p) => require('path').basename(p)).slice(0, 200) });
       }
     }
     this.history.push(batch);

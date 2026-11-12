@@ -56,7 +56,9 @@ function dockerItems({ run = dockerFor(os.homedir()) } = {}) {
       // Gone already: nothing to protect.
     }
   }
-  const inUse = (id) => [...used].some((u) => u === id || (u.length >= 12 && id.length >= 12 && (u.startsWith(id) || id.startsWith(u))));
+  // docker inspect prints "sha256:<64 hex>" while image ls prints 12 hex; compare without the prefix.
+  const bare = (x) => String(x).replace(/^sha256:/, '');
+  const inUse = (id) => [...used].map(bare).some((u) => u === bare(id) || (u.length >= 12 && bare(id).length >= 12 && (u.startsWith(bare(id)) || bare(id).startsWith(u))));
   // An id is passed to docker as an argument, so it must look like an id, never a flag (F11).
   const safeId = (id) => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9:._-]*$/.test(id);
   const seen = new Set();

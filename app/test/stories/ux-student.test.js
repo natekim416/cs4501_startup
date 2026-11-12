@@ -153,6 +153,7 @@ test('N2 naming one model deletes that model only', async () => {
   engine.ml = engine.findMl();
   const plan = await engine.plan('delete whisper-small');
   assert.deepStrictEqual(plan.actions.map((a) => a.path), [other]);
+  assert.match(plan.summary, /the model you named/);
 });
 
 test('N4 "delete my old node_modules" deletes node_modules only, not Python environments', async () => {
