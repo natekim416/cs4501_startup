@@ -354,7 +354,8 @@ function mergeBatchPlans(results) {
         actions.push(a);
       }
     }
-    else questions.push({ text: `I couldn't make a safe plan for part ${i + 1} of this folder, so I left it out. The rest is ready.${r.error ? ` (${r.error})` : ''}`, options: ['OK'] });
+    // No raw checker text here: it can carry full paths (round 3 F6). The Safety Log has the details.
+    else questions.push({ text: `I couldn't make a safe plan for part ${i + 1} of this folder, so I left it out. The rest is ready.`, options: ['OK'] });
   });
   return { actions, questions };
 }

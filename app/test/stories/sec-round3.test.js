@@ -149,3 +149,34 @@ test('R3-9 the usage log records local mode and Docker removals as counts (F12)'
   assert.match(text, /"mode":"local"/);
   assert.match(text, /"ops_remove_docker":2/);
 });
+
+test('R3-10 a model read yesterday is not "unused" just because its files are old (F9)', () => {
+  const { mlItems } = require('../../backend/ecosystems/ml');
+  const home = tmp();
+  const file = write(path.join(home, '.cache', 'huggingface', 'hub', 'models--org--m', 'snapshots', 'a', 'w.bin'), 'w');
+  const old = new Date(Date.now() - 90 * 864e5);
+  const { age } = require('./helpers');
+  age(path.join(home, '.cache', 'huggingface', 'hub', 'models--org--m'), 90);
+  fs.utimesSync(file, new Date(Date.now() - 864e5), old); // read yesterday, written 90 days ago
+  const [item] = mlItems({ home });
+  assert.strictEqual(item.offered, false, item.reason);
+});
+
+test('R3-11 the semester sweep plans exactly its own projects; a folder name can\'t add another (F8)', async () => {
+  const root = tmp();
+  makeJsProject(root, 'CS2100 notes, myapp', { ageDays: 90 });
+  makeJsProject(root, 'myapp', { ageDays: 2 });
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  engine.profile.setZone(root, 'free');
+  engine.profile.data.semesterEnd = new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10);
+  const info = engine.openFolder(root);
+  assert.deepStrictEqual(info.sweep.projects, ['CS2100 notes, myapp']);
+  const plan = await engine.plan(info.sweep.request);
+  assert.ok(!plan.actions.some((a) => path.basename(path.dirname(a.path)) === 'myapp'), plan.actions.map((a) => a.path).join(', '));
+});
+
+test('R3-12 a batch that fails is reported without raw paths or internal error text (F6)', () => {
+  const { mergeBatchPlans } = require('../../backend/planner');
+  const merged = mergeBatchPlans([{ ok: false, actions: [], error: '/Users/x/secret-project/file.txt does not exist (or was already moved/removed earlier in this plan).' }]);
+  assert.doesNotMatch(merged.questions[0].text, /\/Users|secret-project/);
+});

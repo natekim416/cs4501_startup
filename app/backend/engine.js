@@ -117,6 +117,8 @@ class Engine {
       .map((p) => ({ name: path.basename(p), lastChanged: lastChanged(p) }));
     const offer = sweepOffer({ semesterEnd: end, projects });
     if (!offer.offered) return null;
+    // Accepting plans exactly these projects; the request text is never re-read for names (round 3 F8).
+    this.pendingSweep = { request: offer.request, projects: offer.projects };
     this.profile.data.sweepOfferedFor = end;
     this.profile.save();
     return offer;
@@ -221,6 +223,8 @@ class Engine {
     // Protected folders are left out before planning (the validator also rejects them) and listed in the reply.
     const dev = this.dev.filter((d) => !this.profile.protectedBy(d.path, this.folder));
     const protectedNames = this.protectedHere();
+    if (this.pendingSweep && request === this.pendingSweep.request) this.pendingProjects = this.pendingSweep.projects;
+    this.pendingSweep = null;
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
     // U5: a class folder above the project counts too (~/school/CS3140/hw3 is CS 3140).
     if (!this.pendingProjects && (intent.codes || []).length) {

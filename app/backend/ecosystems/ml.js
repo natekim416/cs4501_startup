@@ -22,7 +22,8 @@ function list(dir) {
   }
 }
 
-// The newest modification time anywhere inside, without following symlinks (the hub links blobs).
+// The newest time anything inside was read or written, without following symlinks (the hub links blobs).
+// Reading counts as use, so a model loaded yesterday isn't "unused" because its files are old (round 3 F9).
 function lastUsed(dir) {
   let newest = 0;
   const stack = [dir];
@@ -34,7 +35,7 @@ function lastUsed(dir) {
     } catch {
       continue;
     }
-    newest = Math.max(newest, st.mtimeMs);
+    newest = Math.max(newest, st.mtimeMs, st.isFile() ? st.atimeMs : 0);
     if (st.isDirectory()) for (const e of list(p)) stack.push(path.join(p, e));
   }
   return newest;
