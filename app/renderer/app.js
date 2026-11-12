@@ -432,7 +432,7 @@ async function runPlan(planId, list, approve) {
   const ids = checked.map((i) => i.dataset.id);
   if (!ids.length) return botSay('Nothing is checked, so there is nothing to do.');
   if (isBusy()) return;
-  // US-24: a permanent delete from the Trash needs its own yes, on top of APPROVE.
+  // US-30: a permanent delete from the Trash needs its own yes, on top of APPROVE.
   const permanent = checked.filter((i) => i.dataset.op === 'delete_from_trash').length;
   if (permanent && !window.confirm(`Permanently delete ${permanent} item${permanent === 1 ? '' : 's'} from the Trash? This can't be undone.`)) {
     return botSay('OK, nothing was deleted from the Trash.');

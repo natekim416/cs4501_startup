@@ -90,7 +90,7 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (a.op === 'delete_rebuildable' && isDerivedData(src, home)) {
       return fail(`${path.basename(src)} is Xcode build data that was built in the last 30 days, or that I can't match to a project, so I won't delete it.`);
     }
-    // US-24: a permanent delete is allowed only for something already in the Trash, and always asks.
+    // US-30: a permanent delete is allowed only for something already in the Trash, and always asks.
     if (a.op === 'delete_from_trash') {
       if (!inTrash(src, trashDir)) return fail(`${src} isn't in the Trash. I can permanently delete only items already in the Trash.`);
       bytesFreed += itemBytes(src);

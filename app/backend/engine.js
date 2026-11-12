@@ -236,7 +236,7 @@ class Engine {
 
     // A project the user named but touched recently is allowed, and shown unchecked so they decide.
     for (const a of plan.actions || []) {
-      // US-24: permanent deletes start unchecked; the user opts in and confirms.
+      // US-30: permanent deletes start unchecked; the user opts in and confirms.
       if (a.op === 'delete_from_trash') Object.assign(a, { checked: false, note: 'Permanent: this deletes it from the Trash for good and cannot be undone.' });
       // Xcode's own build data has its own 30-day rule (US-08); its parent folder isn't a project.
       if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path)) continue;
@@ -357,7 +357,7 @@ class Engine {
     const chosen = picked.filter((a) => a.op !== 'mkdir' || !filesInto(path.resolve(a.path), all) || filesInto(path.resolve(a.path), picked));
     const skippedFolders = picked.length - chosen.length;
     const uncheckedMoves = all.filter((a) => (a.op === 'move' || a.op === 'rename') && !actionIds.includes(a.id)).length;
-    // US-24: nothing is permanently deleted unless the user confirmed it in a separate step.
+    // US-30: nothing is permanently deleted unless the user confirmed it in a separate step.
     if (chosen.some((a) => a.op === 'delete_from_trash') && !confirmPermanent) {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }

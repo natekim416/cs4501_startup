@@ -323,7 +323,7 @@ const STEPS = [
     if (left.length) throw new Error('still there: ' + left.join(', '));
     return created.length + ' folders removed';
   }],
-  ['emptying the Trash needs the confirm dialog: Cancel deletes nothing, OK deletes for real (US-24)', async ({ win, base }) => {
+  ['emptying the Trash needs the confirm dialog: Cancel deletes nothing, OK deletes for real (US-30)', async ({ win, base }) => {
     const trash = path.join(base, 'Trash');
     fs.mkdirSync(trash, { recursive: true });
     fs.writeFileSync(path.join(trash, 'old draft.docx'), 'x');
