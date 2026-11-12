@@ -64,7 +64,7 @@ async function planWithRetry(engine, request) {
   try {
     return await engine.plan(request);
   } catch (err) {
-    if (!/busy|having trouble|couldn't reach/i.test(err.message)) throw err;
+    if (!/busy|having trouble|couldn't reach|didn't answer/i.test(err.message)) throw err;
     await new Promise((r) => setTimeout(r, 20000));
     return engine.plan(request);
   }

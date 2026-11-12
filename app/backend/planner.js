@@ -147,6 +147,7 @@ async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = []
 function friendlyApiError(err) {
   const status = err && err.status;
   const code = err && (err.code || (err.cause && err.cause.code));
+  if (/credit balance is too low/i.test(String(err && err.message))) return "The Anthropic account behind this API key is out of credit, so Claude can't plan right now. Add credit in the Anthropic Console, or turn on LOCAL to keep cleaning with on-device rules.";
   if (status === 429) return 'Claude is busy right now (too many requests). Try again in a minute.';
   if (status === 401 || status === 403) return "Claude didn't accept the API key. Check the key in the .env file.";
   if (status >= 500 || status === 529) return 'Claude is having trouble right now. Try again in a few minutes.';

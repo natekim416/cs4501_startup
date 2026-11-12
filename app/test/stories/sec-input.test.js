@@ -107,3 +107,9 @@ test('INPUT-7 a folder to scan must be a full path to a real folder (red-team ro
   const ok = tmp();
   assert.strictEqual(engine.openFolder(ok).folder, ok);
 });
+
+test('INPUT-8 an API account out of credit gets a plain message that says so, and how to keep going', async () => {
+  const broke = Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."},"request_id":"req_1"}'), { status: 400 });
+  const engine = engineWith(client(async () => { throw broke; }));
+  await assert.rejects(engine.plan('tidy up'), (e) => /out of credit/i.test(e.message) && /LOCAL/.test(e.message) && !/request_id|\{"type"/.test(e.message));
+});
