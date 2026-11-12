@@ -309,6 +309,13 @@ class Engine {
     return xcodeItems({ home: this.home, run: this.xcodeRun });
   }
 
+  // US-16: about how much a cleanup could free, from the last scan, for the storage-watch notification.
+  estimateFreeable() {
+    const rebuildable = this.dev.filter((d) => d.label === 'rebuildable').reduce((n, d) => n + d.bytes, 0);
+    const offered = this.ml.filter((x) => x.offered);
+    return [rebuildable, ...this.xcode.map((x) => x.bytes), ...this.docker.map((d) => d.bytes), ...offered.map((x) => x.bytes)].reduce((n, b) => n + (b || 0), 0);
+  }
+
   // US-10: models in the Hugging Face download cache. A model used in the last 30 days is offered only if named.
   findMl(named = []) {
     return mlItems({ home: this.home, named });
@@ -452,7 +459,9 @@ class Engine {
   rebuild(request, { run } = {}) {
     const recorded = this.executor.recordedRecipe(request);
     if (!recorded) return { ok: false, message: 'I can only rebuild a folder I deleted myself, using the command I saved when I deleted it.' };
-    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
+    // US-21: rebuilds are logged by category (never the path), so the pivot test can see they work.
+    const category = /^(npm|yarn|pnpm)\b/.test(recorded.command) ? 'javascript' : /^(python3?|pip|uv|poetry|conda)\b/.test(recorded.command) ? 'python' : 'other';
+    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms, category }) });
   }
 
   undoAction(batchId, actionId) {

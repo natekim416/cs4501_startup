@@ -1,7 +1,6 @@
 // US-16 (#17) · Storage watch.
 const test = require('node:test');
 const assert = require('node:assert');
-const TODO = { todo: 'US-16 (#17): storage watch not built yet' };
 const DAY = 864e5;
 
 function watch(opts = {}) {
@@ -11,7 +10,7 @@ function watch(opts = {}) {
   return { w, sent };
 }
 
-test('US-16 passing 85% full sends one notification that opens the plan preview and runs nothing', TODO, () => {
+test('US-16 passing 85% full sends one notification that opens the plan preview and runs nothing', () => {
   const { w, sent } = watch();
   w.check({ usedFraction: 0.87, now: 0 });
   w.check({ usedFraction: 0.88, now: DAY });
@@ -21,7 +20,7 @@ test('US-16 passing 85% full sends one notification that opens the plan preview 
   assert.strictEqual(sent[0].action, 'open-plan-preview');
 });
 
-test('US-16 after a dismissal it stays quiet until 5% more or 7 days pass', TODO, () => {
+test('US-16 after a dismissal it stays quiet until 5% more or 7 days pass', () => {
   const { w, sent } = watch();
   w.check({ usedFraction: 0.86, now: 0 });
   w.dismiss({ now: 0 });
@@ -34,7 +33,7 @@ test('US-16 after a dismissal it stays quiet until 5% more or 7 days pass', TODO
   assert.strictEqual(sent.length, 3);
 });
 
-test('US-16 when the watch is turned off, no notifications', TODO, () => {
+test('US-16 when the watch is turned off, no notifications', () => {
   const { w, sent } = watch({ enabled: false });
   w.check({ usedFraction: 0.99, now: 0 });
   assert.strictEqual(sent.length, 0);

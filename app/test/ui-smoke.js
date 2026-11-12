@@ -360,6 +360,20 @@ const STEPS = [
       await __t.waitFor(() => /uncommitted/i.test(__t.botText()), 'the reason (uncommitted changes)');
       return 'ok';`);
   }],
+  ['US-21 GO PRO shows "not available yet" and changes nothing', `
+    const b = await __t.waitFor(() => document.querySelector('#gopro-btn'), 'GO PRO button');
+    b.click();
+    await __t.waitFor(() => /Pro isn't available yet/.test(__t.botText()), 'Go Pro message');
+    return 'ok';`],
+  ['US-16 the storage-watch notification opens a plan preview and runs nothing', async ({ win }) => {
+    const before = await page(win, `return (__t.botText().match(/Done! /g) || []).length;`);
+    win.webContents.send('storage-watch', { text: "You're 87% full. I can get you about 18 GB back.", action: 'open-plan-preview' });
+    return page(win, `
+      await __t.waitFor(() => /87% full/.test(__t.botText()) && /Nothing runs until you approve/.test(__t.botText()), 'storage-watch message');
+      await __t.waitFor(() => !document.body.classList.contains('busy'), 'preview to finish');
+      if ((__t.botText().match(/Done! /g) || []).length !== ${before}) throw new Error('something ran');
+      return 'preview only';`);
+  }],
   // Last, so a failure can't strand the other steps on a foreign page. Red-team F15.
   ['SEC: the window cannot be navigated to another page or open new windows, so no other page gets the app API', async ({ win, base }) => {
     const evil = path.join(base, 'evil.html');

@@ -532,6 +532,15 @@ api.onAttempt((a) => {
 
 api.onUsage(renderUsage);
 
+// US-21: the "Go Pro" fake door.
+$('#gopro-btn').addEventListener('click', async () => botSay((await api.goPro()).message));
+
+// US-16: the storage-watch notification opens a plan preview. Nothing runs until the user approves.
+api.onStorageWatch(async (n) => {
+  botSay(`${n.text}\nHere's a plan preview. Nothing runs until you approve it.`);
+  if (state.folder) await sendRequest('Free up space');
+});
+
 $('#usage-toggle').addEventListener('click', async () => {
   const on = !state.usageOn;
   if (!on && !confirm('Turn off the usage log and delete what it has recorded?')) return;
