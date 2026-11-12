@@ -142,3 +142,42 @@ test('REG-7c undoing one move removes the folder it created once that folder is 
   for (const a of intoDest) engine.undoAction(res.batchId, a.id);
   assert.ok(!fs.existsSync(dest), `${path.basename(dest)} should be removed after its last file moved back`);
 });
+
+// A temp folder that's removed when the test ends.
+function tempDir(t) {
+  const dir = tmp();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
+test('REG-8 the Yarn and pnpm caches in ~/Library can be cleared, though ~/Library stays NEVER (found while building US-08)', async (t) => {
+  const { validate } = require('../../backend/validator');
+  const { write } = require('./helpers');
+  const home = tempDir(t);
+  const yarn = path.join(home, 'Library', 'Caches', 'Yarn');
+  const pnpm = path.join(home, 'Library', 'pnpm', 'store');
+  write(path.join(yarn, 'v6', 'blob'), 'y'.repeat(20 * 1024));
+  write(path.join(pnpm, 'v3', 'files', 'blob'), 'p'.repeat(20 * 1024));
+  const root = tempDir(t);
+  makeJsProject(root, 'app');
+  const engine = new Engine({ dataDir: tempDir(t), apiKey: '', home });
+  engine.profile.setZone(root, 'free');
+  // Like the real ~/Library, which FEAT-01 locks to NEVER. The US-06 tests used a home with no zones.
+  engine.profile.setZone(path.join(home, 'Library'), 'never');
+  engine.scanFolder(root);
+  const plan = await engine.plan('Clear my package caches');
+  const clear = plan.actions.filter((a) => a.op === 'clear_cache');
+  assert.deepStrictEqual(clear.map((a) => a.path).sort(), [pnpm, yarn].sort(), JSON.stringify(plan.attempts));
+  assert.ok(plan.attempts[0].ok, 'the caches were rejected before they got in');
+  const run = engine.execute(plan.planId, clear.map((a) => a.id));
+  assert.ok(run.ok, JSON.stringify(run.errors));
+  assert.deepStrictEqual(fs.readdirSync(yarn), [], 'the Yarn cache is still full');
+  assert.deepStrictEqual(fs.readdirSync(pnpm), [], 'the pnpm store is still full');
+  // Only the exact known caches are opened up: everything else in ~/Library stays NEVER, even next to them.
+  const other = path.dirname(write(path.join(home, 'Library', 'Caches', 'com.apple.Safari', 'Cache.db'), 'x'));
+  for (const p of [other, path.join(home, 'Library', 'Caches'), path.join(yarn, 'v6')]) {
+    const res = validate({ actions: [{ id: 'x', op: 'clear_cache', path: p, dest: '', keep: '', reason: 'x' }] }, { scan: engine.snapshot, findings: [], profile: engine.profile, home });
+    assert.strictEqual(res.ok, false, `${p} was allowed`);
+    assert.match(res.errors[0].message, /NEVER/);
+  }
+});
