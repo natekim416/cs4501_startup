@@ -21,6 +21,8 @@ const DEFAULT_PROFILE = {
   // Where organized files are allowed to end up. Empty means "inside the folder being cleaned".
   targetPlan: { destRoots: [], notes: '' },
   preferences: [],
+  // US-04: projects to always keep, by folder name or a pattern like capstone-*. Shown in DINO MEMORY.
+  protected: [],
   // null until the user answers, then true or false. See usage-log.js.
   usageLogging: null,
 };
@@ -106,6 +108,49 @@ class Profile {
     this.data.preferences = this.data.preferences.filter((p) => p !== preference);
     this.save();
   }
+
+  // US-04: protect a project in every later plan. The validator enforces it, not the LLM.
+  protect(name) {
+    const clean = protectName(name);
+    if (!this.data.protected.includes(clean)) this.data.protected.push(clean);
+    this.save();
+    return clean;
+  }
+
+  unprotect(name) {
+    this.data.protected = this.data.protected.filter((p) => p !== name);
+    this.save();
+  }
+
+  // The saved name or pattern that protects a folder called `name`, or null. Like macOS, it ignores case.
+  protectedPattern(name) {
+    return (this.data.protected || []).find((p) => globMatch(p, name)) || null;
+  }
+
+  // The protected folder that `target` is in, checking it and each parent up to the scanned folder.
+  protectedBy(target, root) {
+    const top = path.resolve(root);
+    for (let dir = path.resolve(target); dir === top || dir.startsWith(top + path.sep); dir = path.dirname(dir)) {
+      const pattern = this.protectedPattern(path.basename(dir));
+      if (pattern) return { project: path.basename(dir), pattern };
+      if (dir === top) break;
+    }
+    return null;
+  }
+}
+
+// A protection is a folder name or a pattern with *, never a path.
+function protectName(name) {
+  const clean = typeof name === 'string' ? name.trim() : '';
+  if (!clean || /[/\\]/.test(clean) || clean === '.' || clean === '..') {
+    throw new Error(`"${name}" isn't a project name. Use a folder name like capstone-team7, or a pattern like capstone-*.`);
+  }
+  return clean;
+}
+
+function globMatch(pattern, name) {
+  const re = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
+  return new RegExp(`^${re}$`, 'i').test(name);
 }
 
 // Returns the repo folder if target is inside a code project. A repo at the home folder
@@ -133,4 +178,4 @@ function realPath(target) {
   }
 }
 
-module.exports = { Profile, DEFAULT_PROFILE };
+module.exports = { Profile, DEFAULT_PROFILE, protectName };

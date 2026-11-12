@@ -184,6 +184,49 @@ const STEPS = [
     }
     if ((await __t.savedZone(lib)) !== 'never') throw new Error('~/Library is no longer NEVER');
     return 'ok';`],
+  // US-04 (#5): protect projects once, see later plans skip them, and remove a protection in DINO MEMORY.
+  ['US-04 "keep anything on my resume" shows a checklist of projects, and SAVE protects only the ones picked', async ({ win, base }) => {
+    const { makeJsProject } = require('./stories/helpers');
+    const code = path.join(base, 'code');
+    for (const name of ['capstone-team7', 'portfolio-site', 'cs3140-hw1']) makeJsProject(code, name);
+    return win.webContents.executeJavaScript(`(async () => {
+      __t.code = ${JSON.stringify(code)};
+      await api.setZone(__t.code, 'free');
+      await useFolder(__t.code);
+      await sendRequest('Keep anything on my resume');
+      const pick = await __t.waitFor(() => document.querySelector('.question.pick'), 'project checklist');
+      const names = [...pick.querySelectorAll('label')].map((l) => l.textContent.trim());
+      if (names.join(', ') !== 'capstone-team7, cs3140-hw1, portfolio-site') throw new Error('checklist shows ' + names.join(', '));
+      if (__t.button('SAVE')) throw new Error('SAVE works before anything is picked');
+      for (const box of pick.querySelectorAll('input')) if (/capstone-team7|portfolio-site/.test(box.value)) box.click();
+      __t.button('SAVE').click();
+      const memory = () => document.querySelector('#memory').textContent;
+      await __t.waitFor(() => /Always keep: capstone-team7/.test(memory()) && /Always keep: portfolio-site/.test(memory()), 'protections in DINO MEMORY');
+      if (/cs3140-hw1/.test(memory())) throw new Error('a project that was not picked got protected');
+      const refused = await api.protect(['../code']);
+      if (!refused || !refused.error) throw new Error('the backend saved a path as a protection');
+      return names.join(', ');
+    })()`);
+  }],
+  ['US-04 later plans skip protected projects and say so', `
+    const cards = () => document.querySelectorAll('.card');
+    const n = cards().length;
+    await sendRequest('Free up space');
+    if (cards().length === n) throw new Error('no plan card');
+    const actions = [...[...cards()].pop().querySelectorAll('.action')].map((a) => a.textContent).join('\\n');
+    if (/capstone-team7|portfolio-site/.test(actions)) throw new Error('the plan includes a protected project');
+    if (!/cs3140-hw1/.test(actions)) throw new Error('the unprotected project is missing');
+    await __t.waitFor(() => /left out capstone-team7 and portfolio-site/.test(__t.botText()), 'note about protected projects');
+    return 'ok';`],
+  ['US-04 removing a protection in DINO MEMORY lets the project back into plans', `
+    const item = [...document.querySelectorAll('#memory li')].find((li) => /Always keep: capstone-team7/.test(li.textContent));
+    item.querySelector('button').click();
+    await __t.waitFor(() => !/Always keep: capstone-team7/.test(document.querySelector('#memory').textContent), 'protection removed');
+    await sendRequest('Free up space');
+    const actions = [...[...document.querySelectorAll('.card')].pop().querySelectorAll('.action')].map((a) => a.textContent).join('\\n');
+    if (!/capstone-team7/.test(actions)) throw new Error('capstone-team7 is still left out');
+    if (/portfolio-site/.test(actions)) throw new Error('portfolio-site lost its protection');
+    return 'ok';`],
 ];
 
 module.exports = function runUiTest(win, resultFile) {

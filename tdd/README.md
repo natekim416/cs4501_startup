@@ -57,6 +57,7 @@
 | round-3 tests → `e365edc` | Negation, keep-first, exact answers, scan root (REG-5) | 🔴 3 fail → 🟢 101/101 |
 | `5932552` | LIVE-1…5 against the real Claude, written before any live run | ⏭ skipped without a key → 🟢 5/5 with a key (no red phase) |
 | FEAT-01 (#41) | Changing a zone from the zones panel: 6 tests in `test/feat01-change-zone.test.js` and 5 UI steps, written before any code ([`07-feat01-red-run.txt`](07-feat01-red-run.txt)), then `profile.changeZone`, the macOS-folder lock, and the picker ([`08-feat01-green-run.txt`](08-feat01-green-run.txt)) | 🔴 6 fail (3 on real checks; 3 on "changeZone is not a function", a weak red) and UI step 16 fails → 🟢 117/117 runnable, UI 20/20 |
+| US-04 (#5), branch `us-04-protect-projects` from `beta` | The 3 todo tests switched on, 7 tests and 3 UI steps added, all before any code ([`09-us04-red-run.txt`](09-us04-red-run.txt)); then saved protections, "always keep" in chat, the project checklist, and the validator check ([`10-us04-green-run.txt`](10-us04-green-run.txt)). 4 more tests were added after the code to cover parts nothing tested; each was shown to fail with its code taken out (9 of 9 caught) | 🔴 10 fail (6 on real checks; 4 on "protect is not a function", a weak red) and UI step 16 fails → 🟢 125/125 runnable, UI 18/18 |
 
 ## 3. Every GitHub issue and its tests
 
@@ -65,7 +66,7 @@
 | #2 | US-01 Storage breakdown | Must | `us01-storage-breakdown.test.js` (5: 4 pass, 1 todo) | 🟡 partial: JS/Python totals, top projects, blocked folders work; Xcode/Docker/ML totals wait for US-08–10 |
 | #3 | US-02 Label rebuildable vs. not | Must | `us02-labels.test.js` (5) | 🟢 pass |
 | #4 | US-03 Clean by intent | Must | `us03-clean-by-intent.test.js` (10), LLM-7, REG-3, REG-4, REG-5 | 🟢 pass  |
-| #5 | US-04 Protect projects | Must | `us04-protect-projects.test.js` (3) | 🔴 todo |
+| #5 | US-04 Protect projects | Must | `us04-protect-projects.test.js` (14), UI steps 16–18 | 🟢 pass (on `us-04-protect-projects`, not merged yet) |
 | #6 | US-05 Rebuild proof | Must | `us05-rebuild-proof.test.js` (12) | 🟢 pass |
 | #7 | US-06 JavaScript packages | Must | `us06-javascript.test.js` (7) | 🟢 pass; caches now offered in plans  |
 | #8 | US-07 Python environments | Must | `us07-python.test.js` (6) | 🟢 pass; conda export wired into plans  |
@@ -141,5 +142,5 @@
 ## 6. Next stories, in sprint order
 
 1. Record the demo on Claude as the backup video, and rerun `npm run test:live` before class (5/5 on Nov 4). (`alpha-review` was merged in #32; #2 was reopened because US-01 is partial.)
-2. US-04 protect projects.
+2. ~~US-04 protect projects.~~ Built on `us-04-protect-projects` (from `beta`); see §2.
 3. US-08 Xcode, US-09 Docker, US-10 ML caches (which also completes US-01), US-16 storage watch, US-21 Go Pro.
