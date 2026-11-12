@@ -91,6 +91,8 @@ const PATTERN = /[\w.-]*\*[\w.*-]*/g;
 
 // Returns null, or the names and patterns to protect plus the rest of the request to plan.
 function matchProtect(request, names) {
+  // U13: "always keep X and free up space" is two requests; split before a cleanup verb after "and".
+  request = request.replace(/\s+and\s+(?=(?:free|clean|delete|remove|clear|tidy|organi[sz]e|sort)\b)/gi, '. ');
   const standalone = /^\s*(?:please\s+)?keep\b/i.test(request) && !CLEANUP.test(request) && !DONE_WITH.test(request);
   const protecting = [];
   const rest = [];

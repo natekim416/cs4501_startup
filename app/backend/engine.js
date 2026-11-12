@@ -3,22 +3,25 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
-const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
+const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, rebuildProof, INACTIVE_DAYS } = require('./devclutter');
 const { listTrash } = require('./trash');
 const { xcodeItems, xcrunFor } = require('./ecosystems/xcode');
-const { matchProjects, matchProtect } = require('./intent');
+const { dockerItems, dockerFor, reportDockerFreed } = require('./ecosystems/docker');
+const { mlItems } = require('./ecosystems/ml');
+const { matchProjects, matchProtect, courseCodes } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
 const { breakdown } = require('./breakdown');
 const { scanFiles } = require('./malware');
 const { validate } = require('./validator');
-const { makePlan } = require('./planner');
+const { makePlan, batches, mergeBatchPlans, localModeNotice, MAX_FILES_IN_PROMPT } = require('./planner');
+const { sweepOffer, lastSemesterEnd } = require('./semester');
 const { Executor } = require('./executor');
 const { Profile, protectName } = require('./profile');
 const { UsageLog } = require('./usage-log');
 
 const MAX_ATTEMPTS = 3;
-const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator'];
+const OPS = ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'remove_simulator', 'remove_docker', 'delete_from_trash'];
 const ESTIMATE_GAP = 0.1;
 
 // "a", "a and b", "a, b and c"
@@ -54,8 +57,10 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+const MAX_ACTIONS_PER_PLAN = 500;
+
 class Engine {
-  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000 } = {}) {
+  constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000, dockerRun = null } = {}) {
     this.planTimeoutMs = planTimeoutMs;
     this.llmClient = llmClient;
     this.dataDir = dataDir;
@@ -63,6 +68,10 @@ class Engine {
     this.condaRun = condaRun;
     // US-08: runs `xcrun simctl` to list and remove simulators. Tests pass a fake.
     this.xcodeRun = xcodeRun || xcrunFor(home);
+    this.dockerRun = dockerRun || dockerFor(home);
+    this.docker = [];
+    this.dockerMessage = null;
+    this.ml = [];
     this.xcode = [];
     this.caches = [];
     this.condaExports = {};
@@ -70,7 +79,7 @@ class Engine {
     this.profile = new Profile(path.join(dataDir, 'profile.json'));
     this.trashDir = trashDir;
     this.trashItems = [];
-    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun });
+    this.executor = new Executor(dataDir, { trashDir, xcrun: this.xcodeRun, dockerRun: this.dockerRun });
     this.binName = trashDir ? 'the Trash' : 'the Dino Bin';
     this.usage = new UsageLog(path.join(dataDir, 'usage-log.jsonl'), this.profile);
     this.practiceFolders = new Set();
@@ -84,7 +93,35 @@ class Engine {
   }
 
   get mode() {
+    // A profile we couldn't read may have had local mode on, so fail closed: nothing leaves the Mac (round 3 F7).
+    if (this.profile.data.localMode || this.profile.corrupt) return 'local';
     return this.apiKey || this.llmClient ? 'llm' : 'demo';
+  }
+
+  // US-20: local mode keeps even file names on this Mac. Returns the one-time notice, or null after that.
+  setLocalMode(on) {
+    const first = on && !this.profile.data.localModeExplained;
+    this.profile.data.localMode = Boolean(on);
+    if (first) this.profile.data.localModeExplained = true;
+    this.profile.save();
+    if (!first) return null;
+    // U18: with no key, nothing was leaving the Mac anyway.
+    return this.apiKey || this.llmClient ? localModeNotice() : "You're already offline (no API key), so nothing leaves your laptop. Local mode keeps it that way.";
+  }
+
+  // US-17: once per semester, after it ends, offer a sweep of class projects already quiet before the end.
+  sweepOffer() {
+    const end = this.profile.data.semesterEnd || lastSemesterEnd();
+    if (this.profile.data.sweepOfferedFor === end) return null;
+    const projects = [...new Set(this.dev.filter((d) => d.label === 'rebuildable' && d.project !== this.folder).map((d) => d.project))]
+      .map((p) => ({ name: path.basename(p), lastChanged: lastChanged(p) }));
+    const offer = sweepOffer({ semesterEnd: end, projects });
+    if (!offer.offered) return null;
+    // Accepting plans exactly these projects; the request text is never re-read for names (round 3 F8).
+    this.pendingSweep = { request: offer.request, projects: offer.projects };
+    this.profile.data.sweepOfferedFor = end;
+    this.profile.save();
+    return offer;
   }
 
   // Practice runs (the guided demo, --demo-folder) aren't real use, so they stay out of the usage log.
@@ -106,7 +143,7 @@ class Engine {
       flagged: info.findings.length,
       zone: info.zone,
     });
-    return info;
+    return { ...info, sweep: this.sweepOffer() };
   }
 
   scanFolder(folder) {
@@ -115,6 +152,10 @@ class Engine {
     this.dev = findArtifacts(folder);
     this.caches = toolCaches(this.home);
     this.xcode = this.findXcode();
+    const docker = this.findDocker();
+    this.docker = docker.items;
+    this.dockerMessage = docker.message;
+    this.ml = this.findMl();
     this.trashItems = listTrash(this.trashDir);
     this.exportCondaEnvs();
     const malware = scanFiles(this.snapshot.files);
@@ -165,7 +206,7 @@ class Engine {
     }
     this.scanFolder(this.folder);
     // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
-    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown();
+    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown|why.*(full|no (space|room))/i.test(request)) return this.answerBreakdown();
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
     // The scanned folder itself isn't a project (a VM bundle at the top level would otherwise make it one).
     const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
@@ -182,24 +223,54 @@ class Engine {
     // Protected folders are left out before planning (the validator also rejects them) and listed in the reply.
     const dev = this.dev.filter((d) => !this.profile.protectedBy(d.path, this.folder));
     const protectedNames = this.protectedHere();
+    if (this.pendingSweep && request === this.pendingSweep.request) this.pendingProjects = this.pendingSweep.projects;
+    this.pendingSweep = null;
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
+    // U5: a class folder above the project counts too (~/school/CS3140/hw3 is CS 3140).
+    // Only a parent folder whose own name is the class code counts, and a project named exactly is never widened (RN1).
+    const exactName = intent.matched.some((n) => new RegExp(`(^|[^\\w-])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`, 'i').test(request));
+    if (!this.pendingProjects && !exactName && (intent.codes || []).length) {
+      for (const d of this.dev) {
+        const name = path.basename(d.project);
+        const parents = path.relative(this.folder, path.dirname(d.project)).split(path.sep);
+        const inClass = parents.some((seg) => courseCodes(seg).some((c) => intent.codes.includes(c)));
+        if (inClass && !intent.matched.includes(name) && !(intent.kept || []).includes(name)) intent.matched.push(name);
+      }
+      if (intent.matched.length) intent.ambiguous = null;
+    }
     this.pendingProjects = null;
-    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode };
-    const attempts = [];
-    let previous = null;
-    let plan;
-    let check;
-
-    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined }), this.planTimeoutMs);
-      // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
-      plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
+    // US-10: a model the request names by name may go even if it was used recently.
+    const lower = request.toLowerCase();
+    const namedModels = this.ml.filter((x) => [x.model, x.model.split('/').pop()].some((n) => n.length >= 4 && new RegExp(`(^|[^\\w-])${n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`).test(lower))).map((x) => x.model);
+    if (namedModels.length) this.ml = this.findMl(namedModels);
+    const ctx = { scan: this.snapshot, dev, caches: this.caches, findings: this.findings, profile: this.profile, named: intent.matched, intent, home: this.home, condaExports: this.condaExports, trashDir: this.trashDir, trashItems: this.trashItems, xcode: this.xcode, docker: this.docker, dockerMessage: this.dockerMessage, ml: this.ml };
+    let { plan, check, attempts } = { plan: null, check: null, attempts: [] };
+    if (this.mode === 'llm' && this.snapshot.files.length > MAX_FILES_IN_PROMPT) {
+      // US-22: a big folder goes to Claude in batches; each batch is planned and checked on its own, then
+      // the merged plan is checked once more against the whole folder below.
+      const results = [];
+      const groups = batches(this.snapshot.files, MAX_FILES_IN_PROMPT);
+      for (const [n, group] of groups.entries()) {
+        const inBatch = new Set(group.map((f) => f.path));
+        const scanPart = { ...this.snapshot, files: group, duplicates: this.snapshot.duplicates.filter((g) => g.files.every((f) => inBatch.has(f))) };
+        // Mac-wide items (build folders, caches, Docker, models, Xcode, the Trash) go to the first batch only,
+        // so each is planned once (round 3 F2).
+        const part = n === 0 ? { ...ctx, scan: scanPart } : { ...ctx, scan: scanPart, dev: [], caches: [], trashItems: [], xcode: [], docker: [], ml: [] };
+        const r = await this.attemptPlan(request, part, onAttempt);
+        attempts.push(...r.attempts.map((a) => ({ ...a, batch: n + 1 })));
+        const actions = (Array.isArray(r.plan.actions) ? r.plan.actions : []).filter((a) => a && typeof a === 'object').map((a) => ({ ...a, id: `b${n + 1}-${a.id}` }));
+        results.push({ ok: r.check.ok, actions, error: r.check.ok ? null : r.check.errors[0] && r.check.errors[0].message });
+      }
+      const merged = mergeBatchPlans(results);
+      // One plan is capped at 500 actions; keep the first 500 and say so, rather than drop it all (round 3 F3).
+      if (merged.actions.length > MAX_ACTIONS_PER_PLAN) {
+        merged.actions = merged.actions.slice(0, MAX_ACTIONS_PER_PLAN);
+        merged.questions.push({ text: `This folder needs more than ${MAX_ACTIONS_PER_PLAN} changes, so this plan has the first ${MAX_ACTIONS_PER_PLAN}. Approve it, then ask again for the rest.`, options: ['OK'] });
+      }
+      plan = { summary: `I planned this folder in ${groups.length} parts of up to ${MAX_FILES_IN_PROMPT} files.`, actions: merged.actions, questions: merged.questions };
       check = validate(plan, ctx);
-      const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
-      attempts.push(attempt);
-      onAttempt(attempt);
-      if (check.ok) break;
-      previous = { plan, errors: check.errors };
+    } else {
+      ({ plan, check, attempts } = await this.attemptPlan(request, ctx, onAttempt));
     }
 
     const questions = Array.isArray(plan.questions)
@@ -242,13 +313,13 @@ class Engine {
       // US-30: permanent deletes start unchecked; the user opts in and confirms.
       if (a.op === 'delete_from_trash') Object.assign(a, { checked: false, note: 'Permanent: this deletes it from the Trash for good and cannot be undone.' });
       // Xcode's own build data has its own 30-day rule (US-08); its parent folder isn't a project.
-      if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path)) continue;
+      if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path) || this.ml.some((x) => x.path === a.path)) continue;
       const days = Math.floor((Date.now() - lastChanged(path.dirname(a.path))) / 864e5);
       if (days < INACTIVE_DAYS) Object.assign(a, { checked: false, note: `${path.basename(path.dirname(a.path))} is still active (changed ${days} day${days === 1 ? '' : 's'} ago). Check it only if you're sure.` });
     }
 
     const planId = ++this.planCount;
-    this.lastPlan = { id: planId, request, plan, check, named: ctx.named };
+    this.lastPlan = { id: planId, request, plan, check, named: ctx.named, namedModels };
     this.track('plan', {
       zone: this.profile.zoneFor(this.folder),
       tries: attempts.length,
@@ -261,7 +332,7 @@ class Engine {
       ms: Date.now() - started,
       ...countOps(plan.actions || []),
     });
-    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
+    const sizes = new Map([...this.snapshot.files.map((f) => [f.path, f.size]), ...this.dev.map((d) => [d.path, d.bytes]), ...this.xcode.map((x) => [x.path, x.bytes]), ...this.docker.map((d) => [d.path, d.bytes]), ...this.ml.map((x) => [x.path, x.bytes]), ...this.trashItems.map((t) => [t.path, t.bytes])]);
     const dayAgo = Date.now() - 864e5;
     const recentlyOpened = (plan.actions || []).map((a) => a.path).filter((p) => {
       try {
@@ -273,12 +344,26 @@ class Engine {
     });
     const oneLine = summarize({ folder: this.folder, actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) })) }, { recentlyOpened });
     const leftOut = protectedNames.length ? `Protected in DINO MEMORY, so I left out ${listWords(protectedNames)}.` : null;
+    // U4: a project the student named that the plan leaves out is explained here, with the checker's reason.
+    const planned = new Set((plan.actions || []).map((a) => a.project || path.basename(path.dirname(a.path))));
+    const skipped = (intent.matched || []).filter((name) => !planned.has(name)).map((name) => {
+      const err = attempts.flatMap((a) => a.errors).find((e) => e.includes(name));
+      return `I left ${name} alone: ${err ? err.replace(/^Rebuild proof failed: /, '').replace(`${name} `, 'it ') : "I couldn't prove its build folders can be rebuilt."}`;
+    });
+    // U1: a size target gets a straight answer.
+    const target = request.match(/(\d+(?:\.\d+)?)\s*gb/i);
+    const offered = (plan.actions || []).reduce((n, a) => n + (sizes.get(a.path) || 0), 0);
+    const goal = target && (plan.actions || []).length ? `I can safely free about ${formatBytes(offered)} of the ${target[1]} GB you asked for.` : null;
+    // U8: a folder with no zone starts everything unchecked; say why and what to do.
+    const noZone = check.needsApproval.length && /no zone set/.test(this.profile.zoneInfo(this.folder).reason)
+      ? 'This folder has no zone yet, so every change here starts unchecked (ASK FIRST). Check the ones you want, or set this folder to FREE on the right.' : null;
     return {
       mode: this.mode,
       planId,
       oneLine,
-      summary: [saved && saved.summary, plan.summary, leftOut].filter(Boolean).join('\n'),
-      actions: plan.actions || [],
+      summary: [saved && saved.summary, plan.summary, ...skipped, goal, leftOut, noZone].filter(Boolean).join('\n'),
+      // Each action carries its size, so the card can total what's checked (U8).
+      actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) || 0 })),
       questions,
       attempts,
       bytesFreed: check.bytesFreed,
@@ -289,10 +374,53 @@ class Engine {
     };
   }
 
+  // Plans, validates, and feeds the errors back until the plan passes or the tries run out.
+  async attemptPlan(request, ctx, onAttempt = () => {}) {
+    const attempts = [];
+    let previous = null;
+    let plan;
+    let check;
+    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined, local: this.mode === 'local' }), this.planTimeoutMs);
+      // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
+      plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
+      check = validate(plan, ctx);
+      const attempt = { attempt: i, ok: check.ok, errors: check.errors.map((e) => e.message) };
+      attempts.push(attempt);
+      onAttempt(attempt);
+      if (check.ok) break;
+      previous = { plan, errors: check.errors };
+    }
+    return { plan, check, attempts };
+  }
+
   // US-08: Xcode build data and simulators unused long enough to offer. Run again at approval, so a
   // project rebuilt or a simulator booted since the plan was made is refused.
   findXcode() {
     return xcodeItems({ home: this.home, run: this.xcodeRun });
+  }
+
+  // Counts per action type for the usage log (round 3 F12).
+  countOpsFor(actions) {
+    return countOps(actions);
+  }
+
+  // US-16: about how much a cleanup could free, from the last scan, for the storage-watch notification.
+  // U2: only build folders that pass the rebuild proof count, the same ones a plan would offer.
+  estimateFreeable() {
+    const rebuildable = this.dev.filter((d) => d.label === 'rebuildable' && rebuildProof(d.path, { home: this.home, condaExports: this.condaExports }).ok).reduce((n, d) => n + d.bytes, 0);
+    const offered = this.ml.filter((x) => x.offered);
+    return [rebuildable, ...this.xcode.map((x) => x.bytes), ...this.docker.map((d) => d.bytes), ...offered.map((x) => x.bytes)].reduce((n, b) => n + (b || 0), 0);
+  }
+
+  // US-10: models in the Hugging Face download cache. A model used in the last 30 days is offered only if named.
+  findMl(named = []) {
+    return mlItems({ home: this.home, named });
+  }
+
+  // US-09: Docker images no container uses, and the build cache. Re-checked at approval, like Xcode.
+  findDocker() {
+    return dockerItems({ run: this.dockerRun });
   }
 
   // A reply with nothing to approve.
@@ -365,7 +493,7 @@ class Engine {
       return { ok: false, errors: ['Permanently deleting from the Trash needs your confirmation first.'] };
     }
     // Re-check the exact subset the user approved, since unchecking a mkdir can break a later move.
-    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode() });
+    const check = validate({ actions: chosen }, { scan: scan(this.folder), findings: this.findings, profile: this.profile, home: this.home, condaExports: this.condaExports, named: this.lastPlan.named, trashDir: this.trashDir, xcode: this.findXcode(), docker: this.findDocker().items, ml: this.findMl(this.lastPlan.namedModels) });
     if (!check.ok) {
       this.track('run_blocked', { errors: check.errors.length });
       return { ok: false, errors: check.errors.map((e) => e.message) };
@@ -387,7 +515,9 @@ class Engine {
       ...countOps(chosen),
     });
     this.lastPlan = null;
-    const report = this.freedReport(chosen, check.bytesFreed, measuredFreed);
+    // Only what actually ran counts toward what was freed (round 3 F5).
+    const okIds = new Set(run.results.filter((r) => r.ok).map((r) => r.id));
+    const report = this.freedReport(chosen.filter((a) => okIds.has(a.id)), check.bytesFreed, measuredFreed);
     if (uncheckedMoves && skippedFolders) {
       const zone = this.profile.zoneFor(this.folder) === 'ask' ? " They're marked ASK FIRST because this folder is an ASK zone." : '';
       const moved = `${uncheckedMoves} move${uncheckedMoves === 1 ? '' : 's'} weren't checked, so those files stayed put and I didn't create their ${skippedFolders === 1 ? 'folder' : `${skippedFolders} folders`}.${zone} Check them and approve again to move them.`;
@@ -404,18 +534,22 @@ class Engine {
     const deletedEstimate = Math.max(0, estimatedFreed - binned);
     const showBoth = deletedEstimate > 0 && Math.abs(measuredFreed - deletedEstimate) / deletedEstimate > ESTIMATE_GAP;
     const notes = [];
-    if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
+    const insideDocker = actions.filter((a) => a.op === 'remove_docker').reduce((n, a) => n + ((this.docker.find((d) => d.path === a.path) || {}).bytes || 0), 0);
+    const docker = reportDockerFreed({ insideDocker, diskChange: measuredFreed });
+    // U9: when Docker explains the gap, that one sentence is enough.
+    if (docker.showBoth) notes.push(docker.text);
+    else if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
     if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
   }
 
   answerBreakdown() {
-    const b = breakdown(this.folder);
-    const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker', ml: 'ML model caches' };
+    const b = breakdown(this.folder, { home: this.home, docker: this.docker });
+    const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker (unused)', ml: 'ML model caches' };
     const types = Object.entries(b.byType).map(([k, v]) => `${names[k]}: ${formatBytes(v)}`).join('\n');
     const top = b.topProjects.map((p, i) => `${i + 1}. ${path.basename(p.path)}: ${formatBytes(p.bytes)}`).join('\n');
     const blocked = b.unreadable.map((u) => `${u.path}: ${u.howToFix}`).join('\n');
-    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest projects:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}`;
+    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest folders:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}\nSay "free up space" and I'll plan the part I can safely get back.`;
     this.track('breakdown', { projects: b.topProjects.length, unreadable: b.unreadable.length });
     return { mode: this.mode, planId: null, summary, breakdown: b, actions: [], questions: [], attempts: [], bytesFreed: 0, needsApproval: [], warnings: [] };
   }
@@ -425,7 +559,9 @@ class Engine {
   rebuild(request, { run } = {}) {
     const recorded = this.executor.recordedRecipe(request);
     if (!recorded) return { ok: false, message: 'I can only rebuild a folder I deleted myself, using the command I saved when I deleted it.' };
-    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms }) });
+    // US-21: rebuilds are logged by category (never the path), so the pivot test can see they work.
+    const category = /^(npm|yarn|pnpm)\b/.test(recorded.command) ? 'javascript' : /^(python3?|pip|uv|poetry|conda)\b/.test(recorded.command) ? 'python' : 'other';
+    return rebuild(recorded, { ...(run && { run }), record: ({ event, ok, ms }) => this.track(event, { ok, ms, category }) });
   }
 
   undoAction(batchId, actionId) {

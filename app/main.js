@@ -1,5 +1,5 @@
 // Electron entry point: opens the window and connects the UI to the backend engine over IPC.
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -133,6 +133,8 @@ function registerIpc() {
     return profileView();
   });
   handle('set-usage', (_e, on) => engine.usage.setEnabled(on));
+  handle('go-pro', () => engine.usage.goPro());
+  handle('set-local-mode', (_e, on) => ({ notice: engine.setLocalMode(on === true), mode: engine.mode }));
   handle('export-usage', async () => {
     const res = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('desktop'), 'cleanasaurus-usage-log.jsonl') });
     if (res.canceled || !res.filePath) return null;
@@ -148,6 +150,35 @@ function registerIpc() {
   });
 }
 
+// US-16: checks the disk every hour. Past 85% full it sends one notification; clicking it opens a plan
+// preview in the app. Nothing runs until the user approves, and closing it counts as a dismissal.
+function startStorageWatch() {
+  const { StorageWatch } = require('./backend/storage-watch');
+  const watch = new StorageWatch({
+    enabled: engine.profile.data.storageWatch !== false,
+    estimate: () => engine.estimateFreeable(),
+    stateFile: path.join(engine.dataDir, 'storage-watch.json'),
+    notify: (n) => {
+      if (!Notification.isSupported()) return;
+      const note = new Notification({ title: 'Cleanasaurus', body: n.text });
+      note.on('click', () => {
+        watch.opened();
+        win.show();
+        win.focus();
+        win.webContents.send('storage-watch', n);
+      });
+      note.on('close', () => watch.dismiss());
+      note.show();
+    },
+  });
+  const tick = () => {
+    const d = diskInfo();
+    if (d && d.total) watch.check({ usedFraction: 1 - d.free / d.total });
+  };
+  tick();
+  setInterval(tick, 60 * 60 * 1000);
+}
+
 app.whenReady().then(() => {
   // Removed duplicates go to the macOS Trash (US-13); tests pass --trash-dir to keep the real Trash clean.
   // --home points the Xcode check (US-08) and the package caches at a fake home folder; the UI test uses it.
@@ -160,6 +191,7 @@ app.whenReady().then(() => {
   registerIpc();
   createWindow();
   engine.usage.onChange = () => win.webContents.send('usage', engine.usage.status());
+  if (!arg('ui-test') && !arg('tour-test') && !arg('screenshot')) startStorageWatch();
   if (arg('ui-test')) require('./test/ui-smoke')(win, arg('ui-test'));
   if (arg('tour-test')) require('./test/tour-check')(win, arg('tour-test'));
 });

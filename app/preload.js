@@ -23,4 +23,7 @@ contextBridge.exposeInMainWorld('api', {
   capture: () => ipcRenderer.invoke('capture'),
   onAttempt: (fn) => ipcRenderer.on('attempt', (_e, attempt) => fn(attempt)),
   onUsage: (fn) => ipcRenderer.on('usage', (_e, status) => fn(status)),
+  goPro: () => ipcRenderer.invoke('go-pro'),
+  setLocalMode: (on) => ipcRenderer.invoke('set-local-mode', on),
+  onStorageWatch: (fn) => ipcRenderer.on('storage-watch', (_e, n) => fn(n)),
 });

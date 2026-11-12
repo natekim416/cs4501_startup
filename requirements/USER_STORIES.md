@@ -429,7 +429,7 @@ These came up in the sessions. We're saying no for now on purpose.
 
 ## 6. Release plan
 
-**Where we are (Nov 4):** the Alpha delivered Sprints 1–3 except US-04 (19 of 29 stories done; see [tdd/README.md](../tdd/README.md#3-every-github-issue-and-its-tests)). **Beta goal:** finish Sprint 4 and US-04, then run the pivot test: 20 CS students from outside our friend group, using the app unsupervised, measured against the KPIs in [§7](#pivot-test-kpi--stories-it-depends-on).
+**Where we are (Nov 13, Beta):** every story is built except US-23, whose course-code logic is built and tested but isn't wired to read PDFs yet. The Beta also hardened the app through three internal red-team rounds and a usability pass (see [docs/REDTEAM_WALKTHROUGH.md](../docs/REDTEAM_WALKTHROUGH.md) and [tdd/README.md](../tdd/README.md)). **Next:** run the pivot test: 20 CS students from outside our friend group, using the app unsupervised, measured against the KPIs in [§7](#pivot-test-kpi--stories-it-depends-on).
 
 | Priority | Stories | Points |
 |---|---|---|

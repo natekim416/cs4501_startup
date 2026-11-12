@@ -253,7 +253,7 @@ const STEPS = [
     await win.webContents.executeJavaScript(`(async () => {
       __t.button('↶ UNDO').click();
       const last = () => [...document.querySelectorAll('.msg.bot')].pop();
-      await __t.waitFor(() => /Undone\\./.test(last().textContent) && /Xcode rebuilds it on the next build/.test(last().textContent), 'undo note');
+      await __t.waitFor(() => /Nothing to move back|Undone\\./.test(last().textContent) && /Xcode rebuilds it on the next build/.test(last().textContent), 'undo note');
       if (last().querySelector('button')) throw new Error('undo offers a button: ' + last().querySelector('button').textContent);
       return true;
     })()`);
@@ -360,6 +360,28 @@ const STEPS = [
       await __t.waitFor(() => /uncommitted/i.test(__t.botText()), 'the reason (uncommitted changes)');
       return 'ok';`);
   }],
+  ['US-21 GO PRO shows "not available yet" and changes nothing', `
+    const b = await __t.waitFor(() => document.querySelector('#gopro-btn'), 'GO PRO button');
+    b.click();
+    await __t.waitFor(() => /Pro isn't available yet/.test(__t.botText()), 'Go Pro message');
+    return 'ok';`],
+  ['US-16 the storage-watch notification opens a plan preview and runs nothing', async ({ win }) => {
+    const before = await page(win, `return (__t.botText().match(/Done! /g) || []).length;`);
+    win.webContents.send('storage-watch', { text: "You're 87% full. I can get you about 18 GB back.", action: 'open-plan-preview' });
+    return page(win, `
+      await __t.waitFor(() => /87% full/.test(__t.botText()) && /Nothing runs until you approve/.test(__t.botText()), 'storage-watch message');
+      await __t.waitFor(() => !document.body.classList.contains('busy'), 'preview to finish');
+      if ((__t.botText().match(/Done! /g) || []).length !== ${before}) throw new Error('something ran');
+      return 'preview only';`);
+  }],
+  ['US-20 LOCAL turns on local mode: the badge says LOCAL and the app explains the trade-off once', `
+    const b = await __t.waitFor(() => document.querySelector('#local-btn'), 'LOCAL button');
+    b.click();
+    await __t.waitFor(() => document.querySelector('#mode').textContent === 'LOCAL', 'LOCAL badge');
+    await __t.waitFor(() => /slower or less accurate|already offline/.test(__t.botText()), 'local-mode notice');
+    b.click();
+    await __t.waitFor(() => document.querySelector('#mode').textContent !== 'LOCAL', 'badge back');
+    return 'ok';`],
   // Last, so a failure can't strand the other steps on a foreign page. Red-team F15.
   ['SEC: the window cannot be navigated to another page or open new windows, so no other page gets the app API', async ({ win, base }) => {
     const evil = path.join(base, 'evil.html');

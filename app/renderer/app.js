@@ -3,7 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const chat = $('#chat');
 const state = { folder: null, freed: 0, home: '', currentCard: null };
 
-const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR' };
+const OP_LABEL = { mkdir: 'NEW FOLDER', move: 'MOVE', rename: 'RENAME', trash_duplicate: 'DUPLICATE', quarantine: 'QUARANTINE', delete_rebuildable: 'REBUILDABLE', clear_cache: 'CACHE', delete_from_trash: 'PERMANENT', remove_simulator: 'SIMULATOR' , remove_docker: 'DOCKER' };
 // US-08: "simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0" -> "iOS 16.0 simulator"
 const simulatorName = (p) => `${p.replace(/^simulator:.*SimRuntime\./, '').replace(/^([A-Za-z]+)-([\d-]+)$/, (_, os, v) => `${os} ${v.replace(/-/g, '.')}`)} simulator`;
 
@@ -203,7 +203,7 @@ function setDisk(disk) {
 
 function setMode(mode) {
   const m = $('#mode');
-  m.textContent = mode === 'llm' ? 'CLAUDE' : 'DEMO';
+  m.textContent = mode === 'llm' ? 'CLAUDE' : mode === 'local' ? 'LOCAL' : 'DEMO';
   m.className = `mode ${mode}`;
 }
 
@@ -264,6 +264,20 @@ async function useFolder(folder) {
   if (info.zone === 'never') text += `\nHeads up: this folder is in a NEVER zone (${info.zoneReason}), so I won't touch it.`;
   text += '\nWhat should I do?';
   botSay(text);
+  // US-17: once per semester, offer a sweep of class projects. Accepting it is an ordinary request.
+  if (info.sweep && info.sweep.offered) {
+    const offer = botSay(info.sweep.text);
+    const go = el('button', { class: 'btn btn-pink' }, 'Plan the cleanup');
+    const no = el('button', { class: 'btn' }, 'Not now');
+    go.addEventListener('click', () => {
+      go.disabled = no.disabled = true;
+      sendRequest(info.sweep.request);
+    });
+    no.addEventListener('click', () => {
+      go.disabled = no.disabled = true;
+    });
+    offer.append(el('div', { class: 'undo-row' }, go, no));
+  }
 }
 
 // ---------- Plans ----------
@@ -325,6 +339,15 @@ function showPlan(result) {
       );
     });
     const list = el('ul', { class: 'actions' }, items);
+    // U8: the header totals what's checked, so it matches what APPROVE will do.
+    const bytesOf = new Map(result.actions.map((a) => [a.id, a.bytes || 0]));
+    const title = el('span', { class: 'card-title' });
+    const retotal = () => {
+      const sum = [...list.querySelectorAll('input:checked')].reduce((n, i) => n + (bytesOf.get(i.dataset.id) || 0), 0);
+      title.textContent = `CLEANUP PLAN · FREES ${formatBytes(sum)}`;
+    };
+    list.addEventListener('change', retotal);
+    retotal();
     const approve = el('button', { class: 'btn btn-primary' }, '▶ APPROVE');
     const card = el(
       'div',
@@ -332,7 +355,7 @@ function showPlan(result) {
       el(
         'div',
         { class: 'card-head' },
-        el('span', { class: 'card-title' }, `CLEANUP PLAN · FREES ${formatBytes(result.bytesFreed)}`),
+        title,
         el('span', { class: 'badge pass' }, `PASSED CHECKS · TRY ${lastTry.attempt}/3`),
       ),
       list,
@@ -469,7 +492,9 @@ async function runPlan(planId, list, approve) {
     `Done! ${res.results.length - failed.length} actions complete. ${formatBytes(res.bytesFreed)} freed on disk.` +
       (res.freedNote ? `\n${res.freedNote}` : '') +
       (failed.length ? `\n${failed.length} could not run.` : '') +
-      `\nRemoved files are in the Trash. Deleted build folders can be rebuilt with the command I saved.`,
+      // U9: only say what's true for this run.
+      (ids.some((id) => list.querySelector(`input[data-id="${id}"][data-op="trash_duplicate"]`)) ? '\nRemoved files are in the Trash.' : '') +
+      (ids.some((id) => list.querySelector(`input[data-id="${id}"][data-op="delete_rebuildable"]`)) ? '\nDeleted build folders can be rebuilt with the command I saved.' : ''),
   );
   body.append(el('div', { class: 'undo-row' }, undo));
   // US-14: undo a single action, leaving the rest done.
@@ -505,7 +530,9 @@ async function runPlan(planId, list, approve) {
     // Red-team F6/F7: say when a file came back under a new name, or couldn't come back at all.
     const renamed = (r.restoredAs || []).map((x) => `\nA newer ${short(x.path)} was already there, so the old one came back as ${short(x.as)}.`).join('');
     const failedNote = (r.failed || []).length ? `\n${r.failed.length} step${r.failed.length === 1 ? '' : 's'} couldn't be undone (${r.failed.map((f) => `${short(f.path)}: ${f.reason}`).join('; ')}). I kept ${r.failed.length === 1 ? 'it' : 'them'} so you can try UNDO again.` : '';
-    const msg = botSay(`Undone. ${r.undone} steps reversed.${keptNote}${renamed}${failedNote}${notes}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
+    // U9/U10: lead with what happened, not "0 steps reversed".
+    const lead = r.undone ? `Undone. ${r.undone} step${r.undone === 1 ? '' : 's'} reversed.` : needs.length || notes ? 'Nothing to move back.' : 'Nothing left to undo.';
+    const msg = botSay(`${lead}${keptNote}${renamed}${failedNote}${notes ? `\nThese come back on their own:${notes}` : ''}${needs.length ? '\nThese build folders were deleted for real. One click rebuilds each one:' : ''}`);
     for (const recipe of needs) {
       const b = el('button', { class: 'btn' }, `↻ REBUILD ${short(recipe.cwd)}`);
       b.title = recipe.command;
@@ -516,7 +543,9 @@ async function runPlan(planId, list, approve) {
         setDisk(res.disk);
         b.textContent = res.ok ? '✓ REBUILT' : '✗ FAILED';
         log(res.ok ? `Rebuilt ${short(recipe.cwd)}` : `Rebuild failed: ${short(recipe.cwd)}`, res.ok ? 'pass' : 'fail');
-        botSay([res.warning, res.message].filter(Boolean).join('\n'));
+        // U11: say why a rebuild failed (first line only), e.g. a network problem vs. a broken lockfile.
+        const why = !res.ok && res.error ? `(${String(res.error).split('\n')[0].slice(0, 160)})` : null;
+        botSay([res.warning, res.message, why].filter(Boolean).join('\n'));
       });
       msg.append(el('div', { class: 'undo-row' }, b));
     }
@@ -531,6 +560,24 @@ api.onAttempt((a) => {
 });
 
 api.onUsage(renderUsage);
+
+// US-20: local mode keeps even file names on this Mac.
+$('#local-btn').addEventListener('click', async () => {
+  const on = $('#local-btn').classList.toggle('on');
+  $('#local-btn').textContent = on ? 'LOCAL: ON' : 'LOCAL: OFF';
+  const res = await api.setLocalMode(on);
+  setMode(res.mode);
+  if (res.notice) botSay(res.notice);
+});
+
+// US-21: the "Go Pro" fake door.
+$('#gopro-btn').addEventListener('click', async () => botSay((await api.goPro()).message));
+
+// US-16: the storage-watch notification opens a plan preview. Nothing runs until the user approves.
+api.onStorageWatch(async (n) => {
+  botSay(`${n.text}\nHere's a plan preview. Nothing runs until you approve it.`);
+  if (state.folder) await sendRequest('Free up space');
+});
 
 $('#usage-toggle').addEventListener('click', async () => {
   const on = !state.usageOn;
@@ -587,6 +634,10 @@ document.querySelectorAll('.zone-btn').forEach((b) =>
   $('#logo-dino').append(makeDino(44));
   const init = await api.init();
   setMode(init.mode);
+  if (init.mode === 'local') {
+    $('#local-btn').classList.add('on');
+    $('#local-btn').textContent = 'LOCAL: ON';
+  }
   setDisk(init.disk);
   renderProfile(init.profile);
   renderUsage(init.usage);

@@ -8,13 +8,13 @@
 
 | Metric | Value | How it's measured |
 |---|---|---|
-| User stories | **29** | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
-| GitHub issues logged vs. closed | **29 logged, 18 closed** (6 built in the MVP, 12 built in the Alpha). #2 is open as partial: its Xcode/Docker/ML totals wait for US-08–10 | `gh issue list`; §3 |
-| Automated tests | **129** unit and integration tests, plus a **14-step** end-to-end UI test, plus **5 live tests against the real Claude API** (`npm run test:live`, kept out of `npm test` because they need a key and cost API calls). **93 of the 129 were written before the code they test.** 25 came with the MVP's code, 6 (LLM-1…6) cover the planner that already existed, and 5 (REG-1…4 and one US-03 test) came with or after their fix | `npm test`, `npm run test:ui`, commit history |
-| Average tests per issue | **4.4** overall (129 / 29). Every issue has **at least 2 tests mapped to it** in §3 | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
-| Pass rate | **100% of runnable tests (101/101)**. Live Claude tests: **5/5** on the first run (Nov 4, [`06-live-claude-run.txt`](06-live-claude-run.txt)). Counting every test: **78% (101/129)**. The other 28 (22%) are written for stories not built yet and run as `todo`; CI fails if any of them starts passing (`npm run test:todos`) | [`05-green-run.txt`](05-green-run.txt), [`06-live-claude-run.txt`](06-live-claude-run.txt) |
-| Line coverage (`backend/` only) | **96.0%** lines, **90.4%** branches, 93.8% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Varies by about ±0.1% between runs (timing-dependent branches). Test files and scripts are excluded. The UI (renderer, main) is exercised by the end-to-end test but not measured |
-| AI-generated vs. refined | **100% AI-generated** (129 tests + 5 live tests + 14 UI steps). **25 tests added or changed because of review**, every one listed in §5 (rows 1–19). **0 refined by a team member so far** | Commit history; §5 |
+| User stories | **30** (US-30, emptying the Trash, was added in the Beta; its GitHub issue is still to be filed) | [USER_STORIES.md](../requirements/USER_STORIES.md) §4 |
+| GitHub issues logged vs. closed | **29 logged, 28 closed** after the Beta merge. #24 (US-23 first-page sorting) stays open as partial: the course-code logic is built and tested, but the app doesn't read PDFs yet | `gh issue list`; §3 |
+| Automated tests | **230** unit and integration tests, plus a **35-step** end-to-end UI test, plus **13 live tests against the real Claude API** (`npm run test:live`, kept out of `npm test` because they need a key and cost API calls). Every Beta story's tests were switched on or written before its code, and every red-team and usability finding got a failing test before its fix | `npm test`, `npm run test:ui`, commit history |
+| Average tests per issue | **7.7** per story (230 / 30). Every story has **at least 2 tests** | Shared files (`engine.test.js`, `minimal.test.js`) cover several built stories |
+| Pass rate | **100% (230/230)**, with **0 todo** left: every story now has running tests. Live Claude tests: **11/13** on the Beta run ([`07-live-claude-run.txt`](07-live-claude-run.txt)); LIVE-8 passed on rerun (it failed during a laptop sleep), and LIVE-11 couldn't finish because the API account ran out of credit | [`05-green-run.txt`](05-green-run.txt), [`07-live-claude-run.txt`](07-live-claude-run.txt) |
+| Line coverage (`backend/` only) | **97.5%** lines, **91.7%** branches, 96.3% functions | `npm run test:coverage`, [`04-coverage.txt`](04-coverage.txt). Test files and scripts are excluded; tests run with a throwaway HOME (`test/setup.js`) |
+| AI-generated vs. refined | **All drafted by Claude.** Beyond the 25 tests changed after the Alpha review, the Beta added tests from three red-team rounds (SEC, STATE, INPUT, R3) and a usability pass playing a CS student (U, N); each finding failed first. **0 tests hand-edited by a team member so far** | Commit history; §5 |
 
 ## 2. How we ran it, and what the history actually shows
 

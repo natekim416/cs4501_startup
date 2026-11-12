@@ -19,7 +19,9 @@ const TYPE_GROUP = {
 // macOS blocks some folders until the app is granted access; say how instead of skipping silently.
 const HOW_TO_FIX = 'macOS blocked this folder. Open System Settings > Privacy & Security > Full Disk Access (or Files and Folders) and allow Cleanasaurus, then scan again.';
 
-function breakdown(root, { onProgress = () => {} } = {}) {
+// home: also measure the Mac-wide stores in that home folder (Xcode's DerivedData, the Hugging Face model
+// cache). docker: what the Docker check found (US-09). Measuring is read-only.
+function breakdown(root, { onProgress = () => {}, home = null, docker = [] } = {}) {
   const byType = { javascript: 0, python: 0, xcode: 0, docker: 0, ml: 0 };
   const unreadable = [];
   let entries = [];
@@ -46,6 +48,14 @@ function breakdown(root, { onProgress = () => {} } = {}) {
     const group = TYPE_GROUP[item.type];
     if (group) byType[group] += item.bytes;
   }
+
+  // US-01: the Xcode and ML totals from their stores, in the scanned folder or the home folder, counted once.
+  for (const h of new Set([root, home].filter(Boolean).map((p) => path.resolve(p)))) {
+    const store = (...parts) => path.join(h, ...parts);
+    if (fs.existsSync(store('Library', 'Developer', 'Xcode', 'DerivedData'))) byType.xcode += measureFreeable(store('Library', 'Developer', 'Xcode', 'DerivedData'));
+    if (fs.existsSync(store('.cache', 'huggingface', 'hub'))) byType.ml += measureFreeable(store('.cache', 'huggingface', 'hub'));
+  }
+  byType.docker += docker.reduce((n, d) => n + (d.bytes || 0), 0);
 
   return { byType, topProjects: projects.sort((a, b) => b.bytes - a.bytes).slice(0, 10), unreadable };
 }

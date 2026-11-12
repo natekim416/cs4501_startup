@@ -3,7 +3,7 @@
 // never file names, folder names, or what the user typed.
 const fs = require('fs');
 
-const LABELS = { mode: ['llm', 'demo'], zone: ['free', 'ask', 'never'] };
+const LABELS = { mode: ['llm', 'demo', 'local'], zone: ['free', 'ask', 'never'], category: ['javascript', 'python', 'xcode', 'docker', 'ml', 'other'] };
 
 // Keeps only numbers, true/false, and known labels, so a file name can't slip into the log.
 function clean(fields) {
@@ -35,6 +35,12 @@ class UsageLog {
     } catch {
       return 0;
     }
+  }
+
+  // US-21: the "Go Pro" fake door. Nothing to buy yet; the click is what the pivot test measures.
+  goPro() {
+    this.record('go_pro_click');
+    return { message: "Pro isn't available yet. Want us to email you when it is? (We're counting this click; nothing is charged.)" };
   }
 
   // Turning the log off also deletes what it recorded.

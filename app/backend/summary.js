@@ -18,6 +18,8 @@ function summarize(plan, { recentlyOpened = [] } = {}) {
   if (rebuild.length) parts.push(`delete ${plural(rebuild.length, 'rebuildable folder')} (${size(rebuild.reduce((n, a) => n + (a.bytes || 0), 0))})`);
   const permanent = by('delete_from_trash');
   if (permanent.length) parts.push(`permanently delete ${plural(permanent.length, 'item')} from the Trash (${size(permanent.reduce((n, a) => n + (a.bytes || 0), 0))})`);
+  const docker = by('remove_docker');
+  if (docker.length) parts.push(`remove ${plural(docker.length, 'unused Docker item')} (${size(docker.reduce((n, a) => n + (a.bytes || 0), 0))})`);
   const caches = by('clear_cache');
   if (caches.length) parts.push(`clear ${plural(caches.length, 'package cache')}`);
   const sims = by('remove_simulator');

@@ -13,7 +13,7 @@ const { realPath } = require('./profile');
 // plan path with ".." is never allowed (red-team F3).
 const hasDotDot = (p) => typeof p === 'string' && p.split(/[\\/]/).includes('..');
 
-const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator']);
+const OPS = new Set(['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator', 'remove_docker']);
 const BIG_FILE = 1024 ** 3;
 const MAX_ACTIONS = 500;
 
@@ -24,7 +24,7 @@ function inside(child, root) {
 }
 
 // xcode: what the Xcode check found unused (US-08). Only those exact items in ~/Library can be cleaned.
-function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [] }) {
+function validate(plan, { scan, findings, profile, now, named, home, condaExports, trashDir, xcode = [], docker = [], ml = [] }) {
   const errors = [];
   const warnings = [];
   const needsApproval = [];
@@ -49,6 +49,8 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
   const removed = new Map(); // path -> the copy that must survive
   const recipes = {}; // action id -> how to rebuild what it deletes
   let bytesFreed = 0;
+  const seenIds = new Set();
+  const seenActions = new Set();
 
   plan.actions.forEach((a, i) => {
     const id = a && a.id ? a.id : `#${i + 1}`;
@@ -60,8 +62,26 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (wrong) return fail(`"${wrong}" must be text.`);
     if (!OPS.has(a.op)) return fail(`Unknown op "${a.op}". Allowed: ${[...OPS].join(', ')}.`);
     if (['path', 'dest', 'keep'].some((k) => hasDotDot(a[k]))) return fail('Paths may not contain "..". Use the full, direct path.');
+    // Round 3 F1/F2: each action has its own id (approving one id runs exactly one action), and the same
+    // thing is never planned twice.
+    if (!a.id) return fail('Every action needs an "id".');
+    if (seenIds.has(a.id)) return fail(`Two actions share the id "${a.id}". Every action needs its own id.`);
+    seenIds.add(a.id);
+    const key = `${a.op}|${a.path}`;
+    if (seenActions.has(key)) return fail(`The same ${a.op} on ${a.path} is planned twice. Keep one.`);
+    seenActions.add(key);
     // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
     // and the steps that remove it come from that check, never from the plan.
+    // US-09: a Docker image or the build cache is an id, not a file. Only what the Docker check found unused
+    // can go (never a volume, never an image a container uses), and the docker steps come from that check.
+    if (a.op === 'remove_docker') {
+      if (!a.reason) return fail('Every action needs a "reason" the user can read.');
+      const item = docker.find((d) => d.path === a.path);
+      if (!item) return fail(`${a.path} isn't a Docker image or build cache I found unused. Volumes and images a container uses are never removed.`);
+      recipes[id] = item.rebuild;
+      bytesFreed += item.bytes;
+      return;
+    }
     if (a.op === 'remove_simulator') {
       if (!a.reason) return fail('Every action needs a "reason" the user can read.');
       const sim = xcode.find((x) => x.type === 'simulator' && x.path === a.path);
@@ -85,6 +105,17 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (built) {
       recipes[id] = built.rebuild;
       bytesFreed += built.bytes;
+      return;
+    }
+    // US-10: a model in the Hugging Face download cache re-downloads when loaded. Only models the ML check
+    // offered (unused 30 days, or named) can go; anything the user saved elsewhere is never on that list.
+    const model = a.op === 'delete_rebuildable' && ml.find((x) => path.resolve(x.path) === src);
+    if (model) {
+      if (!model.offered) return fail(`${model.model} was used in the last 30 days, so I'll only remove it if you name it.`);
+      if (profile.zoneFor(src) === 'never') return fail(`${src} is in a NEVER-touch zone. Remove this action.`);
+      recipes[id] = model.rebuild;
+      bytesFreed += model.bytes;
+      if (profile.zoneFor(src) === 'ask') needsApproval.push(id);
       return;
     }
     if (a.op === 'delete_rebuildable' && isDerivedData(src, home)) {

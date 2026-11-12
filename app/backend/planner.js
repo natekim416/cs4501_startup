@@ -23,7 +23,7 @@ const PLAN_SCHEMA = {
         required: ['id', 'op', 'path', 'dest', 'keep', 'reason'],
         properties: {
           id: { type: 'string' },
-          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator'] },
+          op: { type: 'string', enum: ['mkdir', 'move', 'rename', 'trash_duplicate', 'quarantine', 'delete_rebuildable', 'clear_cache', 'delete_from_trash', 'remove_simulator', 'remove_docker'] },
           path: { type: 'string' },
           dest: { type: 'string' },
           keep: { type: 'string' },
@@ -58,6 +58,8 @@ Actions (all paths absolute; use "" for fields an op does not use):
 - clear_cache: empty the package-manager cache folder "path". Only for paths listed in package_caches, and only if the user asks about caches or wants as much space as possible.
 - delete_from_trash: permanently delete "path", an item already in the user's Trash. Only for paths listed in trash_items, and only when the user asks to empty the Trash or permanently delete trashed files. It can't be undone; the user must confirm it separately.
 - delete_rebuildable: permanently delete the folder "path" because it can be rebuilt. Only for items listed in rebuildable_items, or Xcode DerivedData folders listed in xcode_items. The validator re-checks the rebuild proof (gitignored, lockfile present, no secrets, project unchanged for 30 days, no uncommitted work) and rejects anything it can't prove.
+- delete_rebuildable also covers a downloaded ML model folder listed in ml_models (it re-downloads when loaded). Only if the user asks about models, Hugging Face, ML caches, or wants as much space as possible.
+- remove_docker: remove the Docker image or build cache "path" (an id like docker-image:abc123 or docker:build-cache). Only for items listed in docker_items, and only if the user asks about Docker, or wants as much space as possible. Never volumes.
 - remove_simulator: remove the simulator runtime "path" (an id like simulator:com.apple.CoreSimulator.SimRuntime.iOS-16-0) and its devices. Only for simulator runtimes listed in xcode_items, and only if the user asks about Xcode or simulators, or wants as much space as possible.
 
 Rules:
@@ -80,7 +82,7 @@ function describeProject(project) {
   return { course: code ? `${code.replace(/\d+$/, '').toUpperCase()} ${code.match(/\d+$/)[0]}` : null, last_changed_days: info.lastChangedDays, uncommitted: info.uncommitted };
 }
 
-function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = [], xcode = []) {
+function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItems = [], xcode = [], docker = [], ml = []) {
   const dupIndex = new Map();
   scan.duplicates.forEach((g, i) => g.files.forEach((f) => dupIndex.set(f, i + 1)));
   const files = scan.files.slice(0, MAX_FILES_IN_PROMPT).map((f) => ({
@@ -100,6 +102,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
     projects: [...new Set(dev.map((d) => d.project))].map((p) => ({ name: path.basename(p), ...describeProject(p) })),
     package_caches: caches.map((c) => ({ path: c.path, bytes: c.bytes, how: c.reason })),
     trash_items: trashItems.slice(0, MAX_FILES_IN_PROMPT).map((t) => ({ path: t.path, bytes: t.bytes })),
+    ml_models: ml.filter((x) => x.offered).map((x) => ({ path: x.path, model: x.model, bytes: x.bytes, last_used_days: x.days, how: x.reason })),
+    docker_items: docker.map((d) => ({ path: d.path, name: d.name, bytes: d.bytes, how: d.reason })),
     xcode_items: xcode.map((x) => ({ path: x.path, kind: x.type === 'simulator' ? 'simulator runtime' : 'Xcode DerivedData', bytes: x.bytes, how: x.reason })),
     zones: profile.data.zones,
     allowed_destination_roots: profile.data.targetPlan.destRoots.length ? profile.data.targetPlan.destRoots : [scan.root],
@@ -109,8 +113,8 @@ function summarizeScan(scan, findings, profile, dev = [], caches = [], trashItem
   };
 }
 
-async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey, timeout: 60000, maxRetries: 1 }) }) {
-  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems, xcode))}`;
+async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = [], docker = [], ml = [], findings, profile, previous, apiKey, client = new Anthropic({ apiKey, timeout: 60000, maxRetries: 1 }) }) {
+  let content = `User request: ${request}\n\nFolder snapshot (file names and metadata only):\n${JSON.stringify(summarizeScan(scan, findings, profile, dev, caches, trashItems, xcode, docker, ml))}`;
   if (previous) {
     content += `\n\nYour previous plan FAILED validation:\n${previous.errors.map((e) => `- ${e.action ? `[${e.action}] ` : ''}${e.message}`).join('\n')}\n\nPrevious plan:\n${JSON.stringify(previous.plan)}\n\nReturn a corrected full plan.`;
   }
@@ -143,6 +147,7 @@ async function llmPlan({ request, scan, dev, caches, trashItems = [], xcode = []
 function friendlyApiError(err) {
   const status = err && err.status;
   const code = err && (err.code || (err.cause && err.cause.code));
+  if (/credit balance is too low/i.test(String(err && err.message))) return "The Anthropic account behind this API key is out of credit, so Claude can't plan right now. Add credit in the Anthropic Console, or turn on LOCAL to keep cleaning with on-device rules.";
   if (status === 429) return 'Claude is busy right now (too many requests). Try again in a minute.';
   if (status === 401 || status === 403) return "Claude didn't accept the API key. Check the key in the .env file.";
   if (status >= 500 || status === 529) return 'Claude is having trouble right now. Try again in a few minutes.';
@@ -162,13 +167,20 @@ const CATEGORIES = [
   ['Installers', ['.dmg', '.pkg', '.zip']],
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
+// Camera and screenshot names look like course codes (IMG_4802, DSC_1234); they never name a class (U3).
+const CAMERA = /^(img|dsc|dscn|dscf|mov|vid|pxl|scn|dji|gopr|mvi|cimg|wp|photo|screen)$/i;
 
-function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
+function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], docker = [], dockerMessage = null, ml = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
-  const sortSchool = want(/school|class|course|lecture/i);
+  // "I'm done with the robotics class" is a cleanup, not a request to sort files (U5b).
+  const sortSchool = !want(/done with|finished with|over with/i) && want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
   const doneWith = want(/done with|finished with|over with/i);
-  const dedupe = want(/dup|space|storage|clean|free|copies/i) || doneWith;
+  // U6: natural wording ("delete my old node_modules", "my disk is full") is a space request too.
+  const dedupe = want(/dup|space|storage|clean|free|copies|delete|remove|node_modules|venv|reclaim|disk|full|\bgb\b/i) || doneWith;
+  // U5: when the request is clearly about code (projects, build folders), it stays on dev clutter: no
+  // quarantine, duplicate, or document-version detours.
+  const devIntent = doneWith || want(/node_modules|venv|build folders?|dependenc|projects?\b/i);
   const root = profile.data.targetPlan.destRoots[0] || scan.root;
   const actions = [];
   const questions = [];
@@ -198,6 +210,21 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     for (const t of trashItems) add({ op: 'delete_from_trash', path: t.path, reason: `${t.name} is already in the Trash` });
     return { summary: trashItems.length ? `Your Trash has ${trashItems.length} item(s). Check the ones to delete for good.` : 'Your Trash is empty.', actions, questions };
   }
+  // US-10: an ML-cache request plans only downloaded models the ML check offered.
+  if (want(/hugging ?face|pytorch|\bmodels?\b|ml cache/i) || ml.some((x) => x.named)) {
+    // Naming a model means that model only (N2).
+    const offered = ml.some((x) => x.named) ? ml.filter((x) => x.named) : ml.filter((x) => x.offered);
+    for (const x of offered) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
+    const named = ml.some((x) => x.named);
+    const summary = named ? `Here's the model you named: ${offered.map((x) => x.model).join(', ')}. It re-downloads the next time you load it.` : offered.length ? `I found ${offered.length} downloaded model(s) you haven't used in 30 days.` : "I didn't find any downloaded models you haven't used in 30 days.";
+    return { summary, actions, questions };
+  }
+  // US-09: a Docker request plans only Docker's own clutter, nothing in the folder.
+  if (want(/docker|containers?\b|images?\b.*docker/i)) {
+    for (const d of docker) add({ op: 'remove_docker', path: d.path, reason: d.reason });
+    const summary = dockerMessage || (docker.length ? `I found ${docker.length} Docker item(s) nothing uses. Volumes are never touched.` : "I didn't find any Docker images or build cache that nothing uses.");
+    return { summary, actions, questions };
+  }
   // US-08: an Xcode request plans only Xcode's own clutter, nothing in the folder.
   if (want(/xcode|simulators?|derived ?data/i)) {
     for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
@@ -206,7 +233,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
   if (want(/cache/i)) {
     for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
   }
-  for (const f of findings) {
+  for (const f of devIntent ? [] : findings) {
     if (guarded(f.path)) continue;
     add({ op: 'quarantine', path: f.path, reason: f.evidence.join('; ') });
     gone.add(f.path);
@@ -216,15 +243,28 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     // ("done with CS 3140"), only those; if it's ambiguous, ask instead.
     if (intent.ambiguous) questions.push(intent.ambiguous);
     const named = new Set(intent.matched);
+    // "delete my old node_modules" means node_modules; "my venvs" means Python environments (N4).
+    const onlyType = want(/node_modules/i) && !want(/venv|python|conda/i) ? 'node_modules' : want(/venv|python|conda/i) && !want(/node_modules/i) ? 'python' : null;
     for (const d of dev) {
       if (d.label !== 'rebuildable' || rejected.has(d.path) || intent.ambiguous) continue;
+      if (onlyType === 'node_modules' && d.type !== 'node_modules') continue;
+      if (onlyType === 'python' && !['python-venv', 'conda-env'].includes(d.type)) continue;
       const project = path.basename(d.project);
       if (doneWith && !named.has(project)) continue;
       if ((intent.kept || []).includes(project)) continue;
       const why = named.has(project) ? `${project}: you said you're done with it. ${d.reason}` : `${project}: ${d.reason}`;
       add({ op: 'delete_rebuildable', path: d.path, project, reason: why });
     }
-    for (const g of doneWith ? [] : scan.duplicates) {
+    // U1: a general space request also offers what Docker, old models, and Xcode can give back. Not for a
+    // request about duplicates or organizing (N1).
+    const spaceIntent = want(/space|storage|free up|reclaim|disk|full|\bgb\b|as much|everything/i) && !want(/dup|copies|organi[sz]e|sort|tidy/i);
+    if (spaceIntent && !devIntent && !intent.matched.length) {
+      for (const d of docker) add({ op: 'remove_docker', path: d.path, reason: d.reason });
+      for (const x of ml.filter((m) => m.offered)) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
+      for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
+      if (want(/as much|everything|\d+\s*gb/i) && !want(/cache/i)) for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
+    }
+    for (const g of devIntent ? [] : scan.duplicates) {
       const [keep, ...rest] = g.files;
       for (const p of rest) {
         if (gone.has(p) || gone.has(keep) || guarded(p)) continue;
@@ -235,9 +275,9 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
       }
     }
   }
-  // Similar names with different contents are versions: ask instead of guessing.
+  // Similar names with different contents are versions: ask instead of guessing. Only when organizing (U5).
   const byStem = new Map();
-  for (const f of scan.files) {
+  for (const f of sortSchool || sortAll ? scan.files : []) {
     // Files inside code projects are source, not versions of a document.
     if (profile.zoneFor(f.path) === 'never' || guarded(f.path)) continue;
     const stem = f.name.toLowerCase().replace(/\s*\(\d+\)|[-_ ]?(final|v\d+|copy)(?=[-_ .(]|$)/gi, '');
@@ -268,7 +308,8 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     for (const f of scan.files) {
       if (gone.has(f.path) || versionFiles.has(f.path) || f.isBundle || guarded(f.path)) continue;
       if (path.dirname(f.path) !== scan.root) continue; // only tidy the top level
-      const course = f.name.match(COURSE);
+      const hit = f.name.match(COURSE);
+      const course = hit && !CAMERA.test(hit[1]) ? hit : null;
       let dir = null;
       if (course && (sortSchool || sortAll)) {
         dir = path.join(root, 'School', `${course[1].toUpperCase()}${course[2]}`);
@@ -281,14 +322,52 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
       add({ op: 'move', path: f.path, dest: dir, reason: course ? `Matches class ${course[1].toUpperCase()} ${course[2]}` : `${path.basename(dir)} file` });
     }
   }
-  const summary = actions.length ? `Here's my plan for "${request}".` : 'I could not find anything to do for that request.';
+  // The engine adds "(User picked …)" to the request after a question; that's internal, not for the reply (U14).
+  const asked = request.includes(' (User ') ? request.slice(0, request.indexOf(' (User ')) : request;
+  const summary = actions.length ? `Here's my plan for "${asked}".` : 'I could not find anything to do for that request.';
   return { summary, actions, questions };
 }
 
 // An injected client (tests, or a future server proxy) also means "use the LLM".
+// US-20: what the app says once when local mode is turned on.
+function localModeNotice() {
+  return "Local mode is on: nothing leaves your laptop, not even file names. Plans use on-device rules, so they may be slower or less accurate than Claude's.";
+}
+
 async function makePlan(args) {
+  // US-20: in local mode nothing goes over the network; the on-device planner makes the plan.
+  if (args.local) return { mode: 'local', plan: demoPlan(args) };
   if (args.apiKey || args.client) return { mode: 'llm', plan: await llmPlan(args) };
   return { mode: 'demo', plan: demoPlan(args) };
 }
 
-module.exports = { makePlan, demoPlan, PLAN_SCHEMA, MODEL };
+// US-22: a big folder is planned in batches small enough for one request each.
+function batches(files, size = MAX_FILES_IN_PROMPT) {
+  const out = [];
+  for (let i = 0; i < files.length; i += size) out.push(files.slice(i, i + size));
+  return out;
+}
+
+// US-22: one plan from the batch results. A batch that still failed becomes a question instead of hiding
+// the batches that worked.
+function mergeBatchPlans(results) {
+  const actions = [];
+  const questions = [];
+  const seen = new Set();
+  results.forEach((r, i) => {
+    // The same action from two batches is planned once.
+    if (r.ok) {
+      for (const a of r.actions || []) {
+        const key = a && a.op && a.path ? `${a.op}|${a.path}` : null;
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        actions.push(a);
+      }
+    }
+    // No raw checker text here: it can carry full paths (round 3 F6). The Safety Log has the details.
+    else questions.push({ text: `I couldn't make a safe plan for part ${i + 1} of this folder, so I left it out. The rest is ready.`, options: ['OK'] });
+  });
+  return { actions, questions };
+}
+
+module.exports = { localModeNotice, batches, mergeBatchPlans, MAX_FILES_IN_PROMPT, makePlan, demoPlan, PLAN_SCHEMA, MODEL };
