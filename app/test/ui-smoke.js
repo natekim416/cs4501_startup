@@ -253,7 +253,7 @@ const STEPS = [
     await win.webContents.executeJavaScript(`(async () => {
       __t.button('↶ UNDO').click();
       const last = () => [...document.querySelectorAll('.msg.bot')].pop();
-      await __t.waitFor(() => /Undone\\./.test(last().textContent) && /Xcode rebuilds it on the next build/.test(last().textContent), 'undo note');
+      await __t.waitFor(() => /Nothing to move back|Undone\\./.test(last().textContent) && /Xcode rebuilds it on the next build/.test(last().textContent), 'undo note');
       if (last().querySelector('button')) throw new Error('undo offers a button: ' + last().querySelector('button').textContent);
       return true;
     })()`);
@@ -378,7 +378,7 @@ const STEPS = [
     const b = await __t.waitFor(() => document.querySelector('#local-btn'), 'LOCAL button');
     b.click();
     await __t.waitFor(() => document.querySelector('#mode').textContent === 'LOCAL', 'LOCAL badge');
-    await __t.waitFor(() => /slower or less accurate/.test(__t.botText()), 'local-mode notice');
+    await __t.waitFor(() => /slower or less accurate|already offline/.test(__t.botText()), 'local-mode notice');
     b.click();
     await __t.waitFor(() => document.querySelector('#mode').textContent !== 'LOCAL', 'badge back');
     return 'ok';`],

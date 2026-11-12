@@ -62,6 +62,7 @@ function mlItems({ home = os.homedir(), now = Date.now(), named = [] } = {}) {
         lastUsed: new Date(used).toISOString(),
         days,
         offered: days >= UNUSED_DAYS || isNamed,
+        named: isNamed,
         label: 'rebuildable',
         reason: `${model} (${size(bytes)}), last used ${days} day${days === 1 ? '' : 's'} ago. About ${minutes} minute${minutes === 1 ? '' : 's'} to re-download.`,
         rebuild: { note: `${model} re-downloads the next time you load it.` },

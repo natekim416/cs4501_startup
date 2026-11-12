@@ -3,12 +3,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('./scanner');
-const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, INACTIVE_DAYS } = require('./devclutter');
+const { findArtifacts, lastChanged, labelPath, toolCaches, exportCondaEnv, rebuildProof, INACTIVE_DAYS } = require('./devclutter');
 const { listTrash } = require('./trash');
 const { xcodeItems, xcrunFor } = require('./ecosystems/xcode');
 const { dockerItems, dockerFor, reportDockerFreed } = require('./ecosystems/docker');
 const { mlItems } = require('./ecosystems/ml');
-const { matchProjects, matchProtect } = require('./intent');
+const { matchProjects, matchProtect, courseCodes } = require('./intent');
 const { summarize } = require('./summary');
 const { rebuild } = require('./rebuild');
 const { breakdown } = require('./breakdown');
@@ -104,7 +104,9 @@ class Engine {
     this.profile.data.localMode = Boolean(on);
     if (first) this.profile.data.localModeExplained = true;
     this.profile.save();
-    return first ? localModeNotice() : null;
+    if (!first) return null;
+    // U18: with no key, nothing was leaving the Mac anyway.
+    return this.apiKey || this.llmClient ? localModeNotice() : "You're already offline (no API key), so nothing leaves your laptop. Local mode keeps it that way.";
   }
 
   // US-17: once per semester, after it ends, offer a sweep of class projects already quiet before the end.
@@ -202,7 +204,7 @@ class Engine {
     }
     this.scanFolder(this.folder);
     // US-01: "where did my space go?" is a question, not a cleanup. Measure and answer; change nothing.
-    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown/i.test(request)) return this.answerBreakdown();
+    if (/where.*(space|storage)|what.*taking.*(space|room)|breakdown|why.*(full|no (space|room))/i.test(request)) return this.answerBreakdown();
     // Projects the request names. Only these may skip the 30-day rule, and plain code decides it, not the LLM.
     // The scanned folder itself isn't a project (a VM bundle at the top level would otherwise make it one).
     const projectNames = [...new Set(this.dev.filter((d) => d.project !== this.folder).map((d) => path.basename(d.project)))];
@@ -220,6 +222,15 @@ class Engine {
     const dev = this.dev.filter((d) => !this.profile.protectedBy(d.path, this.folder));
     const protectedNames = this.protectedHere();
     const intent = this.pendingProjects ? { matched: this.pendingProjects, kept: [], ambiguous: null, isIntent: true } : matchProjects(request, projectNames);
+    // U5: a class folder above the project counts too (~/school/CS3140/hw3 is CS 3140).
+    if (!this.pendingProjects && (intent.codes || []).length) {
+      for (const d of this.dev) {
+        const name = path.basename(d.project);
+        const parents = path.relative(this.folder, path.dirname(d.project)).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (intent.codes.some((c) => parents.includes(c)) && !intent.matched.includes(name) && !(intent.kept || []).includes(name)) intent.matched.push(name);
+      }
+      if (intent.matched.length) intent.ambiguous = null;
+    }
     this.pendingProjects = null;
     // US-10: a model the request names by name may go even if it was used recently.
     const lower = request.toLowerCase();
@@ -295,7 +306,7 @@ class Engine {
       // US-30: permanent deletes start unchecked; the user opts in and confirms.
       if (a.op === 'delete_from_trash') Object.assign(a, { checked: false, note: 'Permanent: this deletes it from the Trash for good and cannot be undone.' });
       // Xcode's own build data has its own 30-day rule (US-08); its parent folder isn't a project.
-      if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path)) continue;
+      if (a.op !== 'delete_rebuildable' || this.xcode.some((x) => x.path === a.path) || this.ml.some((x) => x.path === a.path)) continue;
       const days = Math.floor((Date.now() - lastChanged(path.dirname(a.path))) / 864e5);
       if (days < INACTIVE_DAYS) Object.assign(a, { checked: false, note: `${path.basename(path.dirname(a.path))} is still active (changed ${days} day${days === 1 ? '' : 's'} ago). Check it only if you're sure.` });
     }
@@ -326,12 +337,26 @@ class Engine {
     });
     const oneLine = summarize({ folder: this.folder, actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) })) }, { recentlyOpened });
     const leftOut = protectedNames.length ? `Protected in DINO MEMORY, so I left out ${listWords(protectedNames)}.` : null;
+    // U4: a project the student named that the plan leaves out is explained here, with the checker's reason.
+    const planned = new Set((plan.actions || []).map((a) => a.project || path.basename(path.dirname(a.path))));
+    const skipped = (intent.matched || []).filter((name) => !planned.has(name)).map((name) => {
+      const err = attempts.flatMap((a) => a.errors).find((e) => e.includes(name));
+      return `I left ${name} alone: ${err ? err.replace(/^Rebuild proof failed: /, '').replace(`${name} `, 'it ') : "I couldn't prove its build folders can be rebuilt."}`;
+    });
+    // U1: a size target gets a straight answer.
+    const target = request.match(/(\d+(?:\.\d+)?)\s*gb/i);
+    const offered = (plan.actions || []).reduce((n, a) => n + (sizes.get(a.path) || 0), 0);
+    const goal = target && (plan.actions || []).length ? `I can safely free about ${formatBytes(offered)} of the ${target[1]} GB you asked for.` : null;
+    // U8: a folder with no zone starts everything unchecked; say why and what to do.
+    const noZone = check.needsApproval.length && /no zone set/.test(this.profile.zoneInfo(this.folder).reason)
+      ? 'This folder has no zone yet, so every change here starts unchecked (ASK FIRST). Check the ones you want, or set this folder to FREE on the right.' : null;
     return {
       mode: this.mode,
       planId,
       oneLine,
-      summary: [saved && saved.summary, plan.summary, leftOut].filter(Boolean).join('\n'),
-      actions: plan.actions || [],
+      summary: [saved && saved.summary, plan.summary, ...skipped, goal, leftOut, noZone].filter(Boolean).join('\n'),
+      // Each action carries its size, so the card can total what's checked (U8).
+      actions: (plan.actions || []).map((a) => ({ ...a, bytes: sizes.get(a.path) || 0 })),
       questions,
       attempts,
       bytesFreed: check.bytesFreed,
@@ -369,8 +394,9 @@ class Engine {
   }
 
   // US-16: about how much a cleanup could free, from the last scan, for the storage-watch notification.
+  // U2: only build folders that pass the rebuild proof count, the same ones a plan would offer.
   estimateFreeable() {
-    const rebuildable = this.dev.filter((d) => d.label === 'rebuildable').reduce((n, d) => n + d.bytes, 0);
+    const rebuildable = this.dev.filter((d) => d.label === 'rebuildable' && rebuildProof(d.path, { home: this.home, condaExports: this.condaExports }).ok).reduce((n, d) => n + d.bytes, 0);
     const offered = this.ml.filter((x) => x.offered);
     return [rebuildable, ...this.xcode.map((x) => x.bytes), ...this.docker.map((d) => d.bytes), ...offered.map((x) => x.bytes)].reduce((n, b) => n + (b || 0), 0);
   }
@@ -496,21 +522,22 @@ class Engine {
     const deletedEstimate = Math.max(0, estimatedFreed - binned);
     const showBoth = deletedEstimate > 0 && Math.abs(measuredFreed - deletedEstimate) / deletedEstimate > ESTIMATE_GAP;
     const notes = [];
-    if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
-    if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     const insideDocker = actions.filter((a) => a.op === 'remove_docker').reduce((n, a) => n + ((this.docker.find((d) => d.path === a.path) || {}).bytes || 0), 0);
     const docker = reportDockerFreed({ insideDocker, diskChange: measuredFreed });
+    // U9: when Docker explains the gap, that one sentence is enough.
     if (docker.showBoth) notes.push(docker.text);
+    else if (showBoth) notes.push(`Measured ${formatBytes(measuredFreed)} freed on disk (estimated ${formatBytes(deletedEstimate)}).`);
+    if (binned) notes.push(`${formatBytes(binned)} moved to ${this.binName} frees up when you empty it.`);
     return { bytesFreed: measuredFreed, measuredFreed, estimatedFreed, binnedBytes: binned, showBoth, freedNote: notes.join(' ') };
   }
 
   answerBreakdown() {
     const b = breakdown(this.folder, { home: this.home, docker: this.docker });
-    const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker', ml: 'ML model caches' };
+    const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker (unused)', ml: 'ML model caches' };
     const types = Object.entries(b.byType).map(([k, v]) => `${names[k]}: ${formatBytes(v)}`).join('\n');
     const top = b.topProjects.map((p, i) => `${i + 1}. ${path.basename(p.path)}: ${formatBytes(p.bytes)}`).join('\n');
     const blocked = b.unreadable.map((u) => `${u.path}: ${u.howToFix}`).join('\n');
-    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest projects:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}`;
+    const summary = `Here's where your space went. Nothing has changed yet.\n${types}\nLargest folders:\n${top}${blocked ? `\nI couldn't read:\n${blocked}` : ''}\nSay "free up space" and I'll plan the part I can safely get back.`;
     this.track('breakdown', { projects: b.topProjects.length, unreadable: b.unreadable.length });
     return { mode: this.mode, planId: null, summary, breakdown: b, actions: [], questions: [], attempts: [], bytesFreed: 0, needsApproval: [], warnings: [] };
   }

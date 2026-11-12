@@ -167,13 +167,19 @@ const CATEGORIES = [
   ['Installers', ['.dmg', '.pkg', '.zip']],
 ];
 const COURSE = /(?<![A-Za-z])([A-Z]{2,4})[ _-]?(\d{4})(?!\d)/i;
+// Camera and screenshot names look like course codes (IMG_4802, DSC_1234); they never name a class (U3).
+const CAMERA = /^(img|dsc|dscn|dscf|mov|vid|pxl|scn|dji|gopr|mvi|cimg|wp|photo|screen)$/i;
 
 function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode = [], docker = [], dockerMessage = null, ml = [], findings, profile, previous, intent = { matched: [], isIntent: false } }) {
   const want = (re) => re.test(request);
   const sortSchool = want(/school|class|course|lecture/i);
   const sortAll = want(/organi[sz]e|sort|tidy|clean up|folders?/i);
   const doneWith = want(/done with|finished with|over with/i);
-  const dedupe = want(/dup|space|storage|clean|free|copies/i) || doneWith;
+  // U6: natural wording ("delete my old node_modules", "my disk is full") is a space request too.
+  const dedupe = want(/dup|space|storage|clean|free|copies|delete|remove|node_modules|venv|reclaim|disk|full|\bgb\b/i) || doneWith;
+  // U5: when the request is clearly about code (projects, build folders), it stays on dev clutter: no
+  // quarantine, duplicate, or document-version detours.
+  const devIntent = doneWith || want(/node_modules|venv|build folders?|dependenc|projects?\b/i);
   const root = profile.data.targetPlan.destRoots[0] || scan.root;
   const actions = [];
   const questions = [];
@@ -204,7 +210,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     return { summary: trashItems.length ? `Your Trash has ${trashItems.length} item(s). Check the ones to delete for good.` : 'Your Trash is empty.', actions, questions };
   }
   // US-10: an ML-cache request plans only downloaded models the ML check offered.
-  if (want(/hugging ?face|pytorch|\bmodels?\b|ml cache/i)) {
+  if (want(/hugging ?face|pytorch|\bmodels?\b|ml cache/i) || ml.some((x) => x.named)) {
     const offered = ml.filter((x) => x.offered);
     for (const x of offered) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
     return { summary: offered.length ? `I found ${offered.length} downloaded model(s) you haven't used in 30 days.` : "I didn't find any downloaded models you haven't used in 30 days.", actions, questions };
@@ -223,7 +229,7 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
   if (want(/cache/i)) {
     for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
   }
-  for (const f of findings) {
+  for (const f of devIntent ? [] : findings) {
     if (guarded(f.path)) continue;
     add({ op: 'quarantine', path: f.path, reason: f.evidence.join('; ') });
     gone.add(f.path);
@@ -241,7 +247,14 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
       const why = named.has(project) ? `${project}: you said you're done with it. ${d.reason}` : `${project}: ${d.reason}`;
       add({ op: 'delete_rebuildable', path: d.path, project, reason: why });
     }
-    for (const g of doneWith ? [] : scan.duplicates) {
+    // U1: a general space request also offers what Docker, old models, and Xcode can give back.
+    if (!devIntent && !intent.matched.length) {
+      for (const d of docker) add({ op: 'remove_docker', path: d.path, reason: d.reason });
+      for (const x of ml.filter((m) => m.offered)) add({ op: 'delete_rebuildable', path: x.path, reason: x.reason });
+      for (const x of xcode) add({ op: x.type === 'simulator' ? 'remove_simulator' : 'delete_rebuildable', path: x.path, reason: x.reason });
+      if (want(/as much|everything|\d+\s*gb/i) && !want(/cache/i)) for (const c of caches) add({ op: 'clear_cache', path: c.path, reason: c.reason });
+    }
+    for (const g of devIntent ? [] : scan.duplicates) {
       const [keep, ...rest] = g.files;
       for (const p of rest) {
         if (gone.has(p) || gone.has(keep) || guarded(p)) continue;
@@ -252,9 +265,9 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
       }
     }
   }
-  // Similar names with different contents are versions: ask instead of guessing.
+  // Similar names with different contents are versions: ask instead of guessing. Only when organizing (U5).
   const byStem = new Map();
-  for (const f of scan.files) {
+  for (const f of sortSchool || sortAll ? scan.files : []) {
     // Files inside code projects are source, not versions of a document.
     if (profile.zoneFor(f.path) === 'never' || guarded(f.path)) continue;
     const stem = f.name.toLowerCase().replace(/\s*\(\d+\)|[-_ ]?(final|v\d+|copy)(?=[-_ .(]|$)/gi, '');
@@ -285,7 +298,8 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
     for (const f of scan.files) {
       if (gone.has(f.path) || versionFiles.has(f.path) || f.isBundle || guarded(f.path)) continue;
       if (path.dirname(f.path) !== scan.root) continue; // only tidy the top level
-      const course = f.name.match(COURSE);
+      const hit = f.name.match(COURSE);
+      const course = hit && !CAMERA.test(hit[1]) ? hit : null;
       let dir = null;
       if (course && (sortSchool || sortAll)) {
         dir = path.join(root, 'School', `${course[1].toUpperCase()}${course[2]}`);
@@ -298,7 +312,9 @@ function demoPlan({ request, scan, dev = [], caches = [], trashItems = [], xcode
       add({ op: 'move', path: f.path, dest: dir, reason: course ? `Matches class ${course[1].toUpperCase()} ${course[2]}` : `${path.basename(dir)} file` });
     }
   }
-  const summary = actions.length ? `Here's my plan for "${request}".` : 'I could not find anything to do for that request.';
+  // The engine adds "(User picked …)" to the request after a question; that's internal, not for the reply (U14).
+  const asked = request.includes(' (User ') ? request.slice(0, request.indexOf(' (User ')) : request;
+  const summary = actions.length ? `Here's my plan for "${asked}".` : 'I could not find anything to do for that request.';
   return { summary, actions, questions };
 }
 

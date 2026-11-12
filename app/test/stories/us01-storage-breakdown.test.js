@@ -85,7 +85,7 @@ test('US-01 "Where did my space go?" reports measured Xcode, Docker, and ML tota
   engine.scanFolder(folder);
   const res = await engine.plan('Where did my space go?');
   assert.match(res.summary, /Xcode build data: [1-9]/);
-  assert.match(res.summary, /Docker: 1\.1 GB/);
+  assert.match(res.summary, /Docker \(unused\): 1\.1 GB/);
   assert.match(res.summary, /ML model caches: [1-9]/);
   assert.strictEqual(res.actions.length, 0, 'the breakdown changes nothing');
 });
