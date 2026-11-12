@@ -49,6 +49,8 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
   const removed = new Map(); // path -> the copy that must survive
   const recipes = {}; // action id -> how to rebuild what it deletes
   let bytesFreed = 0;
+  const seenIds = new Set();
+  const seenActions = new Set();
 
   plan.actions.forEach((a, i) => {
     const id = a && a.id ? a.id : `#${i + 1}`;
@@ -60,6 +62,14 @@ function validate(plan, { scan, findings, profile, now, named, home, condaExport
     if (wrong) return fail(`"${wrong}" must be text.`);
     if (!OPS.has(a.op)) return fail(`Unknown op "${a.op}". Allowed: ${[...OPS].join(', ')}.`);
     if (['path', 'dest', 'keep'].some((k) => hasDotDot(a[k]))) return fail('Paths may not contain "..". Use the full, direct path.');
+    // Round 3 F1/F2: each action has its own id (approving one id runs exactly one action), and the same
+    // thing is never planned twice.
+    if (!a.id) return fail('Every action needs an "id".');
+    if (seenIds.has(a.id)) return fail(`Two actions share the id "${a.id}". Every action needs its own id.`);
+    seenIds.add(a.id);
+    const key = `${a.op}|${a.path}`;
+    if (seenActions.has(key)) return fail(`The same ${a.op} on ${a.path} is planned twice. Keep one.`);
+    seenActions.add(key);
     // US-08: a simulator runtime is an id, not a file. Only a runtime the Xcode check found unused can go,
     // and the steps that remove it come from that check, never from the plan.
     // US-09: a Docker image or the build cache is an id, not a file. Only what the Docker check found unused

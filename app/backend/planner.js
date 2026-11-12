@@ -327,8 +327,17 @@ function batches(files, size = MAX_FILES_IN_PROMPT) {
 function mergeBatchPlans(results) {
   const actions = [];
   const questions = [];
+  const seen = new Set();
   results.forEach((r, i) => {
-    if (r.ok) actions.push(...(r.actions || []));
+    // The same action from two batches is planned once.
+    if (r.ok) {
+      for (const a of r.actions || []) {
+        const key = a && a.op && a.path ? `${a.op}|${a.path}` : null;
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        actions.push(a);
+      }
+    }
     else questions.push({ text: `I couldn't make a safe plan for part ${i + 1} of this folder, so I left it out. The rest is ready.${r.error ? ` (${r.error})` : ''}`, options: ['OK'] });
   });
   return { actions, questions };

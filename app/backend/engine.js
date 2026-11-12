@@ -57,6 +57,8 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+const MAX_ACTIONS_PER_PLAN = 500;
+
 class Engine {
   constructor({ dataDir = path.join(os.homedir(), '.cleanasaurus'), apiKey = process.env.ANTHROPIC_API_KEY, diskFree = diskFreeBytes, llmClient = null, home = os.homedir(), condaRun, trashDir = null, xcodeRun = null , planTimeoutMs = 90000, dockerRun = null } = {}) {
     this.planTimeoutMs = planTimeoutMs;
@@ -91,7 +93,8 @@ class Engine {
   }
 
   get mode() {
-    if (this.profile.data.localMode) return 'local';
+    // A profile we couldn't read may have had local mode on, so fail closed: nothing leaves the Mac (round 3 F7).
+    if (this.profile.data.localMode || this.profile.corrupt) return 'local';
     return this.apiKey || this.llmClient ? 'llm' : 'demo';
   }
 
@@ -232,12 +235,20 @@ class Engine {
       for (const [n, group] of groups.entries()) {
         const inBatch = new Set(group.map((f) => f.path));
         const scanPart = { ...this.snapshot, files: group, duplicates: this.snapshot.duplicates.filter((g) => g.files.every((f) => inBatch.has(f))) };
-        const r = await this.attemptPlan(request, { ...ctx, scan: scanPart }, onAttempt);
+        // Mac-wide items (build folders, caches, Docker, models, Xcode, the Trash) go to the first batch only,
+        // so each is planned once (round 3 F2).
+        const part = n === 0 ? { ...ctx, scan: scanPart } : { ...ctx, scan: scanPart, dev: [], caches: [], trashItems: [], xcode: [], docker: [], ml: [] };
+        const r = await this.attemptPlan(request, part, onAttempt);
         attempts.push(...r.attempts.map((a) => ({ ...a, batch: n + 1 })));
         const actions = (Array.isArray(r.plan.actions) ? r.plan.actions : []).filter((a) => a && typeof a === 'object').map((a) => ({ ...a, id: `b${n + 1}-${a.id}` }));
         results.push({ ok: r.check.ok, actions, error: r.check.ok ? null : r.check.errors[0] && r.check.errors[0].message });
       }
       const merged = mergeBatchPlans(results);
+      // One plan is capped at 500 actions; keep the first 500 and say so, rather than drop it all (round 3 F3).
+      if (merged.actions.length > MAX_ACTIONS_PER_PLAN) {
+        merged.actions = merged.actions.slice(0, MAX_ACTIONS_PER_PLAN);
+        merged.questions.push({ text: `This folder needs more than ${MAX_ACTIONS_PER_PLAN} changes, so this plan has the first ${MAX_ACTIONS_PER_PLAN}. Approve it, then ask again for the rest.`, options: ['OK'] });
+      }
       plan = { summary: `I planned this folder in ${groups.length} parts of up to ${MAX_FILES_IN_PROMPT} files.`, actions: merged.actions, questions: merged.questions };
       check = validate(plan, ctx);
     } else {
@@ -338,7 +349,7 @@ class Engine {
     let plan;
     let check;
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined, local: Boolean(this.profile.data.localMode) }), this.planTimeoutMs);
+      const made = await withTimeout(makePlan({ request, ...ctx, previous, apiKey: this.apiKey, client: this.llmClient || undefined, local: this.mode === 'local' }), this.planTimeoutMs);
       // Red-team F11: whatever comes back, the rest of the app only ever sees a plan-shaped object.
       plan = made.plan && typeof made.plan === 'object' ? made.plan : { summary: '', actions: null, questions: [] };
       check = validate(plan, ctx);
@@ -466,7 +477,9 @@ class Engine {
       ...countOps(chosen),
     });
     this.lastPlan = null;
-    const report = this.freedReport(chosen, check.bytesFreed, measuredFreed);
+    // Only what actually ran counts toward what was freed (round 3 F5).
+    const okIds = new Set(run.results.filter((r) => r.ok).map((r) => r.id));
+    const report = this.freedReport(chosen.filter((a) => okIds.has(a.id)), check.bytesFreed, measuredFreed);
     if (uncheckedMoves && skippedFolders) {
       const zone = this.profile.zoneFor(this.folder) === 'ask' ? " They're marked ASK FIRST because this folder is an ASK zone." : '';
       const moved = `${uncheckedMoves} move${uncheckedMoves === 1 ? '' : 's'} weren't checked, so those files stayed put and I didn't create their ${skippedFolders === 1 ? 'folder' : `${skippedFolders} folders`}.${zone} Check them and approve again to move them.`;

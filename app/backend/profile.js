@@ -33,8 +33,10 @@ class Profile {
     this.data = structuredClone(DEFAULT_PROFILE);
     try {
       this.data = { ...this.data, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
-    } catch {
-      // First run: keep the defaults.
+    } catch (err) {
+      // First run: keep the defaults. A file that exists but can't be read means settings like local mode
+      // are unknown, so the engine fails closed (round 3 F7).
+      if (err.code !== 'ENOENT') this.corrupt = true;
     }
   }
 
