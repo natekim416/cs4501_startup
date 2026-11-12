@@ -437,7 +437,7 @@ class Engine {
   }
 
   answerBreakdown() {
-    const b = breakdown(this.folder);
+    const b = breakdown(this.folder, { home: this.home, docker: this.docker });
     const names = { javascript: 'JavaScript packages', python: 'Python environments', xcode: 'Xcode build data', docker: 'Docker', ml: 'ML model caches' };
     const types = Object.entries(b.byType).map(([k, v]) => `${names[k]}: ${formatBytes(v)}`).join('\n');
     const top = b.topProjects.map((p, i) => `${i + 1}. ${path.basename(p.path)}: ${formatBytes(p.bytes)}`).join('\n');

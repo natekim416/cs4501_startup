@@ -60,10 +60,32 @@ test('US-01 asking "where did my space go?" answers with the breakdown and propo
   assert.ok(res.breakdown && res.breakdown.byType.javascript > 0);
 });
 
-test('US-01 Xcode, Docker, and ML totals are measured, not just present as keys (partial until US-08–10)', { todo: 'US-01 (#2): needs US-08, US-09, US-10' }, () => {
+test('US-01 Xcode, Docker, and ML totals are measured, not just present as keys', () => {
   const { breakdown } = require('../../backend/breakdown');
   const root = tmp();
   write(path.join(root, 'Library', 'Developer', 'Xcode', 'DerivedData', 'App-abc', 'Build', 'x.o'), 'x'.repeat(4096));
   const b = breakdown(root);
   assert.ok(b.byType.xcode > 0, 'DerivedData should count toward Xcode');
+});
+
+test('US-01 "Where did my space go?" reports measured Xcode, Docker, and ML totals from this Mac', async () => {
+  const { Engine } = require('../../backend/engine');
+  const home = tmp();
+  write(path.join(home, 'Library', 'Developer', 'Xcode', 'DerivedData', 'App-abc', 'Build', 'x.o'), 'x'.repeat(2 * 1e6));
+  write(path.join(home, '.cache', 'huggingface', 'hub', 'models--org--m', 'snapshots', 'a', 'w.bin'), 'w'.repeat(3 * 1e6));
+  const docker = (cmd, args) => {
+    const a = args.join(' ');
+    if (a.startsWith('image ls')) return '{"ID":"img2","Repository":"node","Tag":"18","Size":"1.1GB"}';
+    if (a.startsWith('builder du')) return 'Total: 0B';
+    return a.startsWith('info') ? '{}' : '';
+  };
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home, trashDir: tmp(), dockerRun: docker });
+  const folder = tmp();
+  engine.profile.setZone(folder, 'free');
+  engine.scanFolder(folder);
+  const res = await engine.plan('Where did my space go?');
+  assert.match(res.summary, /Xcode build data: [1-9]/);
+  assert.match(res.summary, /Docker: 1\.1 GB/);
+  assert.match(res.summary, /ML model caches: [1-9]/);
+  assert.strictEqual(res.actions.length, 0, 'the breakdown changes nothing');
 });
