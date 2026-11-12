@@ -96,3 +96,14 @@ test('INPUT-6 the target plan only accepts real folders outside NEVER zones', ()
   profile.setTargetPlan({ destRoots: [ok] });
   assert.deepStrictEqual(profile.data.targetPlan.destRoots, [ok]);
 });
+
+test('INPUT-7 a folder to scan must be a full path to a real folder (red-team round 2 note)', () => {
+  const engine = new Engine({ dataDir: tmp(), apiKey: '', home: tmp(), trashDir: tmp() });
+  assert.throws(() => engine.openFolder('Downloads'), /full path/);
+  assert.throws(() => engine.openFolder(42), /full path/);
+  assert.throws(() => engine.openFolder(path.join(tmp(), 'missing')), /isn't a folder/);
+  const file = write(path.join(tmp(), 'a.txt'), 'x');
+  assert.throws(() => engine.openFolder(file), /isn't a folder/);
+  const ok = tmp();
+  assert.strictEqual(engine.openFolder(ok).folder, ok);
+});

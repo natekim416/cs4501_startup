@@ -94,6 +94,9 @@ class Engine {
 
   // The user picked or rescanned a folder. plan() also rescans, so only this counts as a scan in the log.
   openFolder(folder) {
+    // The page picks a folder; it must be a full path to a real folder (red-team round 2 note).
+    if (typeof folder !== 'string' || !path.isAbsolute(folder)) throw new Error('Pick a folder with its full path.');
+    if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`${folder} isn't a folder I can open.`);
     const info = this.scanFolder(folder);
     this.track('scan', {
       files: info.fileCount,
